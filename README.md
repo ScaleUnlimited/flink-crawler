@@ -25,5 +25,9 @@ Whenever normalization changes, the crawl state potentially becomes invalid.
 
 Use WARC? Or Avro?
 
+## Testing
+
+We should resurrect the web graph support (was used by Bixo at one point), as well as a pluggable synthetic graph generator, and use both for integration testing that isn't going to need external web access.
+
 
 
