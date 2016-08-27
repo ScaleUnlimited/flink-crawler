@@ -29,6 +29,8 @@ Use WARC? Or Avro?
 
 We should resurrect the web graph support (was used by Bixo at one point), as well as a pluggable synthetic graph generator, and use both for integration testing that isn't going to need external web access.
 
+There's a new [flink-spector](https://github.com/ottogroup/flink-spector) test library for Flink that looks interesting.
+
 # Flink
 
 ## Documentation
