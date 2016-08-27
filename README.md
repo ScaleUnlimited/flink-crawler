@@ -29,5 +29,16 @@ Use WARC? Or Avro?
 
 We should resurrect the web graph support (was used by Bixo at one point), as well as a pluggable synthetic graph generator, and use both for integration testing that isn't going to need external web access.
 
+# Flink
 
+## Documentation
 
+https://ci.apache.org/projects/flink/flink-docs-release-1.1/apis/streaming/index.html
+
+## Tutorials
+
+http://data-artisans.com/robust-stream-processing-flink-walkthrough/
+
+## Interesting talks
+
+http://www.slideshare.net/tillrohrmann/fault-tolerance-and-job-recovery-in-apache-flink
