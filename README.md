@@ -17,6 +17,18 @@ We could save state using Elasticsearch.
 
 We could craft our own "spill-to-disk" solution, as the set of active URLs (top URLs that should be fetched soon, for unique domains) is often pretty small. The bulk of URLs wind up being endless product links on big eCommerce sites, or spammy link farm URLs, etc. So having a "hot set" in memory that we can query, and a larger set on disk that occasionally gets scanned, is one option. There was a single-server crawler project called [IRLBot](http://irl.cs.tamu.edu/crawler/) that did something like this...we should read [this paper](http://irl.cs.tamu.edu/people/hsin-tsang/papers/www2008.pdf) on details.
 
+### IRLBot-style approach
+
+A key piece of IRLBot is something called DRUM, which uses an in-memory array to store <key, value, payload> data until it's full. Then this is sorted/merged against the backing disk file, and keys that already exist are either dropped (check only) or merged (check-update), and the new disk file is written out. During this process new keys can be forwarded for additional processing.
+
+Typically the key is a hash, the value is any data that's needed for an update, and the payload is something that can be written to disk separate from the `<key, value>`. This means it can also be on disk when the `<key, value>` is in the in-memory queue, thus fitting more in memory.
+
+As an example for processing "new" (added/discovered) URLs, the key is an 8-byte hash of the URL, the value is null, and the payload is the actual URL. This is what IRLBot calls the "URLseen" DRUM, and is used to filter out already seen URLs. It also forwards new URLs to the crawling pipeline.
+
+A second important piece is how they handle budgeting crawl capacity. They calculate a budget for each PLD, based on how many other PLDs have refs to this PLD. The theory is that link farms aren't going to be able to pay for a gazillion PLDs to mess with this metric. Once they have a budget, then when the get a link that is new, they use a set of queues to organize these into groups, where each group size is equal to the budget. The description of how exactly IRLBot uses these queues is a bit confusing, but basically it keeps re-prioritizing URLs by re-partitioning them between the available queues. Though keeping a queue set per PLD doesn't seem scalable.
+
+If we have the concept of a URL score, and a "budget" (percentage of capacity to give to that PLD, based on cluster crawl capacity and all known domains) then we could potentially use this approach to avoid spending much time processing URLs that we'll never want to crawl. Occasionally we'd need to re-process all queues, as the scores for URLs will change based on time (e.g. based on time since last crawl, for the recrawl case).
+
 ## URL Normalization
 
 Whenever normalization changes, the crawl state potentially becomes invalid.
