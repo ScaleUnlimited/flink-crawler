@@ -5,11 +5,21 @@ A continuous scalable web crawler built on top of [Flink](http://flink.apache.or
 
 ## Crawl State
 
-In Nutch, Bixo, and other Hadoop-based web crawlers the most popular way to maintain crawl state is in a sequence file. The start of each processing "loop" is a job that analyzes the this "crawl DB" to extract a set of URLs to be fetched, based on the fetch state, number of URLs per domain, target fetch duration, time since last fetch, summed scores of links pointing at a page, etc.
+In Nutch, Bixo, and other Hadoop-based web crawlers the most popular way to maintain crawl state is in a sequence file. The start of each processing "loop" is a job that analyzes the this "crawl DB" to extract a set of URLs to be fetched, based on the fetch state, number of URLs per domain, target fetch duration, time since last fetch, summed scores of links pointing at a page, etc. As part of this processing you also want to merge in any URLs extracted from contect that was fetched/parsed in the previous crawl loop, as well as merging in status updates for URLs that were fetched.
 
-Unfortunately this adds significant latency to the crawl, especially as the crawl DB grows in size. E.g. for a 500M page crawl, the crawl DB can wind up with 30B known URLs. And a typical crawl loop quickly runs out of URLs for most domains, leaving a handful of domains that slowly are fetched (due to politeness limitations).
+Unfortunately this adds significant latency to the crawl, especially as the crawl DB grows in size. E.g. for a 500M page crawl, the crawl DB can wind up with 30B known URLs (so 60x more "known" URLs than what have been fetched). And a typical crawl loop quickly runs out of URLs for most domains, leaving a handful of domains that slowly are fetched (due to politeness limitations).
 
-So for a continuous crawl, we need to maintain state such that we can continuously query to find the most interesting URLs to fetch, given all of the above factors (including politeness). This state needs to handle > 1B URLs/server, to scale to 10B+ on a 10 server cluster. And the state needs to work well with Flink's [checkpoint](https://ci.apache.org/projects/flink/flink-docs-master/internals/stream_checkpointing.html) support.
+So for a continuous crawl, we need to maintain this crawl state such that we can:
+
+1. Add newly discovered URLs that haven't been seen before.
+1. Update the state of URLs that we've tried to fetch (result of request, time for next fetch, etc).
+1. Update the score of (unfetched only?) URLs based on scoring of pages that link to this page.
+1. Query to find the most interesting URLs to fetch for a given domain, given all of the above factors.
+1. Work well with Flink's [checkpoint](https://ci.apache.org/projects/flink/flink-docs-master/internals/stream_checkpointing.html) support.
+
+The above solution needs to efficiently handle > 1B URLs/server, to scale to 10B+ on a 10 server cluster.
+
+I'm assuming we can quickly filter URLs based on per-domain politeness settings, separate from what we extracted from the crawl state (though we might want to send back information to the crawl state source about how much was filtered, as a way of avoiding sending too many URLs down the pipe).
 
 It's possible we could use Kafka to maintain "state" in a way that scales, but it would be nice to avoid adding another thick technology slice to the stack.
 
@@ -28,6 +38,30 @@ As an example for processing "new" (added/discovered) URLs, the key is an 8-byte
 A second important piece is how they handle budgeting crawl capacity. They calculate a budget for each PLD, based on how many other PLDs have refs to this PLD. The theory is that link farms aren't going to be able to pay for a gazillion PLDs to mess with this metric. Once they have a budget, then when the get a link that is new, they use a set of queues to organize these into groups, where each group size is equal to the budget. The description of how exactly IRLBot uses these queues is a bit confusing, but basically it keeps re-prioritizing URLs by re-partitioning them between the available queues. Though keeping a queue set per PLD doesn't seem scalable.
 
 If we have the concept of a URL score, and a "budget" (percentage of capacity to give to that PLD, based on cluster crawl capacity and all known domains) then we could potentially use this approach to avoid spending much time processing URLs that we'll never want to crawl. Occasionally we'd need to re-process all queues, as the scores for URLs will change based on time (e.g. based on time since last crawl, for the recrawl case).
+
+### Proposal for how to use DRUM approach
+
+TODO - define a term for the key/value and payload files - a drum set? And that's either in-memory (key/value only, payload is alwas on disk) or completely on disk.
+
+We have a crawl DB that maintains an in-memory list of URLs to be updated in the crawl DB. The list is actually three arrays, a long hash value, a ref to an optional "value", and an int offset into a separate payload data file.
+
+When adding a new URL, we check to see if the hash already exists. If it does, then we have to merge the new URL to the existing URL. This potentially means creating a new (merged) payload, which is then written to the end of the payload file, and the payload offset is updated. If it doesn't exist, then we add it to the end of the list.
+
+These URLs added to the end of the list are unsorted, so to check for whether the entry already exists, we use a binary sort over the inital (sorted) set of entries, and then a linear scan over the remaining. When the number of unsorted entries gets too long, we re-sort the list.
+
+When we run out of space in this in-memory table, or there is some other external trigger (we need more URLs to fetch), then this in-memory list is merged with the existing (sorted) key/value file and payload file. The key/value file is read one chunk at a time into a separate buffer, and merged with the in-memory table. The results are written out to a new key/value file. When a payload is added or updated, it is appended to the existing payload file. Note this creates some unused data in the file, which is reclaimed during the compaction phase (see below).
+
+While this merge is going on, two additional processing steps are happening. First, we have an in-memory priority queue of URLs to be fetched. We add entries based on a calculated URL score, which depends on many factors (URL status, estimated score, last fetched time, number of URLs for the host vs. the host "rank" (TBD), etc).
+
+The other processing step is that we're archiving URLs that we are unlikely to want to fetch (score is too low). Instead of writing these to what will become the new key/value (and payload) files, we write them to a new archived key/value and payload file set. So each merge that we do will (potentially) generate a new archived file set (with a timestamped name?). This prevents us from having a very large set of entries in the primary file set that we keep re-processing on every merge but will never wind up fetching.
+
+We might wind up adding a new URL to the primary file set that already exists in one of the archived file sets, but it's likely to have a very low score, so that's OK.
+
+Eventually we'll have many (say 100) archived file sets. When that happens, we'll trigger a compaction, where we do a merge across the primary and all archived file sets, building the new primary and the new (single) archived file set. At this point we'll also create a new payload file for the primary file set, thus reclaiming any unused space.
+
+Note that whenever we're doing a merge (or compaction), we set up a new in-memory key/value and payload file, so that data can continue flowing in while we're merging. The only time we'd be locked up is if the new in-memory list fills up before we finish, which should only happen during a compaction.
+
+TBD: optimization to avoid putting a URL on the fetch list if we're already fetching it...When we're done with the merge, we also add all of these "to be fetched" URLs to the new in-memory queue, so that if a new URL is discovered that
 
 ## URL Normalization
 
