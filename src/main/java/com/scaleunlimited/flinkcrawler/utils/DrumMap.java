@@ -1,7 +1,6 @@
 package com.scaleunlimited.flinkcrawler.utils;
 
 import java.io.Closeable;
-import java.io.DataOutput;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
