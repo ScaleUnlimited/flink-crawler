@@ -17,8 +17,8 @@ public class ParseFunction implements FlatMapFunction<FetchedUrl, Tuple2<Outlink
 		collector.collect(new Tuple2<Outlink, ParsedContent>(null, new ParsedContent("hello, world")));
 		
 		// Output the links
-		collector.collect(new Tuple2<Outlink, ParsedContent>(new Outlink("http://domain.com/hello", "hello"), null));
-		collector.collect(new Tuple2<Outlink, ParsedContent>(new Outlink("http://domain.com/world", "world"), null));
+		collector.collect(new Tuple2<Outlink, ParsedContent>(new Outlink("http://domain.com/hello", "hello", null), null));
+		collector.collect(new Tuple2<Outlink, ParsedContent>(new Outlink("http://domain.com/world", "world", null), null));
 	}
 
 }
