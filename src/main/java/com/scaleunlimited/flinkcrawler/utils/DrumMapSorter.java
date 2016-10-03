@@ -35,7 +35,7 @@ public class DrumMapSorter {
      * @param values
      *            The array of values to sort associative to the given keys array
      */
-    public static void swap(long[] keys, int i, int j, int[] offsets, Object[] values) {
+    private static void swap(long[] keys, int i, int j, int[] offsets, Object[] values) {
         long temp = keys[i];
         keys[i] = keys[j];
         keys[j] = temp;
