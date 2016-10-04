@@ -2,19 +2,19 @@ package com.scaleunlimited.flinkcrawler.pojos;
 
 import java.util.Map;
 
-public class ParsedRec {
+public class ParsedUrl {
 
 	private String _url;
 	private String _hostAddress;
 	private String _parsedText;
 	private String _language;
 	private String _title;
-	private Outlink[] _outlinks;
+	private ExtractedUrl[] _outlinks;
 	private Map<String, String> _parsedMeta;
 
 	// TODO extend this to include the passed in scores and status as well
-	public ParsedRec(String url, String hostAddress, String parsedText,
-			String language, String title, Outlink[] outlinks,
+	public ParsedUrl(String url, String hostAddress, String parsedText,
+			String language, String title, ExtractedUrl[] outlinks,
 			Map<String, String> parsedMeta) {
 
 		_url = url;
@@ -66,11 +66,11 @@ public class ParsedRec {
 		_title = title;
 	}
 
-	public Outlink[] getOutlinks() {
+	public ExtractedUrl[] getOutlinks() {
 		return _outlinks;
 	}
 
-	public void setOutlinks(Outlink[] outlinks) {
+	public void setOutlinks(ExtractedUrl[] outlinks) {
 		_outlinks = outlinks;
 	}
 

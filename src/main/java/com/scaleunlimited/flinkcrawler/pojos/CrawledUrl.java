@@ -1,7 +1,7 @@
 package com.scaleunlimited.flinkcrawler.pojos;
 
 
-public class CrawlRec {
+public class CrawledUrl {
 
 	private String _url;
 	private String _status;		// TODO make this an enum ?
@@ -11,7 +11,7 @@ public class CrawlRec {
 	private long _lastFetchedTime;
 	private long _nextFetchTime;
 	
-	public CrawlRec(String url, String status, String pld, float actualScore, float estimatedScore, long lastFetchedTime, long nextFetchTime) {
+	public CrawledUrl(String url, String status, String pld, float actualScore, float estimatedScore, long lastFetchedTime, long nextFetchTime) {
 		_url = url;
 		_status = status;
 		_pld = pld;
