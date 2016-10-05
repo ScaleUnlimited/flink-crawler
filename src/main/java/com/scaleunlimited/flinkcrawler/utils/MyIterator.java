@@ -14,7 +14,7 @@ public class MyIterator {
     	StreamExecutionEnvironment see = 
 			StreamExecutionEnvironment.getExecutionEnvironment();
 		DataStream<RawUrl> urls = 
-			see.addSource(new SeedUrlSource());
+			see.addSource(new SeedUrlSource(1.0f, "http://cnn.com", "http://facebook.com"));
     		
     	IterativeStream<RawUrl> iteration = urls.iterate();
     	DataStream<RawUrl> iterationBody =

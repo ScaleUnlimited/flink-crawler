@@ -1,12 +1,12 @@
 package com.scaleunlimited.flinkcrawler.pojos;
 
-public class ParsedContent {
+public class ParsedUrl {
 
 	private String _text;
 	
-	public ParsedContent() { }
+	public ParsedUrl() { }
 
-	public ParsedContent(String text) {
+	public ParsedUrl(String text) {
 		_text = text;
 	}
 
@@ -18,5 +18,4 @@ public class ParsedContent {
 		_text = text;
 	}
 
-	
 }

@@ -26,7 +26,4 @@ public class RawUrl {
 		_estimatedScore = estimatedScore;
 	}
 	
-	
-
-	
 }

@@ -37,6 +37,8 @@ public class SeedUrlSource implements SourceFunction<RawUrl> {
 		while (_keepRunning) {
 			if (!_urls.isEmpty()) {
 				context.collect(_urls.pop());
+			} else {
+				Thread.sleep(1000L);
 			}
 		}
 	}
