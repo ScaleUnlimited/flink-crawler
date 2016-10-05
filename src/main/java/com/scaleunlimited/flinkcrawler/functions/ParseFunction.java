@@ -14,7 +14,7 @@ public class ParseFunction implements FlatMapFunction<FetchedUrl, Tuple2<Extract
 	@Override
 	public void flatMap(FetchedUrl fetchedUrl, Collector<Tuple2<ExtractedUrl, ParsedUrl>> collector) throws Exception {
 		// Output the content.
-		collector.collect(new Tuple2<ExtractedUrl, ParsedUrl>(null, new ParsedUrl("hello, world")));
+		collector.collect(new Tuple2<ExtractedUrl, ParsedUrl>(null, new ParsedUrl("http://domain.com", "192.168.1.1", "hello, world", "en", "Title", null)));
 		
 		// Output the links
 		collector.collect(new Tuple2<ExtractedUrl, ParsedUrl>(new ExtractedUrl("http://domain.com/hello", "hello", null), null));
