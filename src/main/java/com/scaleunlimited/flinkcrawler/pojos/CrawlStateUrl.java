@@ -1,5 +1,12 @@
 package com.scaleunlimited.flinkcrawler.pojos;
 
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
+
+import com.scaleunlimited.flinkcrawler.utils.HashUtils;
+import com.scaleunlimited.flinkcrawler.utils.Payload;
+
 
 public class CrawlStateUrl {
 
@@ -26,6 +33,10 @@ public class CrawlStateUrl {
 	}
 	public void setUrl(String url) {
 		_url = url;
+	}
+	
+	public long makeKey() {
+		return HashUtils.longHash(_url);
 	}
 	
 	public String getStatus() {
@@ -74,7 +85,51 @@ public class CrawlStateUrl {
 	public void setNextFetchTime(long nextFetchTime) {
 		_nextFetchTime = nextFetchTime;
 	}
-	
 
+	/**
+	 * Return in a new object all the fields that we need for merging one CrawlStateUrl
+	 * with another one in the CrawlDB DrumMap.
+	 *  
+	 * @return the new object.
+	 */
+	public Object makeValue() {
+		return null;
+	}
+
+	/**
+	 * Return a new paylood that contains all of the fields which are not needed to
+	 * merge these objects, and thus can be kept on disk and out of memory.
+	 * @return
+	 */
+	public Payload makePayload() {
+		return new CrawlStateUrlPayload(_url);
+	}
+	
+	public static class CrawlStateUrlPayload extends Payload {
+
+		private String _url;
+		
+		public CrawlStateUrlPayload() { }
+		
+		public CrawlStateUrlPayload(String url) {
+			_url = url;
+		}
+		
+		@Override
+		public void write(DataOutput out) throws IOException {
+			out.writeUTF(_url);
+		}
+
+		@Override
+		public void readFields(DataInput in) throws IOException {
+			_url = in.readUTF();
+		}
+
+		@Override
+		public void clear() {
+			_url = null;
+		}
+		
+	}
 	
 }
