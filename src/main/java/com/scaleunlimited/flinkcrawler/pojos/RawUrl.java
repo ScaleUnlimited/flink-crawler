@@ -1,11 +1,19 @@
 package com.scaleunlimited.flinkcrawler.pojos;
 
-public class RawUrl {
+
+@SuppressWarnings("serial")
+public class RawUrl extends BaseUrl {
 
 	private String _url;
 	private float _estimatedScore;
 	
+	public RawUrl(boolean tickle) {
+		super(tickle);
+	}
+	
 	public RawUrl(String url, float estimatedScore) {
+		super();
+		
 		_url = url;
 		_estimatedScore = estimatedScore;
 	}
@@ -24,6 +32,11 @@ public class RawUrl {
 
 	public void setEstimatedScore(float estimatedScore) {
 		_estimatedScore = estimatedScore;
+	}
+	
+	@Override
+	public String toString() {
+		return _url;
 	}
 	
 }

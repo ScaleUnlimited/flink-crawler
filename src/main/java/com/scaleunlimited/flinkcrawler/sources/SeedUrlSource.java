@@ -3,13 +3,15 @@ package com.scaleunlimited.flinkcrawler.sources;
 import java.util.Arrays;
 import java.util.LinkedList;
 
-import org.apache.flink.streaming.api.functions.source.SourceFunction;
+import org.apache.flink.streaming.api.functions.source.ParallelSourceFunction;
 
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 
 @SuppressWarnings("serial")
-public class SeedUrlSource implements SourceFunction<RawUrl> {
+public class SeedUrlSource implements ParallelSourceFunction<RawUrl> {
 
+	private static final RawUrl TICKLE_URL = new RawUrl(true);
+	
 	private boolean _keepRunning = false;
 	private LinkedList<RawUrl> _urls;
 	
@@ -36,9 +38,12 @@ public class SeedUrlSource implements SourceFunction<RawUrl> {
 		
 		while (_keepRunning) {
 			if (!_urls.isEmpty()) {
+				// TODO With parallelism, we only want to emit URLs that are appropriate for us, versus
+				// doing a broadcast of every URL.
 				context.collect(_urls.pop());
 			} else {
-				Thread.sleep(1000L);
+				context.collect(TICKLE_URL);
+				Thread.sleep(100L);
 			}
 		}
 	}
