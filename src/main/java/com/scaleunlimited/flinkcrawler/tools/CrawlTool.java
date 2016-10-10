@@ -26,7 +26,7 @@ import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
-import com.scaleunlimited.flinkcrawler.sources.CrawlDBSource;
+import com.scaleunlimited.flinkcrawler.sources.TickleSource;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
 
 public class CrawlTool {
@@ -43,7 +43,7 @@ public class CrawlTool {
 			StreamExecutionEnvironment see = StreamExecutionEnvironment.getExecutionEnvironment();
 			
 			DataStream<RawUrl> rawUrls = see.addSource(new SeedUrlSource(1.0f, "http://cnn.com", "http://facebook.com")).setParallelism(4);
-			DataStream<Tuple0> tickler = see.addSource(new CrawlDBSource());
+			DataStream<Tuple0> tickler = see.addSource(new TickleSource());
 			
 			IterativeStream<RawUrl> iteration = rawUrls.iterate();
 			DataStream<CrawlStateUrl> cleanedUrls = iteration.connect(tickler)
