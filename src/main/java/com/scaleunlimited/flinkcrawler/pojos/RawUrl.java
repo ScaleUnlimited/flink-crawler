@@ -7,10 +7,6 @@ public class RawUrl extends BaseUrl {
 	private String _url;
 	private float _estimatedScore;
 	
-	public RawUrl(boolean tickle) {
-		super(tickle);
-	}
-	
 	public RawUrl(String url, float estimatedScore) {
 		super();
 		

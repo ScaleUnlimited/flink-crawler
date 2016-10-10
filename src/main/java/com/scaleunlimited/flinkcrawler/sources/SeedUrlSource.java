@@ -10,8 +10,6 @@ import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 @SuppressWarnings("serial")
 public class SeedUrlSource implements ParallelSourceFunction<RawUrl> {
 
-	private static final RawUrl TICKLE_URL = new RawUrl(true);
-	
 	private boolean _keepRunning = false;
 	private LinkedList<RawUrl> _urls;
 	
@@ -42,7 +40,7 @@ public class SeedUrlSource implements ParallelSourceFunction<RawUrl> {
 				// doing a broadcast of every URL.
 				context.collect(_urls.pop());
 			} else {
-				context.collect(TICKLE_URL);
+				// context.collect(TICKLE_URL);
 				Thread.sleep(100L);
 			}
 		}

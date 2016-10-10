@@ -15,20 +15,22 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.co.RichCoFlatMapFunction;
 import org.apache.flink.util.Collector;
 
+import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
+import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 
 @SuppressWarnings({ "serial", "unused" })
-public class LengthenUrlsFunction extends RichCoFlatMapFunction<RawUrl, Tuple0, RawUrl> {
+public class FetchUrlsFunction extends RichCoFlatMapFunction<FetchUrl, Tuple0, FetchedUrl> {
 
 	private static final int MIN_THREAD_COUNT = 10;
 	private static final int MAX_THREAD_COUNT = 100;
 	
 	private static final int MAX_QUEUED_URLS = 1000;
 	
-	private transient ConcurrentLinkedQueue<RawUrl> _output;
+	private transient ConcurrentLinkedQueue<FetchedUrl> _output;
 	private transient ThreadPoolExecutor _executor;
 	
-	public LengthenUrlsFunction() {
+	public FetchUrlsFunction() {
 		// TODO Auto-generated constructor stub
 	}
 
@@ -49,25 +51,26 @@ public class LengthenUrlsFunction extends RichCoFlatMapFunction<RawUrl, Tuple0, 
 	}
 	
 	@Override
-	public void flatMap1(final RawUrl url, Collector<RawUrl> collector) throws Exception {
-		System.out.println("Adding URL to lengthening queue: " + url);
+	public void flatMap1(final FetchUrl url, Collector<FetchedUrl> collector) throws Exception {
+		System.out.println("Adding URL to fetch queue: " + url);
 		_executor.execute(new Runnable() {
 			
 			@Override
 			public void run() {
-				// TODO lengthen the URL if the domain is a link shortener.
-				System.out.println("Lengthening " + url);
-				_output.add(url);
+				// TODO fetch the URL.
+				System.out.println("Fetching " + url);
+				FetchedUrl result = new FetchedUrl();
+				_output.add(result);
 			}
 		});
 	}
 
 	@Override
-	public void flatMap2(Tuple0 tickle, Collector<RawUrl> collector) throws Exception {
+	public void flatMap2(Tuple0 tickle, Collector<FetchedUrl> collector) throws Exception {
 		while (!_output.isEmpty()) {
-			RawUrl lengthenedUrl = _output.remove();
-			System.out.println("Removing URL from lengthening queue: " + lengthenedUrl);
-			collector.collect(lengthenedUrl);
+			FetchedUrl url = _output.remove();
+			System.out.println("Removing URL from fetched queue: " + url);
+			collector.collect(url);
 		}
 	}
 	

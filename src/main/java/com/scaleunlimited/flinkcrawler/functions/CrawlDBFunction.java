@@ -12,6 +12,7 @@ import org.apache.flink.util.Collector;
 
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
+import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.utils.DrumMap;
 
 /**
@@ -56,7 +57,11 @@ public class CrawlDBFunction extends RichCoFlatMapFunction<CrawlStateUrl, Tuple0
 	@Override
 	public void flatMap1(CrawlStateUrl url, Collector<FetchUrl> collector) throws Exception {
 		// TODO do we worry about async nature of flatMap2 vs. flatMap1 calls?
-		_crawlDB.add(url.makeKey(), url.makeValue(), url.makePayload());
+		if (url == null) {
+			System.out.println("Got null CrawlStateUrl");
+		} else {
+			_crawlDB.add(url.makeKey(), url.makeValue(), url.makePayload());
+		}
 	}
 
 	/* We get called regularly by a broadcast from the CrawlDbSource, which exists to generate
@@ -66,7 +71,7 @@ public class CrawlDBFunction extends RichCoFlatMapFunction<CrawlStateUrl, Tuple0
 	 * @see org.apache.flink.streaming.api.functions.co.CoFlatMapFunction#flatMap2(java.lang.Object, org.apache.flink.util.Collector)
 	 */
 	@Override
-	public void flatMap2(Tuple0 ignore, Collector<FetchUrl> collector) throws Exception {
+	public void flatMap2(Tuple0 tickle, Collector<FetchUrl> collector) throws Exception {
 		if (_urls.isEmpty()) {
 			// TODO trigger a merge, so that we re-fill this. If there's nothing written to disk
 			// yet, we could just pull from the in-memory queue (no merge needed).
