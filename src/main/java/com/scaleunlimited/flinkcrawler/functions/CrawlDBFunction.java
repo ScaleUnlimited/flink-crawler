@@ -36,7 +36,7 @@ public class CrawlDBFunction extends RichCoFlatMapFunction<CrawlStateUrl, Tuple0
 	DrumMap _crawlDB;
 	PriorityQueue<FetchUrl> _urls;
 	
-	public CrawlDBFunction() throws IOException {
+	public CrawlDBFunction() {
 	}
 
 	@Override

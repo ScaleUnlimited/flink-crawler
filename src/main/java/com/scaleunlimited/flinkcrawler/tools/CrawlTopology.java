@@ -1,11 +1,8 @@
 package com.scaleunlimited.flinkcrawler.tools;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.apache.flink.api.java.CollectionEnvironment;
-import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.tuple.Tuple0;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.streaming.api.collector.selector.OutputSelector;
@@ -19,60 +16,92 @@ import com.scaleunlimited.flinkcrawler.functions.CrawlDBFunction;
 import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.FilterUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.LengthenUrlsFunction;
-import com.scaleunlimited.flinkcrawler.functions.RawToStateUrlFunction;
 import com.scaleunlimited.flinkcrawler.functions.NormalizeUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.OutlinkToStateUrlFunction;
 import com.scaleunlimited.flinkcrawler.functions.ParseFunction;
+import com.scaleunlimited.flinkcrawler.functions.RawToStateUrlFunction;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
-import com.scaleunlimited.flinkcrawler.sources.TickleSource;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
+import com.scaleunlimited.flinkcrawler.sources.TickleSource;
 
-public class CrawlTool {
+/**
+ * A Flink streaming workflow that can be executed.
+ * 
+ * State Checkpoints in Iterative Jobs
 
-	public static void main(String[] args) {
+Flink currently only provides processing guarantees for jobs without iterations.
+Enabling checkpointing on an iterative job causes an exception. 
+In order to force checkpointing on an iterative program the user needs to set 
+a special flag when enabling checkpointing: env.enableCheckpointing(interval, force = true).
+
+Please note that records in flight in the loop edges (and the state changes associated with them) 
+will be lost during failure.
+ *
+ */
+public class CrawlTopology {
+
+	private StreamExecutionEnvironment _env;
+	private String _jobName;
+	
+	protected CrawlTopology(StreamExecutionEnvironment env, String jobName) {
+		_env = env;
+		_jobName = jobName;
+	}
+	
+	
+	public void execute() throws Exception {
+		_env.execute(_jobName);
+	}
+	
+	public static class CrawlTopologyBuilder {
 		
-		// Generate topology, run it
-		// TODO create real fetcher, real CrawlDB, inject into new CrawlTopology
-		//   hmm, probably want to create a CrawlTopologyBuilder, since there's likely a lot
-		// of settings we'd want to inject.
-		// TODO execute the CrawlTopology
+		private StreamExecutionEnvironment _env;
+		private String _jobName = "flink-crawler";
 		
-		try {
-			StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironment();
-			
-			DataStream<RawUrl> rawUrls = env.addSource(new SeedUrlSource(1.0f, "http://cnn.com", "http://facebook.com")).setParallelism(4);
-			
-			DataStream<Tuple0> tickler = env.addSource(new TickleSource());
-			
+		public CrawlTopologyBuilder(StreamExecutionEnvironment env) {
+			_env = env;
+		}
+
+		public CrawlTopologyBuilder setJobName(String jobName) {
+			_jobName = jobName;
+			return this;
+		}
+		
+		public CrawlTopology build() {
+			// TODO set source as a separate call
+			DataStream<RawUrl> rawUrls = _env.addSource(new SeedUrlSource(1.0f, "http://cnn.com", "http://facebook.com")).setParallelism(4);
+
+			DataStream<Tuple0> tickler = _env.addSource(new TickleSource());
+
 			IterativeStream<RawUrl> iteration = rawUrls.iterate();
 			DataStream<CrawlStateUrl> cleanedUrls = iteration.connect(tickler)
 					.flatMap(new LengthenUrlsFunction())
 					.flatMap(new NormalizeUrlsFunction())
 					.flatMap(new FilterUrlsFunction())
 					.map(new RawToStateUrlFunction());
-			
+
 			DataStream<FetchUrl> urlsToFetch = cleanedUrls.connect(tickler)
 					.flatMap(new CrawlDBFunction())
 					.connect(tickler)
 					.flatMap(new CheckUrlWithRobotsFunction());
 			// TODO need to split this stream and send rejected URLs back to crawlDB. Probably need to
 			// merge this CrawlStateUrl stream with CrawlStateUrl streams from outlinks and fetch results.
-				
-			
+
+
 			DataStream<Tuple2<ExtractedUrl, ParsedUrl>> fetchedUrls = urlsToFetch.connect(tickler)
 					.flatMap(new FetchUrlsFunction())
 					.flatMap(new ParseFunction());
-			
+
 			// Need to split this stream and send extracted URLs back, and save off parsed page content.
 			SplitStream<Tuple2<ExtractedUrl,ParsedUrl>> outlinksOrContent = fetchedUrls.split(new OutputSelector<Tuple2<ExtractedUrl,ParsedUrl>>() {
-				
+
 				private final List<String> OUTLINK_STREAM = Arrays.asList("outlink");
 				private final List<String> CONTENT_STREAM = Arrays.asList("content");
-				
+
 				@Override
 				public Iterable<String> select(Tuple2<ExtractedUrl, ParsedUrl> outlinksOrContent) {
 					if (outlinksOrContent.f0 != null) {
@@ -84,20 +113,13 @@ public class CrawlTool {
 					}
 				}
 			});
-			
+
 			DataStream<RawUrl> newUrls = outlinksOrContent.select("outlink")
 					.map(new OutlinkToStateUrlFunction());
-			
+
 			iteration.closeWith(newUrls);
 
-			cleanedUrls.print();
-
-			env.execute();
-		} catch (Throwable t) {
-			System.err.println("Error running CrawlTool: " + t.getMessage());
-			t.printStackTrace(System.err);
-			System.exit(-1);
+			return new CrawlTopology(_env, _jobName);
 		}
 	}
-
 }
