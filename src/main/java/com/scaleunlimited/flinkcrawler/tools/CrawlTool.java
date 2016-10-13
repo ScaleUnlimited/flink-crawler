@@ -1,11 +1,8 @@
 package com.scaleunlimited.flinkcrawler.tools;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.apache.flink.api.java.CollectionEnvironment;
-import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.tuple.Tuple0;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.streaming.api.collector.selector.OutputSelector;
@@ -19,17 +16,17 @@ import com.scaleunlimited.flinkcrawler.functions.CrawlDBFunction;
 import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.FilterUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.LengthenUrlsFunction;
-import com.scaleunlimited.flinkcrawler.functions.RawToStateUrlFunction;
 import com.scaleunlimited.flinkcrawler.functions.NormalizeUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.OutlinkToStateUrlFunction;
 import com.scaleunlimited.flinkcrawler.functions.ParseFunction;
+import com.scaleunlimited.flinkcrawler.functions.RawToStateUrlFunction;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
-import com.scaleunlimited.flinkcrawler.sources.TickleSource;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
+import com.scaleunlimited.flinkcrawler.sources.TickleSource;
 
 public class CrawlTool {
 
