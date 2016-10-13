@@ -10,6 +10,7 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.IterativeStream;
 import org.apache.flink.streaming.api.datastream.SplitStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.co.RichCoFlatMapFunction;
 
 import com.scaleunlimited.flinkcrawler.functions.CheckUrlWithRobotsFunction;
 import com.scaleunlimited.flinkcrawler.functions.CrawlDBFunction;
@@ -23,6 +24,7 @@ import com.scaleunlimited.flinkcrawler.functions.RawToStateUrlFunction;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
+import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
@@ -61,6 +63,10 @@ public class CrawlTopology {
 		
 		private StreamExecutionEnvironment _env;
 		private String _jobName = "flink-crawler";
+		private long _tickleInterval = TickleSource.DEFAULT_TICKLE_INTERVAL;
+		private RichCoFlatMapFunction<CrawlStateUrl, Tuple0, FetchUrl> _crawlDBFunction;
+		private RichCoFlatMapFunction<FetchUrl, Tuple0, FetchUrl> _robotsFunction;
+		private RichCoFlatMapFunction<FetchUrl, Tuple0, FetchedUrl> _fetchFunction;
 		
 		public CrawlTopologyBuilder(StreamExecutionEnvironment env) {
 			_env = env;
@@ -71,11 +77,31 @@ public class CrawlTopology {
 			return this;
 		}
 		
+		public CrawlTopologyBuilder setCrawlDBFunction(RichCoFlatMapFunction<CrawlStateUrl, Tuple0, FetchUrl> crawlDBFunction) {
+			_crawlDBFunction = crawlDBFunction;
+			return this;
+		}
+		
+		public CrawlTopologyBuilder setRobotsFunction(RichCoFlatMapFunction<FetchUrl, Tuple0, FetchUrl> robotsFunction) {
+			_robotsFunction = robotsFunction;
+			return this;
+		}
+		
+		public CrawlTopologyBuilder setFetchFunction(RichCoFlatMapFunction<FetchUrl, Tuple0, FetchedUrl> fetchFunction) {
+			_fetchFunction = fetchFunction;
+			return this;
+		}
+		
+		public CrawlTopologyBuilder setTickleInterval(int tickleInterval) {
+			_tickleInterval = tickleInterval;
+			return this;
+		}
+		
 		public CrawlTopology build() {
 			// TODO set source as a separate call
 			DataStream<RawUrl> rawUrls = _env.addSource(new SeedUrlSource(1.0f, "http://cnn.com", "http://facebook.com")).setParallelism(4);
 
-			DataStream<Tuple0> tickler = _env.addSource(new TickleSource());
+			DataStream<Tuple0> tickler = _env.addSource(new TickleSource(_tickleInterval));
 
 			IterativeStream<RawUrl> iteration = rawUrls.iterate();
 			DataStream<CrawlStateUrl> cleanedUrls = iteration.connect(tickler)
@@ -85,15 +111,15 @@ public class CrawlTopology {
 					.map(new RawToStateUrlFunction());
 
 			DataStream<FetchUrl> urlsToFetch = cleanedUrls.connect(tickler)
-					.flatMap(new CrawlDBFunction())
+					.flatMap(_crawlDBFunction)
 					.connect(tickler)
-					.flatMap(new CheckUrlWithRobotsFunction());
+					.flatMap(_robotsFunction);
 			// TODO need to split this stream and send rejected URLs back to crawlDB. Probably need to
 			// merge this CrawlStateUrl stream with CrawlStateUrl streams from outlinks and fetch results.
 
 
 			DataStream<Tuple2<ExtractedUrl, ParsedUrl>> fetchedUrls = urlsToFetch.connect(tickler)
-					.flatMap(new FetchUrlsFunction())
+					.flatMap(_fetchFunction)
 					.flatMap(new ParseFunction());
 
 			// Need to split this stream and send extracted URLs back, and save off parsed page content.
