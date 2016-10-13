@@ -1,14 +1,13 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
 import org.apache.flink.api.java.tuple.Tuple0;
-import org.apache.flink.streaming.api.functions.co.CoFlatMapFunction;
+import org.apache.flink.streaming.api.functions.co.RichCoFlatMapFunction;
 import org.apache.flink.util.Collector;
 
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 
 @SuppressWarnings("serial")
-public class CheckUrlWithRobotsFunction implements
-		CoFlatMapFunction<FetchUrl, Tuple0, FetchUrl> {
+public class CheckUrlWithRobotsFunction extends RichCoFlatMapFunction<FetchUrl, Tuple0, FetchUrl> {
 
 	@Override
 	public void flatMap1(FetchUrl url, Collector<FetchUrl> collector) throws Exception {
