@@ -12,9 +12,6 @@ import org.apache.flink.streaming.api.datastream.SplitStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.co.RichCoFlatMapFunction;
 
-import com.scaleunlimited.flinkcrawler.functions.CheckUrlWithRobotsFunction;
-import com.scaleunlimited.flinkcrawler.functions.CrawlDBFunction;
-import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.FilterUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.LengthenUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.NormalizeUrlsFunction;
@@ -98,11 +95,13 @@ public class CrawlTopology {
 		}
 		
 		public CrawlTopology build() {
-			// TODO set source as a separate call
+			// TODO set source as a separate call. And use a simple collection source for testing.
 			DataStream<RawUrl> rawUrls = _env.addSource(new SeedUrlSource(1.0f, "http://cnn.com", "http://facebook.com")).setParallelism(4);
 
 			DataStream<Tuple0> tickler = _env.addSource(new TickleSource(_tickleInterval));
 
+			// TODO add lengthener, normalizer, filter to builder.
+			
 			IterativeStream<RawUrl> iteration = rawUrls.iterate();
 			DataStream<CrawlStateUrl> cleanedUrls = iteration.connect(tickler)
 					.flatMap(new LengthenUrlsFunction())
@@ -117,7 +116,7 @@ public class CrawlTopology {
 			// TODO need to split this stream and send rejected URLs back to crawlDB. Probably need to
 			// merge this CrawlStateUrl stream with CrawlStateUrl streams from outlinks and fetch results.
 
-
+			// TODO add parse function to builder.
 			DataStream<Tuple2<ExtractedUrl, ParsedUrl>> fetchedUrls = urlsToFetch.connect(tickler)
 					.flatMap(_fetchFunction)
 					.flatMap(new ParseFunction());

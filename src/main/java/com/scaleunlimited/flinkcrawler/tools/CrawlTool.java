@@ -22,6 +22,7 @@ public class CrawlTool {
 				.setRobotsFunction(new CheckUrlWithRobotsFunction());
 			
 			builder.build().execute();
+			
 		} catch (Throwable t) {
 			System.err.println("Error running CrawlTool: " + t.getMessage());
 			t.printStackTrace(System.err);
