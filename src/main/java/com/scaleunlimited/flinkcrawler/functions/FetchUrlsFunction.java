@@ -1,7 +1,9 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -59,7 +61,9 @@ public class FetchUrlsFunction extends RichCoFlatMapFunction<FetchUrl, Tuple0, F
 			public void run() {
 				// TODO fetch the URL.
 				System.out.println("Fetching " + url);
-				FetchedUrl result = new FetchedUrl();
+				Map<String, List<String>> headers = new HashMap<>();
+				byte[] content = new byte[0];
+				FetchedUrl result = new FetchedUrl(url.getUrl(), url.getUrl(), System.currentTimeMillis(), headers, content, "text/html", 0);
 				_output.add(result);
 			}
 		});
