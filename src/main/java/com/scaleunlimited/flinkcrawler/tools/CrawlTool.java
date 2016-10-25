@@ -1,11 +1,17 @@
 package com.scaleunlimited.flinkcrawler.tools;
 
+import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 
 import com.scaleunlimited.flinkcrawler.functions.CheckUrlWithRobotsFunction;
 import com.scaleunlimited.flinkcrawler.functions.CrawlDBFunction;
 import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
+import com.scaleunlimited.flinkcrawler.functions.ParseFunction;
+import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.tools.CrawlTopology.CrawlTopologyBuilder;
+import com.scaleunlimited.flinkcrawler.urls.SimpleUrlNormalizer;
+import com.scaleunlimited.flinkcrawler.urls.SimpleUrlValidator;
 
 public class CrawlTool {
 
@@ -14,15 +20,18 @@ public class CrawlTool {
 		// Generate topology, run it
 		
 		try {
-			StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironment();
+			LocalStreamEnvironment env = StreamExecutionEnvironment.createLocalEnvironment();
 			
 			CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
 				.setCrawlDBFunction(new CrawlDBFunction())
 				.setFetchFunction(new FetchUrlsFunction())
-				.setRobotsFunction(new CheckUrlWithRobotsFunction());
+				.setRobotsFunction(new CheckUrlWithRobotsFunction())
+				.setParseFunction(new ParseFunction())
+				.setContentSink(new DiscardingSink<ParsedUrl>())
+				.setUrlNormalizer(new SimpleUrlNormalizer())
+				.setUrlFilter(new SimpleUrlValidator());
 			
 			builder.build().execute();
-			
 		} catch (Throwable t) {
 			System.err.println("Error running CrawlTool: " + t.getMessage());
 			t.printStackTrace(System.err);

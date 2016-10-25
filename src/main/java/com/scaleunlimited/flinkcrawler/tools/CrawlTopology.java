@@ -3,16 +3,22 @@ package com.scaleunlimited.flinkcrawler.tools;
 import java.util.Arrays;
 import java.util.List;
 
+import org.apache.flink.api.common.JobExecutionResult;
+import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.common.functions.RichFlatMapFunction;
 import org.apache.flink.api.java.tuple.Tuple0;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.streaming.api.collector.selector.OutputSelector;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.datastream.DataStreamSink;
 import org.apache.flink.streaming.api.datastream.IterativeStream;
 import org.apache.flink.streaming.api.datastream.SplitStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.co.RichCoFlatMapFunction;
+import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
+import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 
-import com.scaleunlimited.flinkcrawler.functions.FilterUrlsFunction;
+import com.scaleunlimited.flinkcrawler.functions.ValidUrlsFilter;
 import com.scaleunlimited.flinkcrawler.functions.LengthenUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.NormalizeUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.OutlinkToStateUrlFunction;
@@ -26,6 +32,8 @@ import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
 import com.scaleunlimited.flinkcrawler.sources.TickleSource;
+import com.scaleunlimited.flinkcrawler.urls.BaseUrlNormalizer;
+import com.scaleunlimited.flinkcrawler.urls.BaseUrlValidator;
 
 /**
  * A Flink streaming workflow that can be executed.
@@ -52,8 +60,8 @@ public class CrawlTopology {
 	}
 	
 	
-	public void execute() throws Exception {
-		_env.execute(_jobName);
+	public JobExecutionResult execute() throws Exception {
+		return _env.execute(_jobName);
 	}
 	
 	public static class CrawlTopologyBuilder {
@@ -64,6 +72,10 @@ public class CrawlTopology {
 		private RichCoFlatMapFunction<CrawlStateUrl, Tuple0, FetchUrl> _crawlDBFunction;
 		private RichCoFlatMapFunction<FetchUrl, Tuple0, FetchUrl> _robotsFunction;
 		private RichCoFlatMapFunction<FetchUrl, Tuple0, FetchedUrl> _fetchFunction;
+		private RichFlatMapFunction<FetchedUrl, Tuple2<ExtractedUrl, ParsedUrl>> _parseFunction;
+		private SinkFunction<ParsedUrl> _contentSink;
+		private BaseUrlNormalizer _urlNormalizer;
+		private BaseUrlValidator _urlFilter;
 		
 		public CrawlTopologyBuilder(StreamExecutionEnvironment env) {
 			_env = env;
@@ -89,11 +101,32 @@ public class CrawlTopology {
 			return this;
 		}
 		
+		public CrawlTopologyBuilder setParseFunction(RichFlatMapFunction<FetchedUrl, Tuple2<ExtractedUrl, ParsedUrl>> parseFunction) {
+			_parseFunction = parseFunction;
+			return this;
+		}
+		
+		public CrawlTopologyBuilder setContentSink(SinkFunction<ParsedUrl> contentSink) {
+			_contentSink = contentSink;
+			return this;
+		}
+		
+		public CrawlTopologyBuilder setUrlNormalizer(BaseUrlNormalizer urlNormalizer) {
+			_urlNormalizer = urlNormalizer;
+			return this;
+		}
+		
+		public CrawlTopologyBuilder setUrlFilter(BaseUrlValidator urlValidator) {
+			_urlFilter = urlValidator;
+			return this;
+		}
+		
 		public CrawlTopologyBuilder setTickleInterval(int tickleInterval) {
 			_tickleInterval = tickleInterval;
 			return this;
 		}
 		
+		@SuppressWarnings("serial")
 		public CrawlTopology build() {
 			// TODO set source as a separate call. And use a simple collection source for testing.
 			DataStream<RawUrl> rawUrls = _env.addSource(new SeedUrlSource(1.0f, "http://cnn.com", "http://facebook.com")).setParallelism(4);
@@ -105,8 +138,8 @@ public class CrawlTopology {
 			IterativeStream<RawUrl> iteration = rawUrls.iterate();
 			DataStream<CrawlStateUrl> cleanedUrls = iteration.connect(tickler)
 					.flatMap(new LengthenUrlsFunction())
-					.flatMap(new NormalizeUrlsFunction())
-					.flatMap(new FilterUrlsFunction())
+					.flatMap(new NormalizeUrlsFunction(_urlNormalizer))
+					.filter(new ValidUrlsFilter(_urlFilter))
 					.map(new RawToStateUrlFunction());
 
 			DataStream<FetchUrl> urlsToFetch = cleanedUrls.connect(tickler)
@@ -116,12 +149,14 @@ public class CrawlTopology {
 			// TODO need to split this stream and send rejected URLs back to crawlDB. Probably need to
 			// merge this CrawlStateUrl stream with CrawlStateUrl streams from outlinks and fetch results.
 
-			// TODO add parse function to builder.
+			// TODO need a Tuple3 with a FetchedUrl(?) that has status update, which we can merge back in with
+			// rejected robots URLs and outlinks. The fetcher code would want to handle settings no outlink(s) or
+			// content and just a FetchedUrl for case of a fetch failure or if the content fetched isn't the
+			// type that we want (e.g. image file)
 			DataStream<Tuple2<ExtractedUrl, ParsedUrl>> fetchedUrls = urlsToFetch.connect(tickler)
 					.flatMap(_fetchFunction)
-					.flatMap(new ParseFunction());
+					.flatMap(_parseFunction);
 
-			// Need to split this stream and send extracted URLs back, and save off parsed page content.
 			SplitStream<Tuple2<ExtractedUrl,ParsedUrl>> outlinksOrContent = fetchedUrls.split(new OutputSelector<Tuple2<ExtractedUrl,ParsedUrl>>() {
 
 				private final List<String> OUTLINK_STREAM = Arrays.asList("outlink");
@@ -138,12 +173,24 @@ public class CrawlTopology {
 					}
 				}
 			});
-
+			
 			DataStream<RawUrl> newUrls = outlinksOrContent.select("outlink")
 					.map(new OutlinkToStateUrlFunction());
 
 			iteration.closeWith(newUrls);
 
+			// Save off parsed page content. So just extract the parsed content piece of the Tuple2, and
+			// then pass it on to the provided content sink function.
+			outlinksOrContent.select("content")
+					.map(new MapFunction<Tuple2<ExtractedUrl,ParsedUrl>, ParsedUrl>() {
+
+						@Override
+						public ParsedUrl map(Tuple2<ExtractedUrl, ParsedUrl> in) throws Exception {
+							return in.f1;
+						}
+					})
+					.addSink(_contentSink);
+			
 			return new CrawlTopology(_env, _jobName);
 		}
 	}
