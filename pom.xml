@@ -32,6 +32,7 @@ under the License.
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<flink.version>1.0.0</flink.version>
 		<slf4j.version>1.7.21</slf4j.version>
+		<tika.version>1.13</tika.version>
 	</properties>
 
 	<repositories>
@@ -94,6 +95,78 @@ under the License.
 			<version>${slf4j.version}</version>
 		</dependency>
 
+		<dependency>
+			<groupId>org.apache.tika</groupId>
+			<artifactId>tika-parsers</artifactId>
+			<version>${tika.version}</version>
+			<exclusions>
+	            <exclusion>
+	                <groupId>org.apache.pdfbox</groupId>
+	                <artifactId>pdfbox</artifactId>
+	            </exclusion>
+	            <exclusion>
+	                <groupId>org.apache.poi</groupId>
+	                <artifactId>poi</artifactId>
+	            </exclusion>
+	            <exclusion>
+	                <groupId>org.apache.poi</groupId>
+	                <artifactId>poi-ooxml</artifactId>
+	            </exclusion>
+	            <exclusion>
+	                <groupId>org.apache.poi</groupId>
+	                <artifactId>poi-scratchpad</artifactId>
+	            </exclusion>
+	            <exclusion>
+	                <groupId>rome</groupId>
+	                <artifactId>rome</artifactId>
+	            </exclusion>
+	            <exclusion>
+	                <groupId>edu.ucar</groupId>
+	                <artifactId>netcdf</artifactId>
+	            </exclusion>
+	            <exclusion>
+	                <groupId>org.bouncycastle</groupId>
+	                <artifactId>bcprov-jdk15</artifactId>
+	            </exclusion>
+	            <exclusion>
+	            	<groupId>edu.ucar</groupId>
+	            	<artifactId>grib</artifactId>
+	            </exclusion>
+	            <exclusion>
+	            	<groupId>edu.ucar</groupId>
+	            	<artifactId>cdm</artifactId>
+	            </exclusion>
+	            <exclusion>
+	            	<groupId>edu.ucar</groupId>
+	            	<artifactId>netcdf4</artifactId>
+	            </exclusion>
+	            <exclusion>
+	            	<groupId>org.bouncycastle</groupId>
+	            	<artifactId>bcmail-jdk15on</artifactId>
+	            </exclusion>
+	            <exclusion>
+	            	<groupId>org.bouncycastle</groupId>
+	            	<artifactId>bcprov-jdk15on</artifactId>
+	            </exclusion>
+	            <exclusion>
+	            	<groupId>org.apache.cxf</groupId>
+	            	<artifactId>cxf-rt-rs-client</artifactId>
+	            </exclusion>
+	            <exclusion>
+	            	<groupId>org.apache.opennlp</groupId>
+	            	<artifactId>opennlp-tools</artifactId>
+	            </exclusion>
+	            <exclusion>
+	            	<groupId>com.healthmarketscience.jackcess</groupId>
+	            	<artifactId>jackcess</artifactId>
+	            </exclusion>
+	            <exclusion>
+	            	<groupId>com.googlecode.mp4parser</groupId>
+	            	<artifactId>isoparser</artifactId>
+	            </exclusion>
+			</exclusions>
+		</dependency>
+		
 		<!-- Test scope -->
 		<dependency>
 			<groupId>org.slf4j</groupId>
