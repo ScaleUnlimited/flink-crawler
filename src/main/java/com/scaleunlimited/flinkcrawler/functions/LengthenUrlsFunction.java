@@ -44,7 +44,13 @@ public class LengthenUrlsFunction extends RichCoFlatMapFunction<RawUrl, Tuple0, 
 	
 	@Override
 	public void close() throws Exception {
-		// TODO flush out everything from the executor service.
+		_executor.shutdown();
+		
+		// TODO get timeout from lengthener service
+		if (!_executor.awaitTermination(1, TimeUnit.SECONDS)) {
+			// TODO handle timeout.
+		}
+		
 		super.close();
 	}
 	

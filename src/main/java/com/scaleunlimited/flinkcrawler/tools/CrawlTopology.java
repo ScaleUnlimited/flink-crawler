@@ -69,6 +69,7 @@ public class CrawlTopology {
 		private StreamExecutionEnvironment _env;
 		private String _jobName = "flink-crawler";
 		private long _tickleInterval = TickleSource.DEFAULT_TICKLE_INTERVAL;
+		private long _runTime = TickleSource.INFINITE_RUN_TIME;
 		private RichCoFlatMapFunction<CrawlStateUrl, Tuple0, FetchUrl> _crawlDBFunction;
 		private RichCoFlatMapFunction<FetchUrl, Tuple0, FetchUrl> _robotsFunction;
 		private RichCoFlatMapFunction<FetchUrl, Tuple0, FetchedUrl> _fetchFunction;
@@ -126,16 +127,24 @@ public class CrawlTopology {
 			return this;
 		}
 		
+		public CrawlTopologyBuilder setRunTime(long runTime) {
+			_runTime = runTime;
+			return this;
+		}
+		
 		@SuppressWarnings("serial")
 		public CrawlTopology build() {
 			// TODO set source as a separate call. And use a simple collection source for testing.
 			DataStream<RawUrl> rawUrls = _env.addSource(new SeedUrlSource(1.0f, "http://cnn.com", "http://facebook.com")).setParallelism(4);
 
-			DataStream<Tuple0> tickler = _env.addSource(new TickleSource(_tickleInterval));
+			DataStream<Tuple0> tickler = _env.addSource(new TickleSource(_runTime, _tickleInterval));
 
-			// TODO add lengthener, normalizer, filter to builder.
-			
-			IterativeStream<RawUrl> iteration = rawUrls.iterate();
+			// TODO use something like double the fetch timeout here? or add fetch timeout to parse timeout? Maybe we
+			// need to be able to ask each operation how long it might take, and use that. Note that as long as the
+			// TickleSource keeps pumping out tickle tuples we won't terminate, so we don't need to worry about
+			// something like a full CrawlDB merge causing us to time out. So in that case maybe just use double the
+			// tickle interval here? But setting it to 200 when tickle is 100 causes us to not terminate :(
+			IterativeStream<RawUrl> iteration = rawUrls.iterate(1000);
 			DataStream<CrawlStateUrl> cleanedUrls = iteration.connect(tickler)
 					.flatMap(new LengthenUrlsFunction())
 					.flatMap(new NormalizeUrlsFunction(_urlNormalizer))

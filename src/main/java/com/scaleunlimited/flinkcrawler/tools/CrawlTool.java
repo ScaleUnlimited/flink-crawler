@@ -29,7 +29,8 @@ public class CrawlTool {
 				.setParseFunction(new ParseFunction())
 				.setContentSink(new DiscardingSink<ParsedUrl>())
 				.setUrlNormalizer(new SimpleUrlNormalizer())
-				.setUrlFilter(new SimpleUrlValidator());
+				.setUrlFilter(new SimpleUrlValidator())
+				.setRunTime(1000);
 			
 			builder.build().execute();
 		} catch (Throwable t) {
