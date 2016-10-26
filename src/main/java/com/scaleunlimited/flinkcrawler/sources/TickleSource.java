@@ -14,14 +14,22 @@ import org.apache.flink.streaming.api.functions.source.SourceFunction;
 public class TickleSource implements SourceFunction<Tuple0> {
 
 	public static final long DEFAULT_TICKLE_INTERVAL = 100;
+	public static final long INFINITE_RUN_TIME = 0;
 	
 	private boolean _keepRunning = false;
-	private long _tickleInterval = DEFAULT_TICKLE_INTERVAL;
+	private long _tickleInterval;
+	private long _runTime;
 	
 	public TickleSource() {
+		this(INFINITE_RUN_TIME);
+	}
+	
+	public TickleSource(long runTime) {
+		this(runTime, DEFAULT_TICKLE_INTERVAL);
 	}
 
-	public TickleSource(long tickleInterval) {
+	public TickleSource(long runTime, long tickleInterval) {
+		_runTime = runTime;
 		_tickleInterval = tickleInterval;
 	}
 
@@ -33,8 +41,9 @@ public class TickleSource implements SourceFunction<Tuple0> {
 	@Override
 	public void run(SourceContext<Tuple0> context) throws Exception {
 		_keepRunning = true;
+		long endTime = System.currentTimeMillis() + _runTime;
 		
-		while (_keepRunning) {
+		while (_keepRunning && ((_runTime == INFINITE_RUN_TIME) || (System.currentTimeMillis() < endTime))) {
 			context.collect(new Tuple0());
 			Thread.sleep(_tickleInterval);
 		}

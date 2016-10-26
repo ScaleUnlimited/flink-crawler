@@ -48,7 +48,13 @@ public class FetchUrlsFunction extends RichCoFlatMapFunction<FetchUrl, Tuple0, F
 	
 	@Override
 	public void close() throws Exception {
-		// TODO flush out everything from the executor service.
+		_executor.shutdown();
+		
+		// TODO get timeout from fetcher
+		if (!_executor.awaitTermination(1, TimeUnit.SECONDS)) {
+			// TODO handle timeout.
+		}
+		
 		super.close();
 	}
 	
