@@ -17,6 +17,7 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.co.RichCoFlatMapFunction;
 import org.apache.flink.util.Collector;
 
+import com.scaleunlimited.flinkcrawler.fetcher.BaseFetcher;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
@@ -29,11 +30,13 @@ public class FetchUrlsFunction extends RichCoFlatMapFunction<FetchUrl, Tuple0, F
 	
 	private static final int MAX_QUEUED_URLS = 1000;
 	
+	private BaseFetcher _fetcher;
+	
 	private transient ConcurrentLinkedQueue<FetchedUrl> _output;
 	private transient ThreadPoolExecutor _executor;
 	
-	public FetchUrlsFunction() {
-		// TODO Auto-generated constructor stub
+	public FetchUrlsFunction(BaseFetcher fetcher) {
+		_fetcher = fetcher;
 	}
 
 	@Override
@@ -67,10 +70,15 @@ public class FetchUrlsFunction extends RichCoFlatMapFunction<FetchUrl, Tuple0, F
 			public void run() {
 				// TODO fetch the URL.
 				System.out.println("Fetching " + url);
-				Map<String, List<String>> headers = new HashMap<>();
-				byte[] content = new byte[0];
-				FetchedUrl result = new FetchedUrl(url.getUrl(), url.getUrl(), System.currentTimeMillis(), headers, content, "text/html", 0);
-				_output.add(result);
+				try {
+					// TODO figure out actual fetch() API that we should use (something similar to Bixo)
+					Map<String, List<String>> headers = new HashMap<>();
+					byte[] content = _fetcher.fetch(url, headers);
+					FetchedUrl result = new FetchedUrl(url.getUrl(), url.getUrl(), System.currentTimeMillis(), headers, content, "text/html", 0);
+					_output.add(result);
+				} catch (Exception e) {
+					
+				}
 			}
 		});
 	}

@@ -5,29 +5,28 @@ import java.util.List;
 
 import org.apache.flink.api.common.JobExecutionResult;
 import org.apache.flink.api.common.functions.MapFunction;
-import org.apache.flink.api.common.functions.RichFlatMapFunction;
 import org.apache.flink.api.java.tuple.Tuple0;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.streaming.api.collector.selector.OutputSelector;
 import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.datastream.DataStreamSink;
 import org.apache.flink.streaming.api.datastream.IterativeStream;
 import org.apache.flink.streaming.api.datastream.SplitStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.co.RichCoFlatMapFunction;
-import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 
-import com.scaleunlimited.flinkcrawler.functions.ValidUrlsFilter;
+import com.scaleunlimited.flinkcrawler.fetcher.BaseFetcher;
+import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.LengthenUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.NormalizeUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.OutlinkToStateUrlFunction;
 import com.scaleunlimited.flinkcrawler.functions.ParseFunction;
 import com.scaleunlimited.flinkcrawler.functions.RawToStateUrlFunction;
+import com.scaleunlimited.flinkcrawler.functions.ValidUrlsFilter;
+import com.scaleunlimited.flinkcrawler.parser.BaseParser;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
-import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
@@ -70,13 +69,15 @@ public class CrawlTopology {
 		private String _jobName = "flink-crawler";
 		private long _tickleInterval = TickleSource.DEFAULT_TICKLE_INTERVAL;
 		private long _runTime = TickleSource.INFINITE_RUN_TIME;
+		
 		private RichCoFlatMapFunction<CrawlStateUrl, Tuple0, FetchUrl> _crawlDBFunction;
 		private RichCoFlatMapFunction<FetchUrl, Tuple0, FetchUrl> _robotsFunction;
-		private RichCoFlatMapFunction<FetchUrl, Tuple0, FetchedUrl> _fetchFunction;
-		private RichFlatMapFunction<FetchedUrl, Tuple2<ExtractedUrl, ParsedUrl>> _parseFunction;
+		
 		private SinkFunction<ParsedUrl> _contentSink;
 		private BaseUrlNormalizer _urlNormalizer;
 		private BaseUrlValidator _urlFilter;
+		private BaseFetcher _fetcher;
+		private BaseParser _parser;
 		
 		public CrawlTopologyBuilder(StreamExecutionEnvironment env) {
 			_env = env;
@@ -97,13 +98,13 @@ public class CrawlTopology {
 			return this;
 		}
 		
-		public CrawlTopologyBuilder setFetchFunction(RichCoFlatMapFunction<FetchUrl, Tuple0, FetchedUrl> fetchFunction) {
-			_fetchFunction = fetchFunction;
+		public CrawlTopologyBuilder setFetcher(BaseFetcher fetcher) {
+			_fetcher = fetcher;
 			return this;
 		}
 		
-		public CrawlTopologyBuilder setParseFunction(RichFlatMapFunction<FetchedUrl, Tuple2<ExtractedUrl, ParsedUrl>> parseFunction) {
-			_parseFunction = parseFunction;
+		public CrawlTopologyBuilder setParser(BaseParser parser) {
+			_parser = parser;
 			return this;
 		}
 		
@@ -166,8 +167,8 @@ public class CrawlTopology {
 			// content and just a FetchedUrl for case of a fetch failure or if the content fetched isn't the
 			// type that we want (e.g. image file)
 			DataStream<Tuple2<ExtractedUrl, ParsedUrl>> fetchedUrls = urlsToFetch.connect(tickler)
-					.flatMap(_fetchFunction)
-					.flatMap(_parseFunction);
+					.flatMap(new FetchUrlsFunction(_fetcher))
+					.flatMap(new ParseFunction(_parser));
 
 			SplitStream<Tuple2<ExtractedUrl,ParsedUrl>> outlinksOrContent = fetchedUrls.split(new OutputSelector<Tuple2<ExtractedUrl,ParsedUrl>>() {
 

@@ -4,9 +4,9 @@ import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 
+import com.scaleunlimited.flinkcrawler.fetcher.SimpleFetcher;
 import com.scaleunlimited.flinkcrawler.functions.CheckUrlWithRobotsFunction;
 import com.scaleunlimited.flinkcrawler.functions.CrawlDBFunction;
-import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.ParseFunction;
 import com.scaleunlimited.flinkcrawler.parser.SimpleParser;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
@@ -25,12 +25,12 @@ public class CrawlTool {
 			
 			CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
 				.setCrawlDBFunction(new CrawlDBFunction())
-				.setFetchFunction(new FetchUrlsFunction())
 				.setRobotsFunction(new CheckUrlWithRobotsFunction())
-				.setParseFunction(new ParseFunction(new SimpleParser()))
+				.setParser(new SimpleParser())
 				.setContentSink(new DiscardingSink<ParsedUrl>())
 				.setUrlNormalizer(new SimpleUrlNormalizer())
 				.setUrlFilter(new SimpleUrlValidator())
+				.setFetcher(new SimpleFetcher())
 				.setRunTime(1000);
 			
 			builder.build().execute();
