@@ -10,6 +10,8 @@ import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 
 /**
  * Source for seed URLs
+ * 
+ * TODO add checkpointing - see FromElementsFunction.java
  *
  */
 @SuppressWarnings("serial")
@@ -17,7 +19,7 @@ public class SeedUrlSource extends RichParallelSourceFunction<RawUrl> {
 
 	private RawUrl[] _unpartitioned;
 	
-	private transient boolean _keepRunning = false;
+	private volatile boolean _keepRunning = false;
 	private transient LinkedList<RawUrl> _urls;
 	
 	public SeedUrlSource(float estimatedScore, String... rawUrls) {
@@ -60,15 +62,8 @@ public class SeedUrlSource extends RichParallelSourceFunction<RawUrl> {
 	public void run(SourceContext<RawUrl> context) throws Exception {
 		_keepRunning = true;
 		
-		while (_keepRunning) {
-			if (!_urls.isEmpty()) {
-				// TODO With parallelism, we only want to emit URLs that are appropriate for us, versus
-				// doing a broadcast of every URL.
-				context.collect(_urls.pop());
-			} else {
-				// context.collect(TICKLE_URL);
-				Thread.sleep(100L);
-			}
+		while (_keepRunning && !_urls.isEmpty()) {
+			context.collect(_urls.pop());
 		}
 	}
 
