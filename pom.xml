@@ -116,6 +116,13 @@ under the License.
 			<version>4.12</version>
 			<scope>test</scope>
 		</dependency>
+		
+		<dependency>
+			<groupId>it.unimi.dsi</groupId>
+			<artifactId>webgraph</artifactId>
+			<version>3.5.2</version>
+			<scope>test</scope>
+		</dependency>
     </dependencies>
 
 	<profiles>
