@@ -4,15 +4,26 @@ import org.apache.flink.api.common.functions.RichFlatMapFunction;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.util.Collector;
 
+
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
+import com.scaleunlimited.flinkcrawler.parser.BaseParser;
 
 @SuppressWarnings("serial")
 public class ParseFunction extends RichFlatMapFunction<FetchedUrl, Tuple2<ExtractedUrl, ParsedUrl>> {
 
+    private BaseParser _parser;
+
+	public ParseFunction(BaseParser parser) {
+        _parser = parser;
+    }
+
 	@Override
 	public void flatMap(FetchedUrl fetchedUrl, Collector<Tuple2<ExtractedUrl, ParsedUrl>> collector) throws Exception {
+		
+		
+		
 		// Output the content.
 		collector.collect(new Tuple2<ExtractedUrl, ParsedUrl>(null, new ParsedUrl("http://domain.com", "192.168.1.1", "hello, world", "en", "Title", null)));
 		

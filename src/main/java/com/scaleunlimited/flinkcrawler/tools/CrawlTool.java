@@ -8,6 +8,7 @@ import com.scaleunlimited.flinkcrawler.functions.CheckUrlWithRobotsFunction;
 import com.scaleunlimited.flinkcrawler.functions.CrawlDBFunction;
 import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.ParseFunction;
+import com.scaleunlimited.flinkcrawler.parser.SimpleParser;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.tools.CrawlTopology.CrawlTopologyBuilder;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlNormalizer;
@@ -26,7 +27,7 @@ public class CrawlTool {
 				.setCrawlDBFunction(new CrawlDBFunction())
 				.setFetchFunction(new FetchUrlsFunction())
 				.setRobotsFunction(new CheckUrlWithRobotsFunction())
-				.setParseFunction(new ParseFunction())
+				.setParseFunction(new ParseFunction(new SimpleParser()))
 				.setContentSink(new DiscardingSink<ParsedUrl>())
 				.setUrlNormalizer(new SimpleUrlNormalizer())
 				.setUrlFilter(new SimpleUrlValidator())
