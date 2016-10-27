@@ -147,8 +147,11 @@ public class CrawlTopology {
 			IterativeStream<RawUrl> iteration = rawUrls.iterate(1000);
 			DataStream<CrawlStateUrl> cleanedUrls = iteration.connect(tickler)
 					.flatMap(new LengthenUrlsFunction())
+					.name("LengthenUrlsFunction")
 					.flatMap(new NormalizeUrlsFunction(_urlNormalizer))
+					.name("NormalizeUrlsFunction")
 					.filter(new ValidUrlsFilter(_urlFilter))
+					.name("FilterUrlsFunction")
 					.map(new RawToStateUrlFunction());
 
 			DataStream<FetchUrl> urlsToFetch = cleanedUrls.connect(tickler)
