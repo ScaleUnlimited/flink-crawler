@@ -11,8 +11,6 @@ public class ParsedUrl {
 	private String _title;
 	private Map<String, String> _parsedMeta;
 
-	// TODO VMa - this shouldn't have outlinks, as those are processed separately (see ParseFunction)
-	
 	// TODO extend this to include the passed in scores and status as well
 	public ParsedUrl(String url, String hostAddress, String parsedText,
 			String language, String title, Map<String, String> parsedMeta) {
