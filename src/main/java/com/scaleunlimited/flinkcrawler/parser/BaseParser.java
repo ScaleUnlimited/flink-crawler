@@ -1,5 +1,6 @@
 package com.scaleunlimited.flinkcrawler.parser;
 
+import java.io.Serializable;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
@@ -8,12 +9,10 @@ import java.util.Map;
 import org.apache.tika.utils.CharsetUtils;
 
 import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
-import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.utils.HttpUtils;
 
-
-
-public abstract class BaseParser {
+@SuppressWarnings("serial")
+public abstract class BaseParser implements Serializable {
 
 	// TODO VMa - move these into a common http headers file ?
     public final static String CONTENT_LANGUAGE = "Content-Language";
