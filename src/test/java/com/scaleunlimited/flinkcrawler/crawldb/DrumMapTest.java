@@ -69,39 +69,26 @@ public class DrumMapTest {
 	}
 
 	@Test
-	public void testResortBySizeTiming() throws Exception {
+	public void testTiming() throws Exception {
 		final int numEntries = 1_000_000;
-		for (int resortSize = 4000; resortSize <= numEntries/50; resortSize += 1000) {
+		for (int test = 0; test < 10; test++) {
 			DrumMap dm = new DrumMap(numEntries);
-			dm.setResortSize(resortSize);
 			Random rand = new Random(System.currentTimeMillis());
 
 			long startTime = System.currentTimeMillis();
+			long lastKey = 0;
 			for (int i = 0; i < numEntries; i++) {
-				long key = rand.nextLong();
-				dm.add(key, null, null);
+				if (((i + 1) % 100) == 0) {
+					dm.add(lastKey, null, null);
+				} else {
+					long key = rand.nextLong();
+					dm.add(key, null, null);
+					lastKey = key;
+				}
 			}
+			
 			long deltaTime = System.currentTimeMillis() - startTime;
-			System.out.format("Resorting at %d took %dms\n", resortSize, deltaTime);
-			dm.close();
-		}
-	}
-	
-	@Test
-	public void testResortByPercentTiming() throws Exception {
-		final int numEntries = 1_000_000;
-		for (double resortPercent = 1.0; resortPercent < 2.5; resortPercent += 0.1) {
-			DrumMap dm = new DrumMap(numEntries);
-			dm.setResortRatio(resortPercent / 100.0);
-			Random rand = new Random(System.currentTimeMillis());
-
-			long startTime = System.currentTimeMillis();
-			for (int i = 0; i < numEntries; i++) {
-				long key = rand.nextLong();
-				dm.add(key, null, null);
-			}
-			long deltaTime = System.currentTimeMillis() - startTime;
-			System.out.format("Resorting at %f took %dms\n", resortPercent, deltaTime);
+			System.out.format("Took %dms\n", deltaTime);
 			dm.close();
 		}
 	}

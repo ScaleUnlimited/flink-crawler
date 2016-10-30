@@ -9,6 +9,28 @@ public class HashUtils {
 		return getLongHash(bytes, 0, bytes.length);
 	}
 	
+	/**
+	 * Return a 32-bit JOAAT hash for <k>, where we initialize the
+	 * resulting hash value with <initValue>.
+	 * 
+	 * @param k
+	 * @param initValue
+	 * @return
+	 */
+	public static int intHash(long k, int initValue) {
+		int result = initValue;
+		
+		result += (int)k;
+		result += (result << 10);
+		result ^= (result >> 6);
+		
+		result += (int)(k >> 32);
+		result += (result << 10);
+		result ^= (result >> 6);
+
+        return result;
+	}
+	
     /**
      * Generate a 64-bit JOAAT hash from the given byte array
      * 
