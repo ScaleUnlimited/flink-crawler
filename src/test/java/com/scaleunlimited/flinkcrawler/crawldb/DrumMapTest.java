@@ -16,56 +16,25 @@ import com.scaleunlimited.flinkcrawler.crawldb.Payload;
 public class DrumMapTest {
 
 	@Test
-	public void testNoSpill() throws Exception {
-		DrumMap dm = new DrumMap(1000);
-		
-		for (int i = 500; i > 0; i--) {
-			assertTrue(dm.add(i, new Integer(i), null));
-		}
-		
-		assertEquals(500, dm.size());
-		
-		for (int i = 1; i <= 500; i++) {
-			assertFalse("Adding with existing key returned true for key = " + i, dm.add(i, null, null));
-		}
-		
-		
-		for (int i = 1; i <= 500; i++) {
-			Integer value = (Integer)dm.getInMemoryEntry(i, null);
-			assertNotNull(value);
-			assertEquals(i, (int)value);
-			
-			// TODO test with non-null payload (should be cleared out)
-		}
-		
-		dm.close();
-	}
-	
-	@Test
 	public void testPayload() throws Exception {
 		DrumMap dm = new DrumMap(1000);
 		
 		for (int i = 500; i > 0; i--) {
-			assertTrue(dm.add(i, null, new LongPayload(i)));
+			dm.add(i, null, new LongPayload(i));
 		}
 		
+		dm.close();
 		assertEquals(500, dm.size());
-		
-		for (int i = 1; i <= 500; i++) {
-			assertFalse("Adding with existing key returned true for key = " + i, dm.add(i, null, null));
-		}
 		
 		LongPayload payload = new LongPayload();
 		for (int i = 1; i <= 500; i++) {
 			Integer value = (Integer)dm.getInMemoryEntry(i, payload);
-			assertNull(value);
+			assertNull("Shouldn't find value for key " + i, value);
 			
 			Long payloadValue = payload.getPayload();
-			assertNotNull(payloadValue);
+			assertNotNull("Should get payload for key " + i, payloadValue);
 			assertEquals(i, (long)payloadValue);
 		}
-		
-		dm.close();
 	}
 
 	@Test
@@ -77,7 +46,9 @@ public class DrumMapTest {
 
 			long startTime = System.currentTimeMillis();
 			long lastKey = 0;
+			
 			for (int i = 0; i < numEntries; i++) {
+				// 1% of the entries are duplicates.
 				if (((i + 1) % 100) == 0) {
 					dm.add(lastKey, null, null);
 				} else {

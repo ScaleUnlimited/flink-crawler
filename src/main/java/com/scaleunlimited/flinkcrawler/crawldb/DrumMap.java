@@ -1,12 +1,12 @@
 package com.scaleunlimited.flinkcrawler.crawldb;
 
 import java.io.Closeable;
+import java.io.DataInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-
-import com.scaleunlimited.flinkcrawler.utils.BloomFilter;
 
 /**
  * A DrumMap implements the DRUM storage system as described by the IRLBot paper
@@ -73,10 +73,9 @@ public class DrumMap implements Closeable {
 	// An in-memory array of offsets into the payload file
 	private int[] _offsets;
 	
-	private DrumDataOutput _payloadOut;
+	private File _payloadFile;
 	
-	private BloomFilter _dupTracker;
-	private int _numEstimatedDups;
+	private DrumDataOutput _payloadOut;
 	
 	public DrumMap(int maxEntries) throws FileNotFoundException, IOException {
 		_maxEntries = maxEntries;
@@ -87,17 +86,8 @@ public class DrumMap implements Closeable {
 		_offsets = new int[_maxEntries];
 		
 		// TODO gzip the output stream, as it's going to have a lot of compression
-		_payloadOut = new DrumDataOutput(new FileOutputStream(File.createTempFile("drum-payload", "bin")));
-		
-		// TODO set these numbers based on the maxEntries. I got these from http://hur.st/bloomfilter,
-		// using 1M entries and a 1-in-100K probability of a false positive. With 1M entries and a 1% dup
-		// rate it returns a high dup count (10001 or 10002, in all my tests) about once very 10 times.
-		// Reducing the number of hash functions speeds this up by a bit (e.g. 10 makes it about 20%
-		// faster, but with slightly higher false positive rates). But that means we're using about 3
-		// bytes/entry for the Bloom set, versus about 16 bytes/entry (estimated) for the other data,
-		// so this adds about 19% to the size, in exchange for skipping a scan at the end.
-		_dupTracker = new BloomFilter(26_000_000, 17);
-		_numEstimatedDups = 0;
+		_payloadFile = File.createTempFile("drum-payload", "bin");
+		_payloadOut = new DrumDataOutput(new FileOutputStream(_payloadFile));
 	}
 	
 	public int size() {
@@ -113,13 +103,6 @@ public class DrumMap implements Closeable {
 		_offsets[_numEntries] = writePayload(payload);
 
 		_numEntries += 1;
-
-		// Keep track of potential dups with BloomSet(key)
-		if (_dupTracker.membershipTest(key)) {
-			_numEstimatedDups += 1;
-		} else {
-			_dupTracker.add(key);
-		}
 
 		if (_numEntries >= _maxEntries) {
 			merge();
@@ -153,44 +136,35 @@ public class DrumMap implements Closeable {
 	private void merge() {
 		DrumMapSorter.quickSort(_keys, 0, _numEntries - 1, _offsets, _values);
 
-		
-		if (_numEstimatedDups > (_numEntries/100)) {
-			for (int i = 1; i < _numEntries; i++) {
-				if (_keys[i - 1] == _keys[i]) {
-					// TODO merge lower entry into upper entry
-					// TODO mark lower entry as unused?
-					// Hmm, we could maybe skip this, since we're doing a merge anyway
-					// with what's on disk. Or maybe see how many dups we get, and if
-					// they're too high then "fill the holes" from the back forward
-					// (more efficient, since we won't spend time doing this for
-					// entries that will be merged). We could track number of potential
-					// dups via a BloomSet, so only bother with the dedup here if it's
-					// likely to be useful.
-				}
-			}
-		}
-		
 		// TODO do the merge
 		
 	}
 
 	@Override
 	public void close() throws IOException {
-		// TODO flush as needed.
+		if (_payloadOut == null) {
+			throw new IllegalStateException("Already closed!");
+		}
 		
 		_payloadOut.close();
+		_payloadOut = null;
 	}
 
 	
 	/**
 	 * Return the value from the in-memory array for <key>. If payload isn't null,
 	 * fill it in with the payload for this entry, or clear it if there's no payload.
+	 * WARNING!!! This is only used for testing!
 	 * 
 	 * @param key
 	 * @param payload
 	 * @return
 	 */
 	public Object getInMemoryEntry(long key, Payload payload) throws IOException {
+		if (_payloadOut != null) {
+			throw new IllegalStateException("Must be closed first!");
+		}
+
 		int index = findKey(key);
 		if (index < 0) {
 			if (payload != null) {
@@ -209,30 +183,26 @@ public class DrumMap implements Closeable {
 					// no more updates? Or maybe this is a test-only call, so
 					// we can open up the file each time, seek to the target
 					// offset, and read the data.
-					_payloadOut.flush();
-					
+					FileInputStream fis = new FileInputStream(_payloadFile);
+					DataInputStream dis = new DataInputStream(fis);
+					dis.skip(payloadOffset);
+					payload.readFields(dis);
+					dis.close();
 				}
 			}
+			
 			return _values[index];
 		}
 	}
 
 	private int findKey(long key) {
-		int index = -1;
-//		if (_sortedEntries > 0) {
-//			index = Arrays.binarySearch(_keys, 0, _sortedEntries, key);
-//		}
-//		
-//		if (index < 0) {
-//			for (int i = _sortedEntries; i < _numEntries; i++) {
-//				if (_keys[i] == key) {
-//					index = i;
-//					break;
-//				}
-//			}
-//		}
+		for (int i = 0; i < _numEntries; i++) {
+			if (_keys[i] == key) {
+				return i;
+			}
+		}
 		
-		return index;
+		return -1;
 	}
 	
 }
