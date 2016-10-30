@@ -1,4 +1,4 @@
-package com.scaleunlimited.flinkcrawler.utils;
+package com.scaleunlimited.flinkcrawler.crawldb;
 
 import java.io.DataInput;
 import java.io.DataOutput;

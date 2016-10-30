@@ -4,8 +4,8 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
+import com.scaleunlimited.flinkcrawler.crawldb.Payload;
 import com.scaleunlimited.flinkcrawler.utils.HashUtils;
-import com.scaleunlimited.flinkcrawler.utils.Payload;
 
 
 public class CrawlStateUrl {

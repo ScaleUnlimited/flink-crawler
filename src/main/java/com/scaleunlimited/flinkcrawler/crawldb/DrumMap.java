@@ -1,4 +1,4 @@
-package com.scaleunlimited.flinkcrawler.utils;
+package com.scaleunlimited.flinkcrawler.crawldb;
 
 import java.io.Closeable;
 import java.io.File;
@@ -40,6 +40,21 @@ import java.util.Arrays;
  * entries. The three possibilities are "active" (as described above), "fetch" (which
  * writes to active and also puts the entry in a fetch queue), and "archive" (which
  * write to archives key/value and payload files).
+ * 
+ * TODO - decide about whether to keep the 'value' as a fixed number of bytes (e.g. 32)
+ * We could have an int offset (or index) to the value in the actual map, which is-1 if no value.
+ * So that way we avoid lots of objects being allocated. But all state required for
+ * merging CrawlDBUrl (doesn't exist yet, but it should) would have to fit in that fixed
+ * size.
+ * 
+ * TODO - decide about deferred merging. We could just keep adding entries to the array,
+ * and when we run out of free space we sort/merge (can we do merging during the sort?)
+ * If we have not enough free space after this, then it's time to merge to disk. So we
+ * trade off faster adding (zero overhead) with a bit more work during the sort, or a
+ * lot more copying after sorting/merging.
+ * 
+ * Issue - if we collapse after we sort, there's a lot of copying of data to fill in
+ * spaces.
  *
  */
 public class DrumMap implements Closeable {
@@ -55,6 +70,9 @@ public class DrumMap implements Closeable {
 	
 	// How many of _numEntries are sorted.
 	private int _sortedEntries;
+	
+	// Ratio of count of unsorted to total entries
+	private double _resortRatio = 0.018;
 	
 	// An in-memory array of keys (hashes), which are longs
 	private long[] _keys;
@@ -76,6 +94,11 @@ public class DrumMap implements Closeable {
 		_offsets = new int[_maxEntries];
 		
 		_payloadOut = new DrumDataOutput(new FileOutputStream(File.createTempFile("drum-payload", "bin")));
+	}
+	
+	public DrumMap setResortRatio(double resortRatio) {
+		_resortRatio = resortRatio;
+		return this;
 	}
 	
 	public int size() {
@@ -120,11 +143,15 @@ public class DrumMap implements Closeable {
 	 * @return true if we should re-sort.
 	 */
 	private boolean timeToSort() {
-		// TODO use a more sophisticated approach. Basically cost of sort
-		// (based on number of sorted & unsorted entries) vs ongoing cost
-		// of linear scan.
+		int unsortedEntries = _numEntries - _sortedEntries;
+		// return unsortedEntries >= _resortSize;
+		// return (double)unsortedEntries/(double)_sortedEntries > _resortPercent;
 		
-		return _numEntries - _sortedEntries > 100;
+		// Lookup time is dominated by the linear scan (# of unsorted entries).
+		// So compare that to the time required to resort, which is roughly equal
+		// to the total # of entries. OK, actually it's some odd measure of unsorted
+		// plus sorted entries, but close enough for now.
+		return (double)unsortedEntries/(double)_numEntries > _resortRatio;
 	}
 
 	/**

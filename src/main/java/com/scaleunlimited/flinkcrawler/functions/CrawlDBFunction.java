@@ -10,10 +10,10 @@ import org.apache.flink.streaming.api.functions.co.RichCoFlatMapFunction;
 import org.apache.flink.streaming.api.functions.windowing.RichWindowFunction;
 import org.apache.flink.util.Collector;
 
+import com.scaleunlimited.flinkcrawler.crawldb.DrumMap;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
-import com.scaleunlimited.flinkcrawler.utils.DrumMap;
 
 /**
  * The Flink operator that wraps our "crawl DB". Incoming URLs are deduplicated and merged in memory.

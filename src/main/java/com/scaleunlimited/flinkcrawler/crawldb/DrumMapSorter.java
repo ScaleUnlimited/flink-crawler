@@ -1,4 +1,4 @@
-package com.scaleunlimited.flinkcrawler.utils;
+package com.scaleunlimited.flinkcrawler.crawldb;
 
 /**
  * A fast sort routine for the arrays that comprise the in-memory data for a DRUM.
