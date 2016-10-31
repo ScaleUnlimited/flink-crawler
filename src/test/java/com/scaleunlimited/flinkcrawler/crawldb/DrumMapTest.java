@@ -1,17 +1,15 @@
 package com.scaleunlimited.flinkcrawler.crawldb;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 
 import java.io.DataInput;
 import java.io.DataOutput;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Random;
 
 import org.junit.Test;
-
-import com.scaleunlimited.flinkcrawler.crawldb.DrumMap;
-import com.scaleunlimited.flinkcrawler.crawldb.Payload;
 
 public class DrumMapTest {
 

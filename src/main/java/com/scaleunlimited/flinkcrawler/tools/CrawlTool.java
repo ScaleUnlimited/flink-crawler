@@ -5,6 +5,7 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 
 import com.scaleunlimited.flinkcrawler.fetcher.SimpleFetcher;
+import com.scaleunlimited.flinkcrawler.fetcher.UserAgent;
 import com.scaleunlimited.flinkcrawler.functions.CheckUrlWithRobotsFunction;
 import com.scaleunlimited.flinkcrawler.functions.CrawlDBFunction;
 import com.scaleunlimited.flinkcrawler.functions.ParseFunction;
@@ -30,7 +31,7 @@ public class CrawlTool {
 				.setContentSink(new DiscardingSink<ParsedUrl>())
 				.setUrlNormalizer(new SimpleUrlNormalizer())
 				.setUrlFilter(new SimpleUrlValidator())
-				.setFetcher(new SimpleFetcher())
+				.setFetcher(new SimpleFetcher(new UserAgent("bogus", "bogus@domain.com", "http://domain.com")))
 				.setRunTime(1000);
 			
 			builder.build().execute();

@@ -1,16 +1,25 @@
 package com.scaleunlimited.flinkcrawler.fetcher;
 
-import java.util.List;
-import java.util.Map;
-
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 
+@SuppressWarnings("serial")
 public class SimpleFetcher extends BaseFetcher {
 
+	public SimpleFetcher(UserAgent userAgent) {
+		super(userAgent);
+	}
+	
 	@Override
-	public byte[] fetch(FetchUrl url, Map<String, List<String>> headers) {
+	public FetchedResult get(FetchUrl url) throws BaseFetchException {
 		// TODO Auto-generated method stub
 		return null;
 	}
+
+	@Override
+	public void abort() {
+		// TODO Auto-generated method stub
+		
+	}
+
 
 }

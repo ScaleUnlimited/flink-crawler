@@ -1,8 +1,5 @@
 package com.scaleunlimited.flinkcrawler.fetcher;
 
-import java.util.List;
-import java.util.Map;
-
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.webgraph.BaseWebGraph;
 
@@ -21,13 +18,20 @@ public class WebGraphFetcher extends BaseFetcher {
 	private BaseWebGraph _graph;
 	
 	public WebGraphFetcher(BaseWebGraph graph) {
+		super(new UserAgent("WebGraphFetcher", "flink-crawler@scaleunlimited.com", "http://www.scaleunlimited.com"));
+		
 		_graph = graph;
 	}
 	
 	@Override
-	public byte[] fetch(FetchUrl url, Map<String, List<String>> headers) {
+	public FetchedResult get(FetchUrl url) throws BaseFetchException {
 		// TODO Auto-generated method stub
 		return null;
+	}
+
+	@Override
+	public void abort() {
+		// nothing to abort
 	}
 
 }

@@ -3,19 +3,21 @@ package com.scaleunlimited.flinkcrawler.pojos;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.tika.metadata.Metadata;
+
 
 public class FetchedUrl {
 
 	private String _baseUrl;
 	private String _fetchedUrl;
 	private long _fetchTime;
-	private Map<String, List<String>> _headers;
+	private Metadata _headers;
 	private byte[] _content;
 	private String _contentType;
 	private int _responseRate;
 
 	
-	public FetchedUrl(String baseUrl, String fetchedUrl, long fetchTime, Map<String, List<String>> headers,
+	public FetchedUrl(String baseUrl, String fetchedUrl, long fetchTime, Metadata headers,
 			byte[] content, String contentType, int responseRate) {
 		_baseUrl = baseUrl;
 		_fetchedUrl= fetchedUrl;
@@ -59,12 +61,12 @@ public class FetchedUrl {
 	}
 
 
-	public Map<String, List<String>> getHeaders() {
+	public Metadata getHeaders() {
 		return _headers;
 	}
 
 
-	public void setHeaders(Map<String, List<String>> headers) {
+	public void setHeaders(Metadata headers) {
 		_headers = headers;
 	}
 

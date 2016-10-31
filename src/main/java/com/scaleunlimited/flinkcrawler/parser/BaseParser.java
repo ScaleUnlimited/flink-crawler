@@ -6,6 +6,7 @@ import java.net.URL;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.tika.metadata.Metadata;
 import org.apache.tika.utils.CharsetUtils;
 
 import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
@@ -51,6 +52,7 @@ public abstract class BaseParser implements Serializable {
      * @return first language in response headers, or null
      */
     protected String getLanguage(FetchedUrl fetchedUrl, String charset) {
+    	
         return getFirst(fetchedUrl.getHeaders(), CONTENT_LANGUAGE);
     }
 
@@ -75,13 +77,13 @@ public abstract class BaseParser implements Serializable {
         return baseUrl;
     }
 
-    private String getFirst(Map<String, List<String>> map, String name) {
+    private String getFirst(Metadata headers, String name) {
         String normalizedName = normalize(name);
-        List<String> curValues = map.get(normalizedName);
+        String[] curValues = headers.getValues(normalizedName);
         if (curValues == null) {
             return null;
         } else {
-            return curValues.get(0);
+            return curValues[0];
         }
     }
 
