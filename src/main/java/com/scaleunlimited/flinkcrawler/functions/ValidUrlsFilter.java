@@ -16,7 +16,15 @@ public class ValidUrlsFilter extends RichFilterFunction<RawUrl> {
 
 	@Override
 	public boolean filter(RawUrl input) throws Exception {
-		return _urlValidator.isValid(input.getUrl());
+		String url = input.getUrl();
+		boolean result = _urlValidator.isValid(url);
+		if (result) {
+			System.out.println("Not filtering " + url);
+		} else {
+			System.out.println("Filtering " + url);
+		}
+		
+		return result;
 	}
 
 }

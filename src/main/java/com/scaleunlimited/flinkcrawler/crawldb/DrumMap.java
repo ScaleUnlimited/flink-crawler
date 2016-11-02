@@ -7,6 +7,9 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.PriorityQueue;
+
+import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 
 /**
  * A DrumMap implements the DRUM storage system as described by the IRLBot paper
@@ -52,8 +55,6 @@ import java.io.IOException;
  * 
  */
 public class DrumMap implements Closeable {
-	private static final int NO_PAYLOAD_OFFSET = -1;
-
 	private static final int NO_VALUE_INDEX = -1;
 	
 	public static int DEFAULT_MAX_ENTRIES = 10_000;
@@ -120,10 +121,6 @@ public class DrumMap implements Closeable {
 	 * @return offset of data written, or NO_PAYLOAD_OFFSET
 	 */
 	private int writePayload(Payload payload) throws IOException {
-		if (payload == null) {
-			return NO_PAYLOAD_OFFSET;
-		}
-		
 		// Write the payload to our file, and return the offset of the data
 		int result = _payloadOut.getBytesWritten();
 		payload.write(_payloadOut);
@@ -137,6 +134,18 @@ public class DrumMap implements Closeable {
 		DrumMapSorter.quickSort(_keys, 0, _numEntries - 1, _offsets, _values);
 
 		// TODO do the merge
+		
+	}
+
+	public void getFetchable(PriorityQueue<FetchUrl> urls) {
+		// TODO trigger a merge if needed.
+		Payload payload = null;
+		
+		for (int i = 0; i < _numEntries; i++) {
+			int payloadOffset = _offsets[i];
+			
+			// TODO make it so
+		}
 		
 	}
 
@@ -175,20 +184,16 @@ public class DrumMap implements Closeable {
 		} else {
 			if (payload != null) {
 				int payloadOffset = _offsets[index];
-				if (payloadOffset == NO_PAYLOAD_OFFSET) {
-					payload.clear();
-				} else {
-					// TODO fill in payload. This means reading from the file.
-					// So I think we might need a flush() call, which triggers
-					// no more updates? Or maybe this is a test-only call, so
-					// we can open up the file each time, seek to the target
-					// offset, and read the data.
-					FileInputStream fis = new FileInputStream(_payloadFile);
-					DataInputStream dis = new DataInputStream(fis);
-					dis.skip(payloadOffset);
-					payload.readFields(dis);
-					dis.close();
-				}
+				// TODO fill in payload. This means reading from the file.
+				// So I think we might need a flush() call, which triggers
+				// no more updates? Or maybe this is a test-only call, so
+				// we can open up the file each time, seek to the target
+				// offset, and read the data.
+				FileInputStream fis = new FileInputStream(_payloadFile);
+				DataInputStream dis = new DataInputStream(fis);
+				dis.skip(payloadOffset);
+				payload.readFields(dis);
+				dis.close();
 			}
 			
 			return _values[index];
@@ -204,5 +209,6 @@ public class DrumMap implements Closeable {
 		
 		return -1;
 	}
+
 	
 }

@@ -22,9 +22,11 @@ public class NormalizeUrlsFunction extends RichFlatMapFunction<RawUrl, RawUrl> {
 
 	@Override
 	public void flatMap(RawUrl input, Collector<RawUrl> collector) throws Exception {
-		_normalizer.normalize(input.getUrl());
-		RawUrl output = new RawUrl(	_normalizer.normalize(input.getUrl()),
-									input.getEstimatedScore());
+		String url = input.getUrl();
+		String normalizedUrl = _normalizer.normalize(url);
+		System.out.println("Normalized " + url + " to be " + normalizedUrl);
+
+		RawUrl output = new RawUrl(normalizedUrl, input.getEstimatedScore());
 		collector.collect(output);
 	}
 

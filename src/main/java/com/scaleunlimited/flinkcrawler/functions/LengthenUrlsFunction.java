@@ -16,6 +16,7 @@ import org.apache.flink.streaming.api.functions.co.RichCoFlatMapFunction;
 import org.apache.flink.util.Collector;
 
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
+import com.scaleunlimited.flinkcrawler.urls.BaseUrlLengthener;
 
 @SuppressWarnings({ "serial", "unused" })
 public class LengthenUrlsFunction extends RichCoFlatMapFunction<RawUrl, Tuple0, RawUrl> {
@@ -25,11 +26,13 @@ public class LengthenUrlsFunction extends RichCoFlatMapFunction<RawUrl, Tuple0, 
 	
 	private static final int MAX_QUEUED_URLS = 1000;
 	
+	private BaseUrlLengthener _lengthener;
+	
 	private transient ConcurrentLinkedQueue<RawUrl> _output;
 	private transient ThreadPoolExecutor _executor;
 	
-	public LengthenUrlsFunction() {
-		// TODO Auto-generated constructor stub
+	public LengthenUrlsFunction(BaseUrlLengthener lengthener) {
+		_lengthener = lengthener;
 	}
 
 	@Override
@@ -61,9 +64,8 @@ public class LengthenUrlsFunction extends RichCoFlatMapFunction<RawUrl, Tuple0, 
 			
 			@Override
 			public void run() {
-				// TODO lengthen the URL if the domain is a link shortener.
 				System.out.println("Lengthening " + url);
-				_output.add(url);
+				_output.add(_lengthener.lengthen(url));
 			}
 		});
 	}

@@ -10,7 +10,7 @@ public class RawToStateUrlFunction implements MapFunction<RawUrl, CrawlStateUrl>
 
 	@Override
 	public CrawlStateUrl map(RawUrl url) throws Exception {
-		// TODO Auto-generated method stub
+		System.out.println("Converting raw url to crawl state url " + url.getUrl());
 		return new CrawlStateUrl(url.getUrl(), "status", "pld", Float.NaN, url.getEstimatedScore(), 0, 0);
 	}
 

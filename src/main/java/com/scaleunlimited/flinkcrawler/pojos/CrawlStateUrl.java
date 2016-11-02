@@ -105,6 +105,12 @@ public class CrawlStateUrl {
 		return new CrawlStateUrlPayload(_url);
 	}
 	
+	@Override
+	public String toString() {
+		// TODO add more fields to the response.
+		return _url;
+	}
+	
 	public static class CrawlStateUrlPayload extends Payload {
 
 		private String _url;

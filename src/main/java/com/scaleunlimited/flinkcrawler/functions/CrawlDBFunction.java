@@ -1,19 +1,13 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
-import java.io.IOException;
-import java.util.PriorityQueue;
-
-import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.java.tuple.Tuple0;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.co.RichCoFlatMapFunction;
-import org.apache.flink.streaming.api.functions.windowing.RichWindowFunction;
 import org.apache.flink.util.Collector;
 
-import com.scaleunlimited.flinkcrawler.crawldb.DrumMap;
+import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDB;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
-import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 
 /**
  * The Flink operator that wraps our "crawl DB". Incoming URLs are deduplicated and merged in memory.
@@ -33,34 +27,33 @@ import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 @SuppressWarnings("serial")
 public class CrawlDBFunction extends RichCoFlatMapFunction<CrawlStateUrl, Tuple0, FetchUrl> {
 
-	DrumMap _crawlDB;
-	PriorityQueue<FetchUrl> _urls;
+	private BaseCrawlDB _crawlDB;
 	
-	public CrawlDBFunction() {
+	public CrawlDBFunction(BaseCrawlDB crawlDB) {
+		_crawlDB = crawlDB;
 	}
 
 	@Override
 	public void open(Configuration parameters) throws Exception {
 		super.open(parameters);
 		
-		_crawlDB = new DrumMap(10000);
+		_crawlDB.open();
 		
-		_urls = new PriorityQueue<>();
 	}
 	
 	@Override
 	public void close() throws Exception {
-		// TODO close the crawl DB
+		_crawlDB.close();
 		super.close();
 	}
 
 	@Override
 	public void flatMap1(CrawlStateUrl url, Collector<FetchUrl> collector) throws Exception {
-		// TODO do we worry about async nature of flatMap2 vs. flatMap1 calls?
 		if (url == null) {
 			System.out.println("Got null CrawlStateUrl");
 		} else {
-			_crawlDB.add(url.makeKey(), url.makeValue(), url.makePayload());
+			System.out.println("Got CrawlStateUrl " + url);
+			_crawlDB.add(url);
 		}
 	}
 
@@ -72,16 +65,12 @@ public class CrawlDBFunction extends RichCoFlatMapFunction<CrawlStateUrl, Tuple0
 	 */
 	@Override
 	public void flatMap2(Tuple0 tickle, Collector<FetchUrl> collector) throws Exception {
-		if (_urls.isEmpty()) {
-			// TODO trigger a merge, so that we re-fill this. If there's nothing written to disk
-			// yet, we could just pull from the in-memory queue (no merge needed).
-			
-			// FUTURE if URLs is getting low do this, so we don't stall out during generation.
-		} else {
-			// TODO output a batch at a time?
-			collector.collect(_urls.remove());
-		}
+		FetchUrl url = _crawlDB.get();
 		
+		if (url != null) {
+			System.out.println("Emitting URL to fetch " + url);
+			collector.collect(url);
+		}
 	}
 	
 	

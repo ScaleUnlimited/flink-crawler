@@ -15,7 +15,7 @@ import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
  *
  */
 @SuppressWarnings("serial")
-public class SeedUrlSource extends RichParallelSourceFunction<RawUrl> {
+public class SeedUrlSource extends BaseUrlSource {
 
 	private RawUrl[] _unpartitioned;
 	

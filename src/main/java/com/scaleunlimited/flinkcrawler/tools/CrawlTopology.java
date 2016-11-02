@@ -15,7 +15,9 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.co.RichCoFlatMapFunction;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 
+import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDB;
 import com.scaleunlimited.flinkcrawler.fetcher.BaseFetcher;
+import com.scaleunlimited.flinkcrawler.functions.CrawlDBFunction;
 import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.LengthenUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.NormalizeUrlsFunction;
@@ -29,8 +31,9 @@ import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
-import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
+import com.scaleunlimited.flinkcrawler.sources.BaseUrlSource;
 import com.scaleunlimited.flinkcrawler.sources.TickleSource;
+import com.scaleunlimited.flinkcrawler.urls.BaseUrlLengthener;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlValidator;
 
@@ -70,9 +73,12 @@ public class CrawlTopology {
 		private long _tickleInterval = TickleSource.DEFAULT_TICKLE_INTERVAL;
 		private long _runTime = TickleSource.INFINITE_RUN_TIME;
 		
-		private RichCoFlatMapFunction<CrawlStateUrl, Tuple0, FetchUrl> _crawlDBFunction;
+		private BaseUrlSource _urlSource;
+		
+		private BaseCrawlDB _crawlDB;
 		private RichCoFlatMapFunction<FetchUrl, Tuple0, FetchUrl> _robotsFunction;
 		
+		private BaseUrlLengthener _urlLengthener;
 		private SinkFunction<ParsedUrl> _contentSink;
 		private BaseUrlNormalizer _urlNormalizer;
 		private BaseUrlValidator _urlFilter;
@@ -88,8 +94,18 @@ public class CrawlTopology {
 			return this;
 		}
 		
-		public CrawlTopologyBuilder setCrawlDBFunction(RichCoFlatMapFunction<CrawlStateUrl, Tuple0, FetchUrl> crawlDBFunction) {
-			_crawlDBFunction = crawlDBFunction;
+		public CrawlTopologyBuilder setUrlSource(BaseUrlSource urlSource) {
+			_urlSource = urlSource;
+			return this;
+		}
+		
+		public CrawlTopologyBuilder setUrlLengthener(BaseUrlLengthener lengthener) {
+			_urlLengthener = lengthener;
+			return this;
+		}
+		
+		public CrawlTopologyBuilder setCrawlDB(BaseCrawlDB crawlDB) {
+			_crawlDB = crawlDB;
 			return this;
 		}
 		
@@ -135,8 +151,8 @@ public class CrawlTopology {
 		
 		@SuppressWarnings("serial")
 		public CrawlTopology build() {
-			// TODO set source as a separate call. And use a simple collection source for testing.
-			DataStream<RawUrl> rawUrls = _env.addSource(new SeedUrlSource(1.0f, "http://cnn.com", "http://facebook.com")).setParallelism(4);
+			// TODO use single topology parallelism? But likely will want different levels for differnt parts.
+			DataStream<RawUrl> rawUrls = _env.addSource(_urlSource).setParallelism(4);
 
 			DataStream<Tuple0> tickler = _env.addSource(new TickleSource(_runTime, _tickleInterval));
 
@@ -147,7 +163,7 @@ public class CrawlTopology {
 			// tickle interval here? But setting it to 200 when tickle is 100 causes us to not terminate :(
 			IterativeStream<RawUrl> iteration = rawUrls.iterate(1000);
 			DataStream<CrawlStateUrl> cleanedUrls = iteration.connect(tickler)
-					.flatMap(new LengthenUrlsFunction())
+					.flatMap(new LengthenUrlsFunction(_urlLengthener))
 					.name("LengthenUrlsFunction")
 					.flatMap(new NormalizeUrlsFunction(_urlNormalizer))
 					.name("NormalizeUrlsFunction")
@@ -156,7 +172,7 @@ public class CrawlTopology {
 					.map(new RawToStateUrlFunction());
 
 			DataStream<FetchUrl> urlsToFetch = cleanedUrls.connect(tickler)
-					.flatMap(_crawlDBFunction)
+					.flatMap(new CrawlDBFunction(_crawlDB))
 					.connect(tickler)
 					.flatMap(_robotsFunction);
 			// TODO need to split this stream and send rejected URLs back to crawlDB. Probably need to
@@ -206,5 +222,6 @@ public class CrawlTopology {
 			
 			return new CrawlTopology(_env, _jobName);
 		}
+
 	}
 }

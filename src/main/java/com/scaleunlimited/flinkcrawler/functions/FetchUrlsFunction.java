@@ -19,6 +19,7 @@ import org.apache.flink.util.Collector;
 
 import com.scaleunlimited.flinkcrawler.fetcher.BaseFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.FetchedResult;
+import com.scaleunlimited.flinkcrawler.fetcher.HttpFetchException;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
@@ -69,17 +70,22 @@ public class FetchUrlsFunction extends RichCoFlatMapFunction<FetchUrl, Tuple0, F
 			
 			@Override
 			public void run() {
-				// TODO fetch the URL.
 				System.out.println("Fetching " + url);
+				
 				try {
 					FetchedResult result = _fetcher.get(url);
 					FetchedUrl fetchedUrl = new FetchedUrl(result.getBaseUrl(), result.getFetchedUrl(),
 														result.getFetchTime(), result.getHeaders(), 
 														result.getContent(), result.getContentType(),
 														result.getResponseRate());
+					
+					System.out.println("Fetched " + result);
 					_output.add(fetchedUrl);
+				} catch (HttpFetchException e) {
+					// TODO generate Tuple2 with fetch status tuple but no fetchedurl
 				} catch (Exception e) {
 					// TODO need to map BaseFetchException to appropriate status URL.
+					throw new RuntimeException("Exception fetching " + url, e);
 				}
 			}
 		});

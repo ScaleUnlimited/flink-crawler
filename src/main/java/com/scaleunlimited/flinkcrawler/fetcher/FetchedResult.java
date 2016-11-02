@@ -25,21 +25,28 @@ import org.apache.tika.metadata.Metadata;
 
 public class FetchedResult {
     private final String _baseUrl;
+    
+    // The actual URL we wound up fetching (!= baseUrl if we got redirects)
     private final String _fetchedUrl;
+    
     private final long _fetchTime;
     private final byte[] _content;
+    
+    // Mime-type for content
     private final String _contentType;
     private final int _responseRate;
     private final Metadata _headers;
+    
+    // Set if we get a permanent redirect
     private final String _newBaseUrl;
+    
     private final int _numRedirects;
-    private final String _hostAddress;
     private final int _statusCode; // HTTP status code
-    private final String _reasonPhrase; // HTTP reason phrase, or null
-
+    private boolean _truncated;
+    
     public FetchedResult(String baseUrl, String redirectedUrl, long fetchTime, Metadata headers, byte[] content, 
     				String contentType, int responseRate, String newBaseUrl,
-                    int numRedirects, String hostAddress, int statusCode, String reasonPhrase) {
+                    int numRedirects, int statusCode) {
 
         if (baseUrl == null) {
             throw new InvalidParameterException("baseUrl cannot be null");
@@ -61,10 +68,6 @@ public class FetchedResult {
             throw new InvalidParameterException("contentType cannot be null");
         }
 
-        if (hostAddress == null) {
-            throw new InvalidParameterException("hostAddress cannot be null");
-        }
-
         _baseUrl = baseUrl;
         _fetchedUrl = redirectedUrl;
         _fetchTime = fetchTime;
@@ -74,9 +77,9 @@ public class FetchedResult {
         _headers = headers;
         _newBaseUrl = newBaseUrl;
         _numRedirects = numRedirects;
-        _hostAddress = hostAddress;
         _statusCode = statusCode;
-        _reasonPhrase = reasonPhrase;
+        
+        _truncated = false;
     }
 
     public String getBaseUrl() {
@@ -119,16 +122,8 @@ public class FetchedResult {
         return _numRedirects;
     }
 
-    public String getHostAddress() {
-        return _hostAddress;
-    }
-
     public int getStatusCode() {
         return _statusCode;
-    }
-
-    public String getReasonPhrase() {
-        return _reasonPhrase;
     }
 
     /**
@@ -151,10 +146,8 @@ public class FetchedResult {
             report.append("                   " + mdString + "\n");
         }
         report.append("    StatusCode    : " + getStatusCode() + "\n");
-        report.append("    ReasonPhrase  : " + getReasonPhrase() + "\n");
         report.append("    NumRedirects  : " + getNumRedirects() + "\n");
         report.append("    NewBaseUrl    : " + getNewBaseUrl() + "\n");
-        report.append("    HostAddress   : " + getHostAddress() + "\n");
         report.append("    ResponseRate  : " + getResponseRate() + "\n");
         report.append("    PayLoad       : __\n"); // Map Keysets to individual
                                                    // string entries

@@ -1,8 +1,10 @@
 package com.scaleunlimited.flinkcrawler.webgraph;
 
+import java.io.Serializable;
 import java.util.Iterator;
 
-public abstract class BaseWebGraph {
+@SuppressWarnings("serial")
+public abstract class BaseWebGraph implements Serializable {
 	/**
 	 * Return an iterator that emits node names for all children of <parent>.
 	 * 
