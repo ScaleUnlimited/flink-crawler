@@ -52,7 +52,6 @@ public abstract class BaseParser implements Serializable {
      * @return first language in response headers, or null
      */
     protected String getLanguage(FetchedUrl fetchedUrl, String charset) {
-    	
         return getFirst(fetchedUrl.getHeaders(), CONTENT_LANGUAGE);
     }
 
@@ -80,7 +79,7 @@ public abstract class BaseParser implements Serializable {
     private String getFirst(Metadata headers, String name) {
         String normalizedName = normalize(name);
         String[] curValues = headers.getValues(normalizedName);
-        if (curValues == null) {
+        if ((curValues == null) || (curValues.length == 0)) {
             return null;
         } else {
             return curValues[0];

@@ -6,13 +6,17 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import com.scaleunlimited.flinkcrawler.urls.BaseUrlNormalizer;
+
 @SuppressWarnings("serial")
 public class SimpleWebGraph extends BaseWebGraph {
 
 	private Map<String, List<String>> _graph;
+	private BaseUrlNormalizer _normalizer;
 	
-	public SimpleWebGraph() {
+	public SimpleWebGraph(BaseUrlNormalizer normalizer) {
 		_graph = new HashMap<>();
+		_normalizer = normalizer;
 	}
 	
 	/**
@@ -39,11 +43,15 @@ public class SimpleWebGraph extends BaseWebGraph {
 			String pieces[] = node.split("\t");
 			String parent = pieces[0];
 			String[] children = Arrays.copyOfRange(pieces, 1, pieces.length);
+			
 			add(parent, children);
 		}
 	}
 	
 	public SimpleWebGraph add(String parent, String... children) {
+		parent = normalize(parent);
+		normalize(children);
+		
 		if (_graph.containsKey(parent)) {
 			throw new IllegalArgumentException("Duplicate node name found: " + parent);
 		}
@@ -52,6 +60,20 @@ public class SimpleWebGraph extends BaseWebGraph {
 		return this;
 	}
 	
+	private String normalize(String url) {
+		if (!url.startsWith("http")) {
+			url = "http://" + url;
+		}
+
+		return _normalizer.normalize(url);
+	}
+	
+	private void normalize(String[] urls) {
+		for (int i = 0; i < urls.length; i++) {
+			urls[i] = normalize(urls[i]);
+		}
+	}
+
 	@Override
 	public Iterator<String> getChildren(String parent) {
 		// TODO we have a webgraph with entries that don't have a protocol. So if we can't

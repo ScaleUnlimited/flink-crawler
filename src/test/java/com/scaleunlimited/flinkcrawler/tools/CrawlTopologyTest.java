@@ -28,23 +28,23 @@ public class CrawlTopologyTest {
 	public void test() throws Exception {
 		LocalStreamEnvironment env = StreamExecutionEnvironment.createLocalEnvironment();
 
-		SimpleWebGraph graph = new SimpleWebGraph()
-		.add("domain1.com", "domain1.com/page1", "domain1.com/page2")
-		.add("domain1.com/page1")
-		.add("domain1.com/page2", "domain2.com", "domain1.com", "domain1.com/page1")
-		.add("domain2.com", "domain2.com/page1");
+		SimpleWebGraph graph = new SimpleWebGraph(new SimpleUrlNormalizer())
+			.add("domain1.com", "domain1.com/page1", "domain1.com/page2")
+			.add("domain1.com/page1")
+			.add("domain1.com/page2", "domain2.com", "domain1.com", "domain1.com/page1")
+			.add("domain2.com", "domain2.com/page1");
 
 		CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
-		.setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
-		.setUrlLengthener(new SimpleUrlLengthener())
-		.setCrawlDB(new SimpleCrawlDB())
-		.setRobotsFunction(new CheckUrlWithRobotsFunction())
-		.setParser(new SimpleParser())
-		.setContentSink(new DiscardingSink<ParsedUrl>())
-		.setUrlNormalizer(new SimpleUrlNormalizer())
-		.setUrlFilter(new SimpleUrlValidator())
-		.setFetcher(new WebGraphFetcher(graph))
-		.setRunTime(50000);
+			.setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
+			.setUrlLengthener(new SimpleUrlLengthener())
+			.setCrawlDB(new SimpleCrawlDB())
+			.setRobotsFunction(new CheckUrlWithRobotsFunction())
+			.setParser(new SimpleParser())
+			.setContentSink(new DiscardingSink<ParsedUrl>())
+			.setUrlNormalizer(new SimpleUrlNormalizer())
+			.setUrlFilter(new SimpleUrlValidator())
+			.setFetcher(new WebGraphFetcher(graph))
+			.setRunTime(50000);
 
 		builder.build().execute();
 	}

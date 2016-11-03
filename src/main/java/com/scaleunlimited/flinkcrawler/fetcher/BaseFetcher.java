@@ -59,7 +59,7 @@ public abstract class BaseFetcher implements Serializable {
 
     // TODO - 
     public boolean isValidMimeType(String mimeType) {
-    	return _validMimeTypes.contains(mimeType);
+    	return _validMimeTypes.isEmpty() || _validMimeTypes.contains(mimeType);
     }
     
     public int getMaxContentSize(String mimeType) {

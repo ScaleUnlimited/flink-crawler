@@ -37,10 +37,6 @@ public class WebGraphFetcher extends BaseFetcher {
 	public FetchedResult get(FetchUrl url) throws BaseFetchException {
 		String urlToFetch = url.getUrl();
 		Iterator<String> outlinksIter = _graph.getChildren(urlToFetch);
-		if ((outlinksIter == null) && urlToFetch.startsWith("http")) {
-			String rawUrl = urlToFetch.replaceFirst("^(http|https)://", "");
-			outlinksIter = _graph.getChildren(rawUrl);
-		}
 		
 		if (outlinksIter == null) {
             throw new HttpFetchException(urlToFetch, "Error fetching " + urlToFetch, HttpStatus.SC_NOT_FOUND, new Metadata());
@@ -59,7 +55,7 @@ public class WebGraphFetcher extends BaseFetcher {
 			}
 			
 			String contentAsStr = String.format(TEMPLATE, linksList);
-			return new FetchedResult(urlToFetch, null, System.currentTimeMillis(), new Metadata(), contentAsStr.getBytes(UTF_8), HTML_MIME_TYPE, DEFAULT_MIN_RESPONSE_RATE, null, 0, HttpStatus.SC_OK);
+			return new FetchedResult(urlToFetch, urlToFetch, System.currentTimeMillis(), new Metadata(), contentAsStr.getBytes(UTF_8), HTML_MIME_TYPE, DEFAULT_MIN_RESPONSE_RATE, null, 0, HttpStatus.SC_OK);
 		}
 	}
 

@@ -42,7 +42,7 @@ public class FetchedResult {
     
     private final int _numRedirects;
     private final int _statusCode; // HTTP status code
-    private boolean _truncated;
+    private boolean _truncated;	// TODO flag truncated content
     
     public FetchedResult(String baseUrl, String redirectedUrl, long fetchTime, Metadata headers, byte[] content, 
     				String contentType, int responseRate, String newBaseUrl,
