@@ -15,6 +15,7 @@ public class OutlinkToStateUrlFunction implements MapFunction<Tuple2<ExtractedUr
 		ExtractedUrl outlinkUrl = outlink.f0;
 		
 		// TODO the extracted url needs to have an estimated score as part of it.
+		System.out.println("Converting outline to raw URL: " + outlinkUrl);
 		return new RawUrl(outlinkUrl.getToUrl(), 1.0f);
 	}
 

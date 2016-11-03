@@ -161,7 +161,7 @@ public class CrawlTopology {
 			// TickleSource keeps pumping out tickle tuples we won't terminate, so we don't need to worry about
 			// something like a full CrawlDB merge causing us to time out. So in that case maybe just use double the
 			// tickle interval here? But setting it to 200 when tickle is 100 causes us to not terminate :(
-			IterativeStream<RawUrl> iteration = rawUrls.iterate(1000);
+			IterativeStream<RawUrl> iteration = rawUrls.iterate(5000);
 			DataStream<CrawlStateUrl> cleanedUrls = iteration.connect(tickler)
 					.flatMap(new LengthenUrlsFunction(_urlLengthener))
 					.name("LengthenUrlsFunction")
