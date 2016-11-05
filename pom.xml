@@ -30,10 +30,11 @@ under the License.
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<flink.version>1.2-SNAPSHOT</flink.version>
+		<flink.version>1.1.3</flink.version>
 		<slf4j.version>1.7.21</slf4j.version>
 		<tika.version>1.13</tika.version>
 		<log4j.version>1.2.17</log4j.version>
+		<crawlercommons.version>0.6</crawlercommons.version>
 	</properties>
 
 	<repositories>
@@ -84,22 +85,31 @@ under the License.
 			<artifactId>flink-java</artifactId>
 			<version>${flink.version}</version>
 		</dependency>
+		
 		<dependency>
 			<groupId>org.apache.flink</groupId>
 			<artifactId>flink-streaming-java_2.10</artifactId>
 			<version>${flink.version}</version>
 		</dependency>
+		
 		<dependency>
 			<groupId>org.apache.flink</groupId>
 			<artifactId>flink-clients_2.10</artifactId>
 			<version>${flink.version}</version>
 		</dependency>
+		
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
 			<version>${slf4j.version}</version>
 		</dependency>
-
+		
+		<dependency>
+			<groupId>com.github.crawler-commons</groupId>
+			<artifactId>crawler-commons</artifactId>
+			<version>${crawlercommons.version}</version>
+		</dependency>
+		
 		<dependency>
 			<groupId>org.apache.tika</groupId>
 			<artifactId>tika-parsers</artifactId>
