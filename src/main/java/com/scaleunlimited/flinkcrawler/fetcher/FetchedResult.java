@@ -126,6 +126,12 @@ public class FetchedResult {
         return _statusCode;
     }
 
+    @Override
+    public String toString() {
+    	// TODO add more fields
+    	return String.format("%s (%d)", getBaseUrl(), getStatusCode()); 
+    }
+    
     /**
      * Produces a neat report containing everything from a {@link FetchedResult}
      * . The order of the report is based on the logical population of

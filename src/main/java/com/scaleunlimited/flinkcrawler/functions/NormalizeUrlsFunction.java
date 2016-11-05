@@ -26,7 +26,7 @@ public class NormalizeUrlsFunction extends RichFlatMapFunction<RawUrl, RawUrl> {
 		String normalizedUrl = _normalizer.normalize(url);
 		System.out.println("Normalized " + url + " to be " + normalizedUrl);
 
-		RawUrl output = new RawUrl(normalizedUrl, input.getEstimatedScore());
+		RawUrl output = new RawUrl(normalizedUrl, input.getPLD(), input.getEstimatedScore());
 		collector.collect(output);
 	}
 

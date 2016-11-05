@@ -1,8 +1,5 @@
 package com.scaleunlimited.flinkcrawler.pojos;
 
-import java.util.List;
-import java.util.Map;
-
 import org.apache.tika.metadata.Metadata;
 
 
@@ -100,6 +97,9 @@ public class FetchedUrl {
 		_responseRate = responseRate;
 	}
 
-	
+	@Override
+	public String toString() {
+		return String.format("%s (%s)", getBaseUrl(), getContentType());
+	}
 	
 }

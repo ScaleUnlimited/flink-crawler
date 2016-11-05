@@ -1,11 +1,16 @@
 package com.scaleunlimited.flinkcrawler.pojos;
 
-public class ScoredUrl extends LengthenedUrl {
+@SuppressWarnings("serial")
+public class ScoredUrl extends RawUrl {
 
 	private float _actualScore;
 
-	public ScoredUrl(String url, float estimatedScore, String pld, float actualScore) {
-		super(url, estimatedScore, pld);
+	public ScoredUrl() {
+		super();
+	}
+	
+	public ScoredUrl(String url, String pld, float estimatedScore, float actualScore) {
+		super(url, pld, estimatedScore);
 		
 		_actualScore = actualScore;
 	}

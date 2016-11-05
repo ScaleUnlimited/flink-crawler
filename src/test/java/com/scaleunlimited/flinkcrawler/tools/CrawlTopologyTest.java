@@ -44,7 +44,7 @@ public class CrawlTopologyTest {
 			.setUrlNormalizer(new SimpleUrlNormalizer())
 			.setUrlFilter(new SimpleUrlValidator())
 			.setFetcher(new WebGraphFetcher(graph))
-			.setRunTime(50000);
+			.setRunTime(5000);
 
 		builder.build().execute();
 	}

@@ -5,12 +5,18 @@ package com.scaleunlimited.flinkcrawler.pojos;
 public class RawUrl extends BaseUrl {
 
 	private String _url;
+	private String _pld;
 	private float _estimatedScore;
 	
-	public RawUrl(String url, float estimatedScore) {
+	public RawUrl() {
+		super();
+	}
+	
+	public RawUrl(String url, String pld, float estimatedScore) {
 		super();
 		
 		_url = url;
+		_pld = pld;
 		_estimatedScore = estimatedScore;
 	}
 
@@ -22,6 +28,14 @@ public class RawUrl extends BaseUrl {
 		_url = url;
 	}
 
+	public String getPLD() {
+	    return _pld;
+	}
+	
+	public void setPLD(String pld) {
+	    _pld = pld;
+	}
+	
 	public float getEstimatedScore() {
 		return _estimatedScore;
 	}

@@ -1,10 +1,15 @@
 package com.scaleunlimited.flinkcrawler.pojos;
 
+@SuppressWarnings("serial")
 public class FetchUrl extends ScoredUrl {
 
-
-	public FetchUrl(String url, float estimatedScore, String pld, float actualScore) {
-		super(url, estimatedScore, pld, actualScore);
+	public FetchUrl() {
+		// Empty constructor so it's a POJO
+		super();
+	}
+	
+	public FetchUrl(String url, String pld, float estimatedScore, float actualScore) {
+		super(url, pld, estimatedScore, actualScore);
 		
 		// TODO fill in the additional fields from the crawlrec so that we have them downstream
 	}

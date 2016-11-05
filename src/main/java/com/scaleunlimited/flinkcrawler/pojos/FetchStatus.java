@@ -16,8 +16,10 @@
  */
 package com.scaleunlimited.flinkcrawler.pojos;
 
+// TODO should we have a primary state, where we have transient failures (so we want to refetch)
+// and permanent failures (skip forever)?
+
 public enum FetchStatus {
-    UNFETCHED,                  // Never processed.
     
     // Not fetched due to pre-fetch operations
     SKIPPED_BLOCKED,            // Blocked by robots.txt
@@ -53,6 +55,8 @@ public enum FetchStatus {
     ERROR_INVALID_URL,
     ERROR_IOEXCEPTION,
     
-    FETCHED;    // Successfully fetched
+    UNFETCHED,                  // Never processed.
+    FETCHING,					// Being fetched
+    FETCHED;    				// Successfully fetched
 
 }

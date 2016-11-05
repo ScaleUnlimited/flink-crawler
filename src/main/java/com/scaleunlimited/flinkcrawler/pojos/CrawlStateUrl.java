@@ -11,14 +11,14 @@ import com.scaleunlimited.flinkcrawler.utils.HashUtils;
 public class CrawlStateUrl {
 
 	private String _url;
-	private String _status;		// TODO make this an enum ?
+	private FetchStatus _status;		// TODO make this an enum ?
 	private String _pld;
 	private float _actualScore;	// TODO do we maintain separate page and link scores ?
 	private float _estimatedScore;
 	private long _lastFetchedTime;
 	private long _nextFetchTime;
 	
-	public CrawlStateUrl(String url, String status, String pld, float actualScore, float estimatedScore, long lastFetchedTime, long nextFetchTime) {
+	public CrawlStateUrl(String url, FetchStatus status, String pld, float actualScore, float estimatedScore, long lastFetchedTime, long nextFetchTime) {
 		_url = url;
 		_status = status;
 		_pld = pld;
@@ -39,10 +39,10 @@ public class CrawlStateUrl {
 		return HashUtils.longHash(_url);
 	}
 	
-	public String getStatus() {
+	public FetchStatus getStatus() {
 		return _status;
 	}
-	public void setStatus(String status) {
+	public void setStatus(FetchStatus status) {
 		_status = status;
 	}
 	

@@ -38,4 +38,9 @@ public class ExtractedUrl  {
         _relAttributes = relAttributes;
     }
 
+    @Override
+    public String toString() {
+        // TODO add more fields
+        return _toUrl;
+    }
 }
