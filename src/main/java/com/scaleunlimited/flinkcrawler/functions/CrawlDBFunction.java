@@ -1,5 +1,6 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
+import org.apache.flink.api.common.functions.RuntimeContext;
 import org.apache.flink.api.java.tuple.Tuple0;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.co.RichCoFlatMapFunction;
@@ -29,6 +30,9 @@ public class CrawlDBFunction extends RichCoFlatMapFunction<CrawlStateUrl, Tuple0
 
 	private BaseCrawlDB _crawlDB;
 	
+	private transient int _parallelism;
+	private transient int _index;
+	
 	public CrawlDBFunction(BaseCrawlDB crawlDB) {
 		_crawlDB = crawlDB;
 	}
@@ -37,8 +41,11 @@ public class CrawlDBFunction extends RichCoFlatMapFunction<CrawlStateUrl, Tuple0
 	public void open(Configuration parameters) throws Exception {
 		super.open(parameters);
 		
+		RuntimeContext context = getRuntimeContext();
+		_parallelism = context.getNumberOfParallelSubtasks();
+		_index = context.getIndexOfThisSubtask();
+
 		_crawlDB.open();
-		
 	}
 	
 	@Override
@@ -49,12 +56,8 @@ public class CrawlDBFunction extends RichCoFlatMapFunction<CrawlStateUrl, Tuple0
 
 	@Override
 	public void flatMap1(CrawlStateUrl url, Collector<FetchUrl> collector) throws Exception {
-		if (url == null) {
-			System.out.println("Got null CrawlStateUrl");
-		} else {
-			System.out.println("Got CrawlStateUrl " + url);
-			_crawlDB.add(url);
-		}
+		System.out.println("CrawlDBFunction got " + url);
+		_crawlDB.add(url);
 	}
 
 	/* We get called regularly by a broadcast from the CrawlDbSource, which exists to generate
@@ -68,7 +71,7 @@ public class CrawlDBFunction extends RichCoFlatMapFunction<CrawlStateUrl, Tuple0
 		FetchUrl url = _crawlDB.get();
 		
 		if (url != null) {
-			System.out.println("Emitting URL to fetch " + url);
+			System.out.format("CrawlDBFunction emitting URL %s to fetch (partition %d of %d)\n", url, _index, _parallelism);
 			collector.collect(url);
 		}
 	}

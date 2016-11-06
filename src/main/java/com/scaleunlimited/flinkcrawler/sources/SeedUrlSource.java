@@ -47,12 +47,8 @@ public class SeedUrlSource extends BaseUrlSource {
 		
 		// Figure out which URLs in the full (unpartitioned) set are ones that
 		// this source task should be emitting.
-		RuntimeContext context = getRuntimeContext();
-		int parallelism = context.getNumberOfParallelSubtasks();
-		int myIndex = context.getIndexOfThisSubtask();
-		
 		for (int i = 0; i < _unpartitioned.length; i++) {
-			if ((i % parallelism) == myIndex) {
+			if ((i % _parallelism) == _index) {
 				_urls.add(_unpartitioned[i]);
 			}
 		}
@@ -68,7 +64,9 @@ public class SeedUrlSource extends BaseUrlSource {
 		_keepRunning = true;
 		
 		while (_keepRunning && !_urls.isEmpty()) {
-			context.collect(_urls.pop());
+			RawUrl url = _urls.pop();
+			System.out.format("Emitting %s for %d of %d\n", url, _index, _parallelism);
+			context.collect(url);
 		}
 	}
 

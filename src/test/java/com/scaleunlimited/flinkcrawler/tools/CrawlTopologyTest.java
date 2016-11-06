@@ -48,5 +48,4 @@ public class CrawlTopologyTest {
 
 		builder.build().execute();
 	}
-
 }
