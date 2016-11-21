@@ -7,15 +7,25 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.co.RichCoFlatMapFunction;
 import org.apache.flink.util.Collector;
 
+import com.scaleunlimited.flinkcrawler.fetcher.BaseFetcher;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
-
-// TODO give this a BaseFetcher that it uses to fetch robots, parse it, etc.
-// Then it can keep track of robot rules, etc here.
+import com.scaleunlimited.flinkcrawler.robots.BaseRobotsParser;
 
 @SuppressWarnings("serial")
 public class CheckUrlWithRobotsFunction extends RichCoFlatMapFunction<FetchUrl, Tuple0, FetchUrl> {
 
-	private ConcurrentLinkedQueue<FetchUrl> _queue;
+	private BaseFetcher _fetcher;
+	private BaseRobotsParser _checker;
+	
+	// TODO we need a map from domain to rules & refresh time, that we maintain here
+	// TODO we need a map from domain to sitemap & refresh time, maintained here.
+	
+	private transient ConcurrentLinkedQueue<FetchUrl> _queue;
+	
+	public CheckUrlWithRobotsFunction(BaseFetcher fetcher, BaseRobotsParser checker) {
+		_fetcher = fetcher;
+		_checker = checker;
+	}
 	
 	@Override
 	public void open(Configuration parameters) throws Exception {

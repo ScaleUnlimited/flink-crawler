@@ -7,15 +7,15 @@ import org.apache.flink.util.Collector;
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
-import com.scaleunlimited.flinkcrawler.parser.BaseParser;
+import com.scaleunlimited.flinkcrawler.parser.BasePageParser;
 import com.scaleunlimited.flinkcrawler.parser.ParserResult;
 
 @SuppressWarnings("serial")
 public class ParseFunction extends RichFlatMapFunction<FetchedUrl, Tuple2<ExtractedUrl, ParsedUrl>> {
 
-    private BaseParser _parser;
+    private BasePageParser _parser;
 
-	public ParseFunction(BaseParser parser) {
+	public ParseFunction(BasePageParser parser) {
         _parser = parser;
     }
 

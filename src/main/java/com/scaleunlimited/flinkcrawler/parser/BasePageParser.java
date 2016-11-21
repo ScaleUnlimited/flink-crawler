@@ -13,7 +13,7 @@ import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.utils.HttpUtils;
 
 @SuppressWarnings("serial")
-public abstract class BaseParser implements Serializable {
+public abstract class BasePageParser implements Serializable {
 
 	// TODO VMa - move these into a common http headers file ?
     public final static String CONTENT_LANGUAGE = "Content-Language";
@@ -21,7 +21,7 @@ public abstract class BaseParser implements Serializable {
 
     private ParserPolicy _policy;
     
-    public BaseParser(ParserPolicy policy) {
+    public BasePageParser(ParserPolicy policy) {
         _policy = policy;
     }
 

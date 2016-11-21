@@ -20,9 +20,7 @@ import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
  * contains actual CrawlStateUrl tuples. The other stream is a timed "trigger" stream that regularly
  * generates an ignorable Tuple that we .
  * 
- * TODO this needs to be a Windowing function
- * 
- * Use ContinuousProcessingTimeTrigger
+ * Use the Timelyxxx function approach, versus the CoFlatMap with a tickler approach.
  *
  */
 @SuppressWarnings("serial")

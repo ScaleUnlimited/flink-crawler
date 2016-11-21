@@ -20,8 +20,9 @@ import org.slf4j.LoggerFactory;
 import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.utils.IoUtils;
 
-public class SimpleParser extends BaseParser {
-    private static final Logger LOGGER = LoggerFactory.getLogger(SimpleParser.class);
+@SuppressWarnings("serial")
+public class SimplePageParser extends BasePageParser {
+    private static final Logger LOGGER = LoggerFactory.getLogger(SimplePageParser.class);
 
 //    /**
 //     * Fixed version of Tika 1.0's IdentityHtmlMapper
@@ -42,11 +43,11 @@ public class SimpleParser extends BaseParser {
     protected ParseContext _parseContext;
     private transient Parser _parser;
     
-    public SimpleParser() {
+    public SimplePageParser() {
         this(new ParserPolicy());
     }
     
-    public SimpleParser(ParserPolicy parserPolicy) {
+    public SimplePageParser(ParserPolicy parserPolicy) {
         this(new SimpleContentExtractor(), new SimpleLinkExtractor(), parserPolicy, null);
     }
     
@@ -58,9 +59,9 @@ public class SimpleParser extends BaseParser {
      * {@link SimpleLinkExtractor} simply to control the set of link tags
      * and attributes it processes. Instead, use {@link ParserPolicy#setLinkTags}
      * and {@link ParserPolicy#setLinkAttributeTypes}, and then pass this policy
-     * to {@link SimpleParser#SimpleParser(ParserPolicy)}.
+     * to {@link SimplePageParser#SimpleParser(ParserPolicy)}.
      */
-    public SimpleParser(BaseContentExtractor contentExtractor, BaseLinkExtractor linkExtractor, ParserPolicy parserPolicy) {
+    public SimplePageParser(BaseContentExtractor contentExtractor, BaseLinkExtractor linkExtractor, ParserPolicy parserPolicy) {
         this(contentExtractor, linkExtractor, parserPolicy, null);
     }
     
@@ -71,9 +72,9 @@ public class SimpleParser extends BaseParser {
      * {@link SimpleLinkExtractor} simply to control the set of link tags
      * and attributes it processes. Instead, use {@link ParserPolicy#setLinkTags}
      * and {@link ParserPolicy#setLinkAttributeTypes}, and then pass this policy
-     * to {@link SimpleParser#SimpleParser(ParserPolicy)}.
+     * to {@link SimplePageParser#SimpleParser(ParserPolicy)}.
      */
-    public SimpleParser(ParserPolicy parserPolicy, boolean includeMarkup) {
+    public SimplePageParser(ParserPolicy parserPolicy, boolean includeMarkup) {
         this(includeMarkup ? new HtmlContentExtractor() : new SimpleContentExtractor(),
              new SimpleLinkExtractor(),
              parserPolicy, includeMarkup);
@@ -86,9 +87,9 @@ public class SimpleParser extends BaseParser {
      * {@link SimpleLinkExtractor} simply to control the set of link tags
      * and attributes it processes. Instead, use {@link ParserPolicy#setLinkTags}
      * and {@link ParserPolicy#setLinkAttributeTypes}, and then pass this policy
-     * to {@link SimpleParser#SimpleParser(ParserPolicy)}.
+     * to {@link SimplePageParser#SimpleParser(ParserPolicy)}.
      */
-    public SimpleParser(BaseContentExtractor contentExtractor, BaseLinkExtractor linkExtractor, ParserPolicy parserPolicy, boolean includeMarkup) {
+    public SimplePageParser(BaseContentExtractor contentExtractor, BaseLinkExtractor linkExtractor, ParserPolicy parserPolicy, boolean includeMarkup) {
         super(parserPolicy);
 
         _contentExtractor = contentExtractor;
@@ -109,9 +110,9 @@ public class SimpleParser extends BaseParser {
      * {@link SimpleLinkExtractor} simply to control the set of link tags
      * and attributes it processes. Instead, use {@link ParserPolicy#setLinkTags}
      * and {@link ParserPolicy#setLinkAttributeTypes}, and then pass this policy
-     * to {@link SimpleParser#SimpleParser(ParserPolicy)}.
+     * to {@link SimplePageParser#SimpleParser(ParserPolicy)}.
      */
-    public SimpleParser(BaseContentExtractor contentExtractor, BaseLinkExtractor linkExtractor, ParserPolicy parserPolicy, ParseContext parseContext) {
+    public SimplePageParser(BaseContentExtractor contentExtractor, BaseLinkExtractor linkExtractor, ParserPolicy parserPolicy, ParseContext parseContext) {
         super(parserPolicy);
         
         _contentExtractor = contentExtractor;

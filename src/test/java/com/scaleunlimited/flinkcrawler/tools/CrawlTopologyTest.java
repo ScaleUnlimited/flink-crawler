@@ -8,13 +8,15 @@ import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.junit.Test;
 
 import com.scaleunlimited.flinkcrawler.crawldb.SimpleCrawlDB;
+import com.scaleunlimited.flinkcrawler.fetcher.MockRobotsFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.SimpleFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.UserAgent;
 import com.scaleunlimited.flinkcrawler.fetcher.WebGraphFetcher;
 import com.scaleunlimited.flinkcrawler.functions.CheckUrlWithRobotsFunction;
 import com.scaleunlimited.flinkcrawler.functions.CrawlDBFunction;
-import com.scaleunlimited.flinkcrawler.parser.SimpleParser;
+import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
+import com.scaleunlimited.flinkcrawler.robots.SimpleRobotsParser;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
 import com.scaleunlimited.flinkcrawler.tools.CrawlTopology.CrawlTopologyBuilder;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlLengthener;
@@ -38,12 +40,13 @@ public class CrawlTopologyTest {
 			.setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
 			.setUrlLengthener(new SimpleUrlLengthener())
 			.setCrawlDB(new SimpleCrawlDB())
-			.setRobotsFunction(new CheckUrlWithRobotsFunction())
-			.setParser(new SimpleParser())
+			.setRobotsFetcher(new MockRobotsFetcher())
+			.setRobotsParser(new SimpleRobotsParser())
+			.setPageParser(new SimplePageParser())
 			.setContentSink(new DiscardingSink<ParsedUrl>())
 			.setUrlNormalizer(new SimpleUrlNormalizer())
 			.setUrlFilter(new SimpleUrlValidator())
-			.setFetcher(new WebGraphFetcher(graph))
+			.setPageFetcher(new WebGraphFetcher(graph))
 			.setRunTime(5000);
 
 		builder.build().execute();

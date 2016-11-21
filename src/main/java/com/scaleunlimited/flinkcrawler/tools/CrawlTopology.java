@@ -20,6 +20,7 @@ import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDB;
 import com.scaleunlimited.flinkcrawler.fetcher.BaseFetcher;
+import com.scaleunlimited.flinkcrawler.functions.CheckUrlWithRobotsFunction;
 import com.scaleunlimited.flinkcrawler.functions.CrawlDBFunction;
 import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.LengthenUrlsFunction;
@@ -28,12 +29,13 @@ import com.scaleunlimited.flinkcrawler.functions.OutlinkToStateUrlFunction;
 import com.scaleunlimited.flinkcrawler.functions.ParseFunction;
 import com.scaleunlimited.flinkcrawler.functions.RawToStateUrlFunction;
 import com.scaleunlimited.flinkcrawler.functions.ValidUrlsFilter;
-import com.scaleunlimited.flinkcrawler.parser.BaseParser;
+import com.scaleunlimited.flinkcrawler.parser.BasePageParser;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
+import com.scaleunlimited.flinkcrawler.robots.BaseRobotsParser;
 import com.scaleunlimited.flinkcrawler.sources.BaseUrlSource;
 import com.scaleunlimited.flinkcrawler.sources.TickleSource;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlLengthener;
@@ -80,14 +82,16 @@ public class CrawlTopology {
         private BaseUrlSource _urlSource;
 
         private BaseCrawlDB _crawlDB;
-        private RichCoFlatMapFunction<FetchUrl, Tuple0, FetchUrl> _robotsFunction;
+        
+        private BaseFetcher _robotsFetcher;
+        private BaseRobotsParser _robotsParser;
 
         private BaseUrlLengthener _urlLengthener;
         private SinkFunction<ParsedUrl> _contentSink;
         private BaseUrlNormalizer _urlNormalizer;
         private BaseUrlValidator _urlFilter;
-        private BaseFetcher _fetcher;
-        private BaseParser _parser;
+        private BaseFetcher _pageFetcher;
+        private BasePageParser _pageParser;
 
         public CrawlTopologyBuilder(StreamExecutionEnvironment env) {
             _env = env;
@@ -113,18 +117,23 @@ public class CrawlTopology {
             return this;
         }
 
-        public CrawlTopologyBuilder setRobotsFunction(RichCoFlatMapFunction<FetchUrl, Tuple0, FetchUrl> robotsFunction) {
-            _robotsFunction = robotsFunction;
+        public CrawlTopologyBuilder setRobotsFetcher(BaseFetcher robotsFetcher) {
+            _robotsFetcher = robotsFetcher;
             return this;
         }
 
-        public CrawlTopologyBuilder setFetcher(BaseFetcher fetcher) {
-            _fetcher = fetcher;
+        public CrawlTopologyBuilder setRobotsParser(BaseRobotsParser robotsParser) {
+        	_robotsParser = robotsParser;
             return this;
         }
 
-        public CrawlTopologyBuilder setParser(BaseParser parser) {
-            _parser = parser;
+        public CrawlTopologyBuilder setPageFetcher(BaseFetcher pageFetcher) {
+            _pageFetcher = pageFetcher;
+            return this;
+        }
+
+        public CrawlTopologyBuilder setPageParser(BasePageParser pageParser) {
+            _pageParser = pageParser;
             return this;
         }
 
@@ -197,8 +206,13 @@ public class CrawlTopology {
                     .filter(new ValidUrlsFilter(_urlFilter)).name("FilterUrlsFunction")
                     .map(new RawToStateUrlFunction());
 
-            DataStream<FetchUrl> urlsToFetch = cleanedUrls.connect(tickler).flatMap(new CrawlDBFunction(_crawlDB))
-                    .connect(tickler).flatMap(_robotsFunction);
+            // TODO need to support setting a separate fetcher for robots, as this often wants to use different
+            // settings than the main fetcher.
+            DataStream<FetchUrl> urlsToFetch = cleanedUrls.connect(tickler)
+            		.flatMap(new CrawlDBFunction(_crawlDB))
+                    .connect(tickler)
+                    .flatMap(new CheckUrlWithRobotsFunction(_robotsFetcher, _robotsParser));
+            
             // TODO need to split this stream and send rejected URLs back to crawlDB. Probably need to
             // merge this CrawlStateUrl stream with CrawlStateUrl streams from outlinks and fetch results.
 
@@ -207,7 +221,7 @@ public class CrawlTopology {
             // content and just a FetchedUrl for case of a fetch failure or if the content fetched isn't the
             // type that we want (e.g. image file)
             DataStream<Tuple2<ExtractedUrl, ParsedUrl>> fetchedUrls = urlsToFetch.connect(tickler)
-                    .flatMap(new FetchUrlsFunction(_fetcher)).flatMap(new ParseFunction(_parser));
+                    .flatMap(new FetchUrlsFunction(_pageFetcher)).flatMap(new ParseFunction(_pageParser));
 
             SplitStream<Tuple2<ExtractedUrl, ParsedUrl>> outlinksOrContent = fetchedUrls
                     .split(new OutputSelector<Tuple2<ExtractedUrl, ParsedUrl>>() {
