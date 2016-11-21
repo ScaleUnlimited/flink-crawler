@@ -30,11 +30,15 @@ under the License.
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		
 		<flink.version>1.1.3</flink.version>
 		<slf4j.version>1.7.21</slf4j.version>
 		<tika.version>1.13</tika.version>
 		<log4j.version>1.2.17</log4j.version>
 		<crawlercommons.version>0.6</crawlercommons.version>
+		
+		<javac.src.version>1.7</javac.src.version>
+		<javac.target.version>1.7</javac.target.version>
 	</properties>
 
 	<repositories>
@@ -49,6 +53,11 @@ under the License.
 				<enabled>true</enabled>
 			</snapshots>
 		</repository>
+	    <repository>
+	      <id>crawler-commons</id>
+	      <name>Sonatype release candidate for crawler-commons 0.7</name>
+	      <url>https://oss.sonatype.org/content/repositories/comgithubcrawler-commons-1003/</url>
+	    </repository>
 		<repository>
 			<id>otto-bintray</id>
 			<url>https://dl.bintray.com/ottogroup/maven</url>
@@ -424,8 +433,8 @@ under the License.
 				<artifactId>maven-compiler-plugin</artifactId>
 				<version>3.1</version>
 				<configuration>
-					<source>1.7</source> <!-- If you want to use Java 8, change this to "1.8" -->
-					<target>1.7</target> <!-- If you want to use Java 8, change this to "1.8" -->
+					<source>${javac.src.version}</source>
+					<target>${javac.target.version}</target>
 				</configuration>
 			</plugin>
 		</plugins>

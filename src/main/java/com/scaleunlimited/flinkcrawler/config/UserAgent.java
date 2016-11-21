@@ -14,7 +14,7 @@
  * limitations under the License.
  *
  */
-package com.scaleunlimited.flinkcrawler.fetcher;
+package com.scaleunlimited.flinkcrawler.config;
 
 import java.io.Serializable;
 

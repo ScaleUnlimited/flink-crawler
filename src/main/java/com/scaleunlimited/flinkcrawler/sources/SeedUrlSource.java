@@ -3,9 +3,7 @@ package com.scaleunlimited.flinkcrawler.sources;
 import java.net.URL;
 import java.util.LinkedList;
 
-import org.apache.flink.api.common.functions.RuntimeContext;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunction;
 
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 

@@ -1,14 +1,36 @@
 package com.scaleunlimited.flinkcrawler.crawldb;
 
 import java.io.Serializable;
+import java.util.Queue;
 
+import com.scaleunlimited.flinkcrawler.config.FetchPolicy;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 
 @SuppressWarnings("serial")
 public abstract class BaseCrawlDB implements Serializable {
 
-	public abstract void open();
+	protected Queue<FetchUrl> _fetchQueue;
+	protected int _maxQueueSize;
+	protected FetchPolicy _fetchPolicy;
+	
+	/**
+	 * Open the CrawlDB, and load entries into the fetch queue if we
+	 * have ones available.
+	 * 
+	 * @param fetchQueue
+	 * @param maxQueueSize Max entries in fetchQueue
+	 */
+	public void open(FetchPolicy fetchPolicy, Queue<FetchUrl> fetchQueue, int maxQueueSize) {
+		_fetchPolicy = fetchPolicy;
+		_fetchQueue = fetchQueue;
+		_maxQueueSize = maxQueueSize;
+	}
+	
+	protected boolean isFetchable(CrawlStateUrl url) {
+		return _fetchPolicy.isFetchable(url);
+	}
+	
 	public abstract void close();
 	
 	/**
@@ -20,13 +42,9 @@ public abstract class BaseCrawlDB implements Serializable {
 	 */
 	public abstract void add(CrawlStateUrl url);
 	
-	
 	/**
-	 * Return the next URL to fetch, or null if no such URL is available.
-	 * 
-	 * WARNING - this call is asynchronous with respect to the add() call.
-	 * 
-	 * @return URL to fetch, or null
+	 * Merge the in-memory queue with the disk-based data (if any exists), and reload
+	 * the fetch queue with good entries.
 	 */
-	public abstract FetchUrl get();
+	public abstract void merge();
 }

@@ -17,6 +17,7 @@ import org.apache.tika.parser.html.IdentityHtmlMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.scaleunlimited.flinkcrawler.config.ParserPolicy;
 import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.utils.IoUtils;
 

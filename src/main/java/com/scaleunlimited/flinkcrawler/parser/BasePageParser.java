@@ -3,12 +3,11 @@ package com.scaleunlimited.flinkcrawler.parser;
 import java.io.Serializable;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.List;
-import java.util.Map;
 
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.utils.CharsetUtils;
 
+import com.scaleunlimited.flinkcrawler.config.ParserPolicy;
 import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.utils.HttpUtils;
 

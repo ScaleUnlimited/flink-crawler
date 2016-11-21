@@ -6,6 +6,7 @@ import java.util.Iterator;
 import org.apache.http.HttpStatus;
 import org.apache.tika.metadata.Metadata;
 
+import com.scaleunlimited.flinkcrawler.config.UserAgent;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.webgraph.BaseWebGraph;
 

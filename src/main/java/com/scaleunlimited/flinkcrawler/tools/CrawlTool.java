@@ -4,9 +4,9 @@ import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 
+import com.scaleunlimited.flinkcrawler.config.UserAgent;
 import com.scaleunlimited.flinkcrawler.crawldb.SimpleCrawlDB;
 import com.scaleunlimited.flinkcrawler.fetcher.SimpleFetcher;
-import com.scaleunlimited.flinkcrawler.fetcher.UserAgent;
 import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.robots.SimpleRobotsParser;

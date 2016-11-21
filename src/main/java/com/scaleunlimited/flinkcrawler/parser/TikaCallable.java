@@ -11,6 +11,7 @@ import java.util.regex.Pattern;
 import org.apache.tika.language.LanguageIdentifier;
 import org.apache.tika.language.ProfilingHandler;
 import org.apache.tika.metadata.Metadata;
+import org.apache.tika.metadata.TikaCoreProperties;
 import org.apache.tika.parser.ParseContext;
 import org.apache.tika.parser.Parser;
 import org.apache.tika.parser.html.DefaultHtmlMapper;
@@ -19,7 +20,6 @@ import org.apache.tika.sax.TeeContentHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 
 
@@ -110,7 +110,7 @@ class TikaCallable implements Callable<ParserResult> {
             
             String lang = _extractLanguage ? detectLanguage(_metadata, profilingHandler) : "";
             return new ParserResult(new ParsedUrl(_metadata.get(Metadata.RESOURCE_NAME_KEY), null, _contentExtractor.getContent(), lang,
-                    _metadata.get(Metadata.TITLE), makeMap(_metadata)),
+                    _metadata.get(TikaCoreProperties.TITLE), makeMap(_metadata)),
                     _linkExtractor.getLinks());
         } catch (Exception e) {
             // Generic exception that's OK to re-throw
@@ -155,7 +155,7 @@ class TikaCallable implements Callable<ParserResult> {
     private static String detectLanguage(Metadata metadata, ProfilingHandler profilingHandler) {
         String result = null;
         
-        String dubCoreLang = metadata.get(Metadata.LANGUAGE);
+        String dubCoreLang = metadata.get(TikaCoreProperties.LANGUAGE);
         String httpEquivLang = metadata.get(Metadata.CONTENT_LANGUAGE);
         
         if (dubCoreLang != null) {

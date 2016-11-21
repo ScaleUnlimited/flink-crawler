@@ -2,6 +2,7 @@ package com.scaleunlimited.flinkcrawler.fetcher;
 
 import org.apache.http.HttpStatus;
 
+import com.scaleunlimited.flinkcrawler.config.UserAgent;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 
 @SuppressWarnings("serial")

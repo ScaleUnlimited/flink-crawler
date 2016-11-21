@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import com.scaleunlimited.flinkcrawler.config.UserAgent;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 
 @SuppressWarnings("serial")

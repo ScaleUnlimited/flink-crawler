@@ -1,5 +1,6 @@
 package com.scaleunlimited.flinkcrawler.fetcher;
 
+import com.scaleunlimited.flinkcrawler.config.UserAgent;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 
 @SuppressWarnings("serial")

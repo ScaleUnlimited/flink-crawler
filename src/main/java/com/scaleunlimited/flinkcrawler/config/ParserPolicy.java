@@ -1,8 +1,10 @@
-package com.scaleunlimited.flinkcrawler.parser;
+package com.scaleunlimited.flinkcrawler.config;
 
 import java.io.Serializable;
 import java.security.InvalidParameterException;
 import java.util.Set;
+
+import com.scaleunlimited.flinkcrawler.parser.BaseLinkExtractor;
 
 
 /**

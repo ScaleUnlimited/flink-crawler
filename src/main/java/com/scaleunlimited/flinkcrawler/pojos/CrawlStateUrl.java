@@ -108,7 +108,7 @@ public class CrawlStateUrl {
 	@Override
 	public String toString() {
 		// TODO add more fields to the response.
-		return _url;
+		return String.format("%s (%s)", _url, _status);
 	}
 	
 	public static class CrawlStateUrlPayload extends Payload {

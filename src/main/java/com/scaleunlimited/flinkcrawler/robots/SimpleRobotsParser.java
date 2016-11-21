@@ -1,7 +1,5 @@
 package com.scaleunlimited.flinkcrawler.robots;
 
-import com.scaleunlimited.flinkcrawler.fetcher.BaseFetcher;
-
 import crawlercommons.robots.BaseRobotRules;
 import crawlercommons.robots.SimpleRobotRulesParser;
 
