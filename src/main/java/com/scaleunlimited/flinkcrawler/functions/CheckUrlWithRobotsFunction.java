@@ -18,6 +18,8 @@ public class CheckUrlWithRobotsFunction extends RichCoFlatMapFunction<FetchUrl, 
 	private BaseRobotsParser _checker;
 	
 	// TODO we need a map from domain to rules & refresh time, that we maintain here
+	// Actually the key needs to be protocol + full domain (not just PLD) + port, as robots are
+	// specific to that combination.
 	// TODO we need a map from domain to sitemap & refresh time, maintained here.
 	
 	private transient ConcurrentLinkedQueue<FetchUrl> _queue;

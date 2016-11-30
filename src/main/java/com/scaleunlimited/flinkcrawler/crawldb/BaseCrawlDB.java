@@ -1,34 +1,24 @@
 package com.scaleunlimited.flinkcrawler.crawldb;
 
 import java.io.Serializable;
-import java.util.Queue;
 
-import com.scaleunlimited.flinkcrawler.config.FetchPolicy;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
-import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
+import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
 
 @SuppressWarnings("serial")
 public abstract class BaseCrawlDB implements Serializable {
 
-	protected Queue<FetchUrl> _fetchQueue;
-	protected int _maxQueueSize;
-	protected FetchPolicy _fetchPolicy;
+	protected FetchQueue _fetchQueue;
 	
 	/**
 	 * Open the CrawlDB, and load entries into the fetch queue if we
 	 * have ones available.
 	 * 
-	 * @param fetchQueue
-	 * @param maxQueueSize Max entries in fetchQueue
+	 * @param fetchablePolicy Decide when a URL should be added to the fetchQueue
+	 * @param fetchQueue Queue used externally as source of URLs to be fetched
 	 */
-	public void open(FetchPolicy fetchPolicy, Queue<FetchUrl> fetchQueue, int maxQueueSize) {
-		_fetchPolicy = fetchPolicy;
+	public void open(FetchQueue fetchQueue) {
 		_fetchQueue = fetchQueue;
-		_maxQueueSize = maxQueueSize;
-	}
-	
-	protected boolean isFetchable(CrawlStateUrl url) {
-		return _fetchPolicy.isFetchable(url);
 	}
 	
 	public abstract void close();

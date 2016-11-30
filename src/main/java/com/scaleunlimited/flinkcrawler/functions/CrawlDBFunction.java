@@ -8,10 +8,10 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.co.RichCoFlatMapFunction;
 import org.apache.flink.util.Collector;
 
-import com.scaleunlimited.flinkcrawler.config.FetchPolicy;
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDB;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
+import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
 
 /**
  * The Flink operator that wraps our "crawl DB". Incoming URLs are de-duplicated and merged in memory.
@@ -35,7 +35,7 @@ public class CrawlDBFunction extends RichCoFlatMapFunction<CrawlStateUrl, Tuple0
 	private BaseCrawlDB _crawlDB;
 	
 	// List of URLs that are available to be fetched.
-	private transient ConcurrentLinkedQueue<FetchUrl> _active;
+	private transient FetchQueue _fetchQueue;
 
 	private transient int _parallelism;
 	private transient int _index;
@@ -52,10 +52,9 @@ public class CrawlDBFunction extends RichCoFlatMapFunction<CrawlStateUrl, Tuple0
 		_parallelism = context.getNumberOfParallelSubtasks();
 		_index = context.getIndexOfThisSubtask();
 
-		_active = new ConcurrentLinkedQueue<>();
+		_fetchQueue = new FetchQueue(MAX_ACTIVE_URLS);
 		
-		// TODO set fetch policy via our constructor
-		_crawlDB.open(new FetchPolicy(), _active, MAX_ACTIVE_URLS);
+		_crawlDB.open(_fetchQueue);
 	}
 	
 	@Override
@@ -81,7 +80,7 @@ public class CrawlDBFunction extends RichCoFlatMapFunction<CrawlStateUrl, Tuple0
 	@Override
 	public void flatMap2(Tuple0 tickle, Collector<FetchUrl> collector) throws Exception {
 		// TODO do this in a loop?
-		FetchUrl url = _active.poll();
+		FetchUrl url = _fetchQueue.poll();
 		
 		if (url != null) {
 			System.out.format("CrawlDBFunction emitting URL %s to fetch (partition %d of %d)\n", url, _index, _parallelism);

@@ -5,7 +5,7 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.junit.Test;
 
-import com.scaleunlimited.flinkcrawler.crawldb.SimpleCrawlDB;
+import com.scaleunlimited.flinkcrawler.crawldb.InMemoryCrawlDB;
 import com.scaleunlimited.flinkcrawler.fetcher.MockRobotsFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.WebGraphFetcher;
 import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
@@ -33,7 +33,7 @@ public class CrawlTopologyTest {
 		CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
 			.setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
 			.setUrlLengthener(new SimpleUrlLengthener())
-			.setCrawlDB(new SimpleCrawlDB())
+			.setCrawlDB(new InMemoryCrawlDB())
 			.setRobotsFetcher(new MockRobotsFetcher())
 			.setRobotsParser(new SimpleRobotsParser())
 			.setPageParser(new SimplePageParser())

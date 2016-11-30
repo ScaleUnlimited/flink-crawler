@@ -19,11 +19,11 @@ import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
  * (long) hash, the value is an (optional) Object of any time, and there's an
  * additional offset into a separate "payload" file, where associated data is kept.
  * 
- * We don't bother deduping keys as they're added. When the array is full, we'll
+ * We don't bother de-duping keys as they're added. When the array is full, we'll
  * sort, and then (TODO) dedup if there are enough duplicate entries, otherwise
  * it's time for a merge.
  * 
- * During deduplication, a provided DrumEntryMerger class is called to merge the
+ * During de-duplication, a provided DrumEntryMerger class is called to merge the
  * old and new entries. The results might be to ignore the new entry,
  * replace the old entry, or update the old entry with the value and/or the payload
  * from the new entry.
@@ -59,7 +59,7 @@ public class DrumMap implements Closeable {
 	
 	public static int DEFAULT_MAX_ENTRIES = 10_000;
 
-	// Max number of entries in the array
+	// Max number of entries in the in-memory array
 	private int _maxEntries;
 	
 	// Number of entries in the in-memory arrays.
@@ -74,6 +74,7 @@ public class DrumMap implements Closeable {
 	// An in-memory array of offsets into the payload file
 	private int[] _offsets;
 	
+	// File where the payload data is being kept
 	private File _payloadFile;
 	
 	private DrumDataOutput _payloadOut;
@@ -86,7 +87,10 @@ public class DrumMap implements Closeable {
 		_values = new Object[_maxEntries];
 		_offsets = new int[_maxEntries];
 		
-		// TODO gzip the output stream, as it's going to have a lot of compression
+		// TODO gzip the output stream, as it's going to have a lot of compression. But
+		// can we keep track of offsets then? Do these need to be bit offsets? Or maybe
+		// since we only should be walking through the entries linearly, we could just
+		// use an entry id (0...n) vs. an offset, so we don't need locations.
 		_payloadFile = File.createTempFile("drum-payload", "bin");
 		_payloadOut = new DrumDataOutput(new FileOutputStream(_payloadFile));
 	}

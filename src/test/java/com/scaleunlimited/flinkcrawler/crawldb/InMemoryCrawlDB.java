@@ -2,21 +2,19 @@ package com.scaleunlimited.flinkcrawler.crawldb;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Queue;
 
-import com.scaleunlimited.flinkcrawler.config.FetchPolicy;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
-import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
+import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
 
 @SuppressWarnings("serial")
-public class SimpleCrawlDB extends BaseCrawlDB {
+public class InMemoryCrawlDB extends BaseCrawlDB {
 
 	private Map<String, CrawlStateUrl> _crawlState;
 
 	@Override
-	public void open(FetchPolicy fetchPolicy, Queue<FetchUrl> fetchQueue, int maxQueueSize) {
-		super.open(fetchPolicy, fetchQueue, maxQueueSize);
+	public void open(FetchQueue fetchQueue) {
+		super.open(fetchQueue);
 		
 		_crawlState = new HashMap<>();
 	}
@@ -68,11 +66,9 @@ public class SimpleCrawlDB extends BaseCrawlDB {
 		synchronized (_crawlState) {
 			for (String url : _crawlState.keySet()) {
 				CrawlStateUrl curState = _crawlState.get(url);
-				if (isFetchable(curState)) {
-					// TODO limit queue size.
-					System.out.format("Adding URL from crawlDB to fetchable queue: %s\n", url);
+				if (_fetchQueue.add(curState)) {
+					System.out.format("Added URL from crawlDB to fetchable queue: %s\n", curState);
 					curState.setStatus(FetchStatus.FETCHING);
-					_fetchQueue.add(new FetchUrl(url, curState.getPLD(), curState.getEstimatedScore(), curState.getActualScore()));
 				}
 			}
 		}

@@ -5,7 +5,7 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 
 import com.scaleunlimited.flinkcrawler.config.UserAgent;
-import com.scaleunlimited.flinkcrawler.crawldb.SimpleCrawlDB;
+import com.scaleunlimited.flinkcrawler.crawldb.InMemoryCrawlDB;
 import com.scaleunlimited.flinkcrawler.fetcher.SimpleFetcher;
 import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
@@ -25,7 +25,7 @@ public class CrawlTool {
 			LocalStreamEnvironment env = StreamExecutionEnvironment.createLocalEnvironment();
 			
 			CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
-				.setCrawlDB(new SimpleCrawlDB())
+				.setCrawlDB(new InMemoryCrawlDB())
 				.setUrlLengthener(new SimpleUrlLengthener())
 				.setRobotsFetcher(new SimpleFetcher(new UserAgent("bogus", "bogus@domain.com", "http://domain.com")))
 				.setRobotsParser(new SimpleRobotsParser())
