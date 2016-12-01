@@ -4,6 +4,7 @@ import org.apache.flink.api.common.functions.RichFilterFunction;
 
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlValidator;
+import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
 @SuppressWarnings("serial")
 public class ValidUrlsFilter extends RichFilterFunction<RawUrl> {
@@ -16,6 +17,8 @@ public class ValidUrlsFilter extends RichFilterFunction<RawUrl> {
 
 	@Override
 	public boolean filter(RawUrl input) throws Exception {
+		UrlLogger.record(this.getClass(), input);
+
 		String url = input.getUrl();
 		boolean result = _urlValidator.isValid(url);
 		if (result) {

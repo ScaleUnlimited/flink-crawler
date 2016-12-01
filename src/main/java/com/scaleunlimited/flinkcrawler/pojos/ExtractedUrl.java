@@ -1,7 +1,8 @@
 package com.scaleunlimited.flinkcrawler.pojos;
 
 
-public class ExtractedUrl  {
+@SuppressWarnings("serial")
+public class ExtractedUrl extends BaseUrl {
 
     private String _toUrl;
     private String _anchorText;

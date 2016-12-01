@@ -9,6 +9,7 @@ import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.parser.BasePageParser;
 import com.scaleunlimited.flinkcrawler.parser.ParserResult;
+import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
 @SuppressWarnings("serial")
 public class ParseFunction extends RichFlatMapFunction<FetchedUrl, Tuple2<ExtractedUrl, ParsedUrl>> {
@@ -21,6 +22,7 @@ public class ParseFunction extends RichFlatMapFunction<FetchedUrl, Tuple2<Extrac
 
 	@Override
 	public void flatMap(FetchedUrl fetchedUrl, Collector<Tuple2<ExtractedUrl, ParsedUrl>> collector) throws Exception {
+		UrlLogger.record(this.getClass(), fetchedUrl);
 		
 		ParserResult result = _parser.parse(fetchedUrl);
 		

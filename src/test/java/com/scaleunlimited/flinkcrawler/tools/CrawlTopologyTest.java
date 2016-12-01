@@ -1,5 +1,6 @@
 package com.scaleunlimited.flinkcrawler.tools;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
@@ -9,6 +10,7 @@ import com.scaleunlimited.flinkcrawler.crawldb.InMemoryCrawlDB;
 import com.scaleunlimited.flinkcrawler.fetcher.MockRobotsFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.WebGraphFetcher;
 import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
+import com.scaleunlimited.flinkcrawler.pojos.BaseUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.robots.SimpleRobotsParser;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
@@ -16,6 +18,7 @@ import com.scaleunlimited.flinkcrawler.tools.CrawlTopology.CrawlTopologyBuilder;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlLengthener;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlValidator;
+import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 import com.scaleunlimited.flinkcrawler.webgraph.SimpleWebGraph;
 
 public class CrawlTopologyTest {
@@ -44,5 +47,10 @@ public class CrawlTopologyTest {
 			.setRunTime(5000);
 
 		builder.build().execute();
+		
+		// TODO add support for validating calls (e.g.n calls to class x, or class x called with y,z,blah values)
+		for (Tuple2<Class<?>, BaseUrl> entry : UrlLogger.getLog()) {
+			System.out.format("%s: %s\n", entry.f0, entry.f1);
+		}
 	}
 }

@@ -3,7 +3,8 @@ package com.scaleunlimited.flinkcrawler.pojos;
 import org.apache.tika.metadata.Metadata;
 
 
-public class FetchedUrl {
+@SuppressWarnings("serial")
+public class FetchedUrl extends BaseUrl {
 
 	private String _baseUrl;
 	private String _fetchedUrl;
@@ -12,7 +13,6 @@ public class FetchedUrl {
 	private byte[] _content;
 	private String _contentType;
 	private int _responseRate;
-
 	
 	public FetchedUrl(String baseUrl, String fetchedUrl, long fetchTime, Metadata headers,
 			byte[] content, String contentType, int responseRate) {

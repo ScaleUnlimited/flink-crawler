@@ -17,6 +17,7 @@ import org.apache.flink.util.Collector;
 
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlLengthener;
+import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
 @SuppressWarnings({ "serial", "unused" })
 public class LengthenUrlsFunction extends RichCoFlatMapFunction<RawUrl, Tuple0, RawUrl> {
@@ -59,7 +60,8 @@ public class LengthenUrlsFunction extends RichCoFlatMapFunction<RawUrl, Tuple0, 
 	
 	@Override
 	public void flatMap1(final RawUrl url, Collector<RawUrl> collector) throws Exception {
-		System.out.println("Adding URL to lengthening queue: " + url);
+		UrlLogger.record(this.getClass(), url);
+
 		_executor.execute(new Runnable() {
 			
 			@Override

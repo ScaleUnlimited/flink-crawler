@@ -12,6 +12,7 @@ import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDB;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
+import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
 /**
  * The Flink operator that wraps our "crawl DB". Incoming URLs are de-duplicated and merged in memory.
@@ -65,7 +66,7 @@ public class CrawlDBFunction extends RichCoFlatMapFunction<CrawlStateUrl, Tuple0
 
 	@Override
 	public void flatMap1(CrawlStateUrl url, Collector<FetchUrl> collector) throws Exception {
-		System.out.println("CrawlDBFunction got " + url);
+		UrlLogger.record(this.getClass(), url);
 		
 		// Add to our in-memory queue. If this is full, it might trigger a merge
 		_crawlDB.add(url);

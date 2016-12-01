@@ -23,6 +23,7 @@ import com.scaleunlimited.flinkcrawler.fetcher.HttpFetchException;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
+import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
 @SuppressWarnings({ "serial", "unused" })
 public class FetchUrlsFunction extends RichCoFlatMapFunction<FetchUrl, Tuple0, FetchedUrl> {
@@ -65,7 +66,8 @@ public class FetchUrlsFunction extends RichCoFlatMapFunction<FetchUrl, Tuple0, F
 	
 	@Override
 	public void flatMap1(final FetchUrl url, Collector<FetchedUrl> collector) throws Exception {
-		System.out.println("Adding URL to fetch queue: " + url);
+		UrlLogger.record(this.getClass(), url);
+		
 		_executor.execute(new Runnable() {
 			
 			@Override

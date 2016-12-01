@@ -10,6 +10,7 @@ import org.apache.flink.util.Collector;
 import com.scaleunlimited.flinkcrawler.fetcher.BaseFetcher;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.robots.BaseRobotsParser;
+import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
 @SuppressWarnings("serial")
 public class CheckUrlWithRobotsFunction extends RichCoFlatMapFunction<FetchUrl, Tuple0, FetchUrl> {
@@ -38,7 +39,8 @@ public class CheckUrlWithRobotsFunction extends RichCoFlatMapFunction<FetchUrl, 
 	
 	@Override
 	public void flatMap1(FetchUrl url, Collector<FetchUrl> collector) throws Exception {
-		System.out.println("Checking against robots: " + url);
+		UrlLogger.record(this.getClass(), url);
+		
 		_queue.add(url);
 	}
 

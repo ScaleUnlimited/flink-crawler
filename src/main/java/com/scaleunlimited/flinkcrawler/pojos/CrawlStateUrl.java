@@ -8,7 +8,8 @@ import com.scaleunlimited.flinkcrawler.crawldb.Payload;
 import com.scaleunlimited.flinkcrawler.utils.HashUtils;
 
 
-public class CrawlStateUrl {
+@SuppressWarnings("serial")
+public class CrawlStateUrl extends BaseUrl {
 
 	private String _url;
 	private FetchStatus _status;		// TODO make this an enum ?
