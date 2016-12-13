@@ -20,6 +20,8 @@ public class CrawlStateUrl extends BaseUrl {
 	private long _nextFetchTime;
 	
 	public CrawlStateUrl(String url, FetchStatus status, String pld, float actualScore, float estimatedScore, long lastFetchedTime, long nextFetchTime) {
+		super();
+		
 		_url = url;
 		_status = status;
 		_pld = pld;
@@ -29,6 +31,11 @@ public class CrawlStateUrl extends BaseUrl {
 		_nextFetchTime = nextFetchTime;
 	}
 	
+	@Override
+	public String getPartitionKey() {
+		return _pld;
+	}
+
 	public String getUrl() {
 		return _url;
 	}
@@ -138,5 +145,6 @@ public class CrawlStateUrl extends BaseUrl {
 		}
 		
 	}
+
 	
 }

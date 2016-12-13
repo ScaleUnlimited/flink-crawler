@@ -1,11 +1,8 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
-import java.util.concurrent.ConcurrentLinkedQueue;
-
 import org.apache.flink.api.common.functions.RuntimeContext;
-import org.apache.flink.api.java.tuple.Tuple0;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.streaming.api.functions.co.RichCoFlatMapFunction;
+import org.apache.flink.streaming.api.functions.RichProcessFunction;
 import org.apache.flink.util.Collector;
 
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDB;
@@ -28,11 +25,14 @@ import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
  *
  */
 @SuppressWarnings("serial")
-public class CrawlDBFunction extends RichCoFlatMapFunction<CrawlStateUrl, Tuple0, FetchUrl> {
+public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl> {
 
 	// TODO configure this
 	private static final int MAX_ACTIVE_URLS = 10_000;
 	
+	// TODO pick good time for this
+	private static final long QUEUE_CHECK_DELAY = 10;
+
 	private BaseCrawlDB _crawlDB;
 	
 	// List of URLs that are available to be fetched.
@@ -65,21 +65,18 @@ public class CrawlDBFunction extends RichCoFlatMapFunction<CrawlStateUrl, Tuple0
 	}
 
 	@Override
-	public void flatMap1(CrawlStateUrl url, Collector<FetchUrl> collector) throws Exception {
+	public void processElement(CrawlStateUrl url, Context context, Collector<FetchUrl> collector) throws Exception {
 		UrlLogger.record(this.getClass(), url);
 		
 		// Add to our in-memory queue. If this is full, it might trigger a merge
 		_crawlDB.add(url);
+		
+		// Every time we get called, we'll set up a new timer that fires
+		context.timerService().registerProcessingTimeTimer(context.timerService().currentProcessingTime() + QUEUE_CHECK_DELAY);
 	}
-
-	/* We get called regularly by a broadcast from the CrawlDbSource, which exists to generate
-	 * new URLs as needed from the crawlDB.
-	 * 
-	 * (non-Javadoc)
-	 * @see org.apache.flink.streaming.api.functions.co.CoFlatMapFunction#flatMap2(java.lang.Object, org.apache.flink.util.Collector)
-	 */
+	
 	@Override
-	public void flatMap2(Tuple0 tickle, Collector<FetchUrl> collector) throws Exception {
+	public void onTimer(long time, OnTimerContext context, Collector<FetchUrl> collector) throws Exception {
 		// TODO do this in a loop?
 		FetchUrl url = _fetchQueue.poll();
 		
@@ -91,8 +88,9 @@ public class CrawlDBFunction extends RichCoFlatMapFunction<CrawlStateUrl, Tuple0
 			// Call the CrawlDB to trigger a merge (if appropriate)
 			_crawlDB.merge();
 		}
+
+		context.timerService().registerProcessingTimeTimer(context.timerService().currentProcessingTime() + QUEUE_CHECK_DELAY);
 	}
-	
-	
+
 
 }

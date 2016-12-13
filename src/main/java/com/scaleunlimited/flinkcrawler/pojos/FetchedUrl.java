@@ -1,12 +1,18 @@
 package com.scaleunlimited.flinkcrawler.pojos;
 
+import java.net.MalformedURLException;
+import java.net.URL;
+
 import org.apache.tika.metadata.Metadata;
+
+import crawlercommons.url.PaidLevelDomain;
 
 
 @SuppressWarnings("serial")
 public class FetchedUrl extends BaseUrl {
 
 	private String _baseUrl;
+	private String _pld;
 	private String _fetchedUrl;
 	private long _fetchTime;
 	private Metadata _headers;
@@ -15,7 +21,7 @@ public class FetchedUrl extends BaseUrl {
 	private int _responseRate;
 	
 	public FetchedUrl(String baseUrl, String fetchedUrl, long fetchTime, Metadata headers,
-			byte[] content, String contentType, int responseRate) {
+			byte[] content, String contentType, int responseRate) throws MalformedURLException {
 		_baseUrl = baseUrl;
 		_fetchedUrl= fetchedUrl;
 		_fetchTime = fetchTime;
@@ -24,10 +30,16 @@ public class FetchedUrl extends BaseUrl {
 		_contentType = contentType;
 		_responseRate = responseRate;
 		
+		_pld = PaidLevelDomain.getPLD(new URL(_baseUrl));
+		
 		// TODO do we need redirects or new baseUrl ?
 	}
 
-
+	@Override
+	public String getPartitionKey() {
+		return _pld;
+	};
+	
 	public String getBaseUrl() {
 		return _baseUrl;
 	}
