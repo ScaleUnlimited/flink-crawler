@@ -2,9 +2,8 @@ package com.scaleunlimited.flinkcrawler.functions;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-import org.apache.flink.api.java.tuple.Tuple0;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.streaming.api.functions.co.RichCoFlatMapFunction;
+import org.apache.flink.streaming.api.functions.RichProcessFunction;
 import org.apache.flink.util.Collector;
 
 import com.scaleunlimited.flinkcrawler.fetcher.BaseFetcher;
@@ -13,7 +12,10 @@ import com.scaleunlimited.flinkcrawler.robots.BaseRobotsParser;
 import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
 @SuppressWarnings("serial")
-public class CheckUrlWithRobotsFunction extends RichCoFlatMapFunction<FetchUrl, Tuple0, FetchUrl> {
+public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, FetchUrl> {
+
+	// TODO pick good time for this
+	private static final long QUEUE_CHECK_DELAY = 10;
 
 	private BaseFetcher _fetcher;
 	private BaseRobotsParser _checker;
@@ -38,20 +40,24 @@ public class CheckUrlWithRobotsFunction extends RichCoFlatMapFunction<FetchUrl, 
 	}
 	
 	@Override
-	public void flatMap1(FetchUrl url, Collector<FetchUrl> collector) throws Exception {
+	public void processElement(final FetchUrl url, Context context, Collector<FetchUrl> collector) throws Exception {
 		UrlLogger.record(this.getClass(), url);
 		
 		_queue.add(url);
+		
+		// Every time we get called, we'll set up a new timer that fires
+		context.timerService().registerProcessingTimeTimer(context.timerService().currentProcessingTime() + QUEUE_CHECK_DELAY);
 	}
 
 	@Override
-	public void flatMap2(Tuple0 tickle, Collector<FetchUrl> collector) throws Exception {
+	public void onTimer(long time, OnTimerContext context, Collector<FetchUrl> collector) throws Exception {
 		if (!_queue.isEmpty()) {
 			FetchUrl url = _queue.remove();
 			System.out.println("Url passed robots check: " + url);
 			collector.collect(url);
 		}
 
+		context.timerService().registerProcessingTimeTimer(context.timerService().currentProcessingTime() + QUEUE_CHECK_DELAY);
 	}
 
 }

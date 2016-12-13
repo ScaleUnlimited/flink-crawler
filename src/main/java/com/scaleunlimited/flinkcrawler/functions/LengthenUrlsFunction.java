@@ -1,31 +1,27 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.flink.api.common.functions.RichFlatMapFunction;
-import org.apache.flink.api.java.tuple.Tuple0;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.streaming.api.functions.co.RichCoFlatMapFunction;
+import org.apache.flink.streaming.api.functions.RichProcessFunction;
 import org.apache.flink.util.Collector;
 
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlLengthener;
 import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
-@SuppressWarnings({ "serial", "unused" })
-public class LengthenUrlsFunction extends RichCoFlatMapFunction<RawUrl, Tuple0, RawUrl> {
+@SuppressWarnings({ "serial" })
+public class LengthenUrlsFunction extends RichProcessFunction<RawUrl, RawUrl> {
 
 	private static final int MIN_THREAD_COUNT = 10;
 	private static final int MAX_THREAD_COUNT = 100;
 	
 	private static final int MAX_QUEUED_URLS = 1000;
+	private static final long QUEUE_CHECK_DELAY = 10;
 	
 	private BaseUrlLengthener _lengthener;
 	
@@ -59,7 +55,7 @@ public class LengthenUrlsFunction extends RichCoFlatMapFunction<RawUrl, Tuple0, 
 	}
 	
 	@Override
-	public void flatMap1(final RawUrl url, Collector<RawUrl> collector) throws Exception {
+	public void processElement(final RawUrl url, Context context, Collector<RawUrl> collector) throws Exception {
 		UrlLogger.record(this.getClass(), url);
 
 		_executor.execute(new Runnable() {
@@ -70,16 +66,21 @@ public class LengthenUrlsFunction extends RichCoFlatMapFunction<RawUrl, Tuple0, 
 				_output.add(_lengthener.lengthen(url));
 			}
 		});
+		
+		// Every time we get called, we'll set up a new timer that fires
+		context.timerService().registerProcessingTimeTimer(context.timerService().currentProcessingTime() + QUEUE_CHECK_DELAY);
 	}
-
+	
 	@Override
-	public void flatMap2(Tuple0 tickle, Collector<RawUrl> collector) throws Exception {
-		while (!_output.isEmpty()) {
+	public void onTimer(long time, OnTimerContext context, Collector<RawUrl> collector) throws Exception {
+		// TODO use a loop?
+		if (!_output.isEmpty()) {
 			RawUrl lengthenedUrl = _output.remove();
 			System.out.println("Removing URL from lengthening queue: " + lengthenedUrl);
 			collector.collect(lengthenedUrl);
 		}
+		
+		context.timerService().registerProcessingTimeTimer(context.timerService().currentProcessingTime() + QUEUE_CHECK_DELAY);
 	}
-	
 
 }

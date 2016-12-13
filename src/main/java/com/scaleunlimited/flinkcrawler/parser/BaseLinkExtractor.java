@@ -1,6 +1,7 @@
 package com.scaleunlimited.flinkcrawler.parser;
 
 import java.io.Serializable;
+import java.net.MalformedURLException;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -131,7 +132,12 @@ public abstract class BaseLinkExtractor extends DefaultHandler implements Serial
         super.endElement(uri, localName, name);
 
         if (localName.equalsIgnoreCase(_inAnchorTag)) {
-            addLink(new ExtractedUrl(_curUrl, _curAnchor.toString(), _curRelAttributes));
+            try {
+				addLink(new ExtractedUrl(_curUrl, _curAnchor.toString(), _curRelAttributes));
+			} catch (MalformedURLException e) {
+				// TODO LOG the issue, keep going.
+			}
+            
             _inAnchorTag = null;
         }
     }

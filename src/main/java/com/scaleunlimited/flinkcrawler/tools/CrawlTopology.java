@@ -27,6 +27,7 @@ import com.scaleunlimited.flinkcrawler.functions.NormalizeUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.OutlinkToStateUrlFunction;
 import com.scaleunlimited.flinkcrawler.functions.ParseFunction;
 import com.scaleunlimited.flinkcrawler.functions.RawToStateUrlFunction;
+import com.scaleunlimited.flinkcrawler.functions.UrlKeySelector;
 import com.scaleunlimited.flinkcrawler.functions.ValidUrlsFilter;
 import com.scaleunlimited.flinkcrawler.parser.BasePageParser;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
@@ -74,7 +75,6 @@ public class CrawlTopology {
 
         private StreamExecutionEnvironment _env;
         private String _jobName = "flink-crawler";
-        private long _tickleInterval = TickleSource.DEFAULT_TICKLE_INTERVAL;
         private long _runTime = TickleSource.INFINITE_RUN_TIME;
         private int _parallelism = DEFAULT_PARALLELISM;
 
@@ -151,12 +151,8 @@ public class CrawlTopology {
             return this;
         }
 
-        public CrawlTopologyBuilder setTickleInterval(int tickleInterval) {
-            _tickleInterval = tickleInterval;
-            return this;
-        }
-
         public CrawlTopologyBuilder setRunTime(long runTime) {
+        	// TODO this won't work
             _runTime = runTime;
             return this;
         }
@@ -176,41 +172,26 @@ public class CrawlTopology {
             
             KeyedStream<RawUrl, String> rawUrls = rawUrlsSource
             		.name("Seed urls source")
-            		.keyBy(new KeySelector<RawUrl, String>() {
-
-                @Override
-                public String getKey(RawUrl url) throws Exception {
-                    return url.getPLD();
-                }
-            });
+            		.keyBy(new UrlKeySelector<RawUrl>());
             
-            DataStreamSource<Tuple0> ticklerSource = _env.addSource(new TickleSource(_runTime, _tickleInterval));
-            if (_parallelism != DEFAULT_PARALLELISM) {
-                ticklerSource = ticklerSource.setParallelism(_parallelism);
-            }
-            // We want to broadcast these tuples to everyone
-            DataStream<Tuple0> tickler = ticklerSource
-            		.name("Tickler source")
-            		.broadcast();
-
             // TODO use something like double the fetch timeout here? or add fetch timeout to parse timeout? Maybe we
             // need to be able to ask each operation how long it might take, and use that. Note that as long as the
             // TickleSource keeps pumping out tickle tuples we won't terminate, so we don't need to worry about
             // something like a full CrawlDB merge causing us to time out. So in that case maybe just use double the
             // tickle interval here? But setting it to 200 when tickle is 100 causes us to not terminate :(
             IterativeStream<RawUrl> iteration = rawUrls.iterate(5000);
-            DataStream<CrawlStateUrl> cleanedUrls = iteration.connect(tickler)
-                    .flatMap(new LengthenUrlsFunction(_urlLengthener)).name("LengthenUrlsFunction")
+            DataStream<CrawlStateUrl> cleanedUrls = iteration
+            		.keyBy(new UrlKeySelector<RawUrl>())
+                    .process(new LengthenUrlsFunction(_urlLengthener)).name("LengthenUrlsFunction")
                     .flatMap(new NormalizeUrlsFunction(_urlNormalizer)).name("NormalizeUrlsFunction")
                     .filter(new ValidUrlsFilter(_urlFilter)).name("FilterUrlsFunction")
                     .map(new RawToStateUrlFunction());
 
-            // TODO need to support setting a separate fetcher for robots, as this often wants to use different
-            // settings than the main fetcher.
-            DataStream<FetchUrl> urlsToFetch = cleanedUrls.connect(tickler)
-            		.flatMap(new CrawlDBFunction(_crawlDB))
-                    .connect(tickler)
-                    .flatMap(new CheckUrlWithRobotsFunction(_robotsFetcher, _robotsParser));
+            DataStream<FetchUrl> urlsToFetch = cleanedUrls
+            		.keyBy(new UrlKeySelector<CrawlStateUrl>())
+            		.process(new CrawlDBFunction(_crawlDB))
+            		.keyBy(new UrlKeySelector<FetchUrl>())
+                    .process(new CheckUrlWithRobotsFunction(_robotsFetcher, _robotsParser));
             
             // TODO need to split this stream and send rejected URLs back to crawlDB. Probably need to
             // merge this CrawlStateUrl stream with CrawlStateUrl streams from outlinks and fetch results.
@@ -219,8 +200,10 @@ public class CrawlTopology {
             // rejected robots URLs and outlinks. The fetcher code would want to handle settings no outlink(s) or
             // content and just a FetchedUrl for case of a fetch failure or if the content fetched isn't the
             // type that we want (e.g. image file)
-            DataStream<Tuple2<ExtractedUrl, ParsedUrl>> fetchedUrls = urlsToFetch.connect(tickler)
-                    .flatMap(new FetchUrlsFunction(_pageFetcher)).flatMap(new ParseFunction(_pageParser));
+            DataStream<Tuple2<ExtractedUrl, ParsedUrl>> fetchedUrls = urlsToFetch
+            		.keyBy(new UrlKeySelector<FetchUrl>())
+                    .process(new FetchUrlsFunction(_pageFetcher))
+                    .flatMap(new ParseFunction(_pageParser));
 
             SplitStream<Tuple2<ExtractedUrl, ParsedUrl>> outlinksOrContent = fetchedUrls
                     .split(new OutputSelector<Tuple2<ExtractedUrl, ParsedUrl>>() {

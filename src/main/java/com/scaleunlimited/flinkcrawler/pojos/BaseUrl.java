@@ -7,4 +7,5 @@ public abstract class BaseUrl implements Serializable {
 
 	public BaseUrl() { }
 
+	public abstract String getPartitionKey();
 }

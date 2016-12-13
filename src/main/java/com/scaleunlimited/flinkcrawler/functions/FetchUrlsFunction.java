@@ -14,6 +14,9 @@ import java.util.concurrent.TimeUnit;
 import org.apache.flink.api.common.functions.RichFlatMapFunction;
 import org.apache.flink.api.java.tuple.Tuple0;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.streaming.api.functions.RichProcessFunction;
+import org.apache.flink.streaming.api.functions.ProcessFunction.Context;
+import org.apache.flink.streaming.api.functions.ProcessFunction.OnTimerContext;
 import org.apache.flink.streaming.api.functions.co.RichCoFlatMapFunction;
 import org.apache.flink.util.Collector;
 
@@ -26,13 +29,16 @@ import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
 @SuppressWarnings({ "serial", "unused" })
-public class FetchUrlsFunction extends RichCoFlatMapFunction<FetchUrl, Tuple0, FetchedUrl> {
+public class FetchUrlsFunction extends RichProcessFunction<FetchUrl, FetchedUrl> {
 
 	private static final int MIN_THREAD_COUNT = 10;
 	private static final int MAX_THREAD_COUNT = 100;
 	
 	private static final int MAX_QUEUED_URLS = 1000;
 	
+	// TODO pick good time for this
+	private static final long QUEUE_CHECK_DELAY = 10;
+
 	private BaseFetcher _fetcher;
 	
 	private transient ConcurrentLinkedQueue<FetchedUrl> _output;
@@ -65,7 +71,7 @@ public class FetchUrlsFunction extends RichCoFlatMapFunction<FetchUrl, Tuple0, F
 	}
 	
 	@Override
-	public void flatMap1(final FetchUrl url, Collector<FetchedUrl> collector) throws Exception {
+	public void processElement(final FetchUrl url, Context context, Collector<FetchedUrl> collector) throws Exception {
 		UrlLogger.record(this.getClass(), url);
 		
 		_executor.execute(new Runnable() {
@@ -91,15 +97,22 @@ public class FetchUrlsFunction extends RichCoFlatMapFunction<FetchUrl, Tuple0, F
 				}
 			}
 		});
+		
+		// Every time we get called, we'll set up a new timer that fires
+		context.timerService().registerProcessingTimeTimer(context.timerService().currentProcessingTime() + QUEUE_CHECK_DELAY);
 	}
 
 	@Override
-	public void flatMap2(Tuple0 tickle, Collector<FetchedUrl> collector) throws Exception {
-		while (!_output.isEmpty()) {
+	public void onTimer(long time, OnTimerContext context, Collector<FetchedUrl> collector) throws Exception {
+		// TODO use a loop?
+		
+		if (!_output.isEmpty()) {
 			FetchedUrl url = _output.remove();
 			System.out.println("Removing URL from fetched queue: " + url);
 			collector.collect(url);
 		}
+		
+		context.timerService().registerProcessingTimeTimer(context.timerService().currentProcessingTime() + QUEUE_CHECK_DELAY);
 	}
 	
 
