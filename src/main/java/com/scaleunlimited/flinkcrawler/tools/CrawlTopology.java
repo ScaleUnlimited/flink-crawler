@@ -5,8 +5,6 @@ import java.util.List;
 
 import org.apache.flink.api.common.JobExecutionResult;
 import org.apache.flink.api.common.functions.MapFunction;
-import org.apache.flink.api.java.functions.KeySelector;
-import org.apache.flink.api.java.tuple.Tuple0;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.streaming.api.collector.selector.OutputSelector;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -32,6 +30,7 @@ import com.scaleunlimited.flinkcrawler.functions.ValidUrlsFilter;
 import com.scaleunlimited.flinkcrawler.parser.BasePageParser;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
+import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
@@ -187,7 +186,7 @@ public class CrawlTopology {
                     .filter(new ValidUrlsFilter(_urlFilter)).name("FilterUrlsFunction")
                     .map(new RawToStateUrlFunction());
 
-            DataStream<FetchUrl> urlsToFetch = cleanedUrls
+            DataStream<Tuple2<FetchStatus, FetchUrl>> postRobotsUrls = cleanedUrls
             		.keyBy(new UrlKeySelector<CrawlStateUrl>())
             		.process(new CrawlDBFunction(_crawlDB))
             		.keyBy(new UrlKeySelector<FetchUrl>())
@@ -195,12 +194,40 @@ public class CrawlTopology {
             
             // TODO need to split this stream and send rejected URLs back to crawlDB. Probably need to
             // merge this CrawlStateUrl stream with CrawlStateUrl streams from outlinks and fetch results.
+            SplitStream<Tuple2<FetchStatus, FetchUrl>> statusOrUrlsToFetch = postRobotsUrls
+            		.split(new OutputSelector<Tuple2<FetchStatus, FetchUrl>>() {
+                        
+            			private final List<String> STATUS_STREAM = Arrays.asList("status");
+                        private final List<String> FETCH_URL_STREAM = Arrays.asList("fetch_url");
 
+                        @Override
+                        public Iterable<String> select(Tuple2<FetchStatus, FetchUrl> statusOrUrlsToFetch) {
+                            if (statusOrUrlsToFetch.f0 != null) {
+                                return STATUS_STREAM;
+                            } else if (statusOrUrlsToFetch.f1 != null) {
+                                return FETCH_URL_STREAM;
+                            } else {
+                                throw new RuntimeException("Invalid case of neither status nor fetch_url");
+                            }
+                        }
+            		});
+            
+            // TODO Need to run statusOrUrlsToFetch.select("status") back into cleanedUrlsIterator
+            // along with Vivek's fetch failures.
+            
             // TODO need a Tuple3 with a FetchedUrl(?) that has status update, which we can merge back in with
             // rejected robots URLs and outlinks. The fetcher code would want to handle settings no outlink(s) or
             // content and just a FetchedUrl for case of a fetch failure or if the content fetched isn't the
             // type that we want (e.g. image file)
-            DataStream<Tuple2<ExtractedUrl, ParsedUrl>> fetchedUrls = urlsToFetch
+            DataStream<Tuple2<ExtractedUrl, ParsedUrl>> fetchedUrls = statusOrUrlsToFetch.select("fetch_url")
+            		.map(new MapFunction<Tuple2<FetchStatus,FetchUrl>, FetchUrl>() {
+
+						@Override
+						public FetchUrl map(Tuple2<FetchStatus, FetchUrl> justHasFetchUrl)
+								throws Exception {
+							return justHasFetchUrl.f1;
+						}
+					})
             		.keyBy(new UrlKeySelector<FetchUrl>())
                     .process(new FetchUrlsFunction(_pageFetcher))
                     .flatMap(new ParseFunction(_pageParser));
