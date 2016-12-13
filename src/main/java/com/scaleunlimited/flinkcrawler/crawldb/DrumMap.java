@@ -56,6 +56,7 @@ import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
  */
 public class DrumMap implements Closeable {
 	private static final int NO_VALUE_INDEX = -1;
+	private static final int NO_PAYLOAD_OFFSET = -1;
 	
 	public static int DEFAULT_MAX_ENTRIES = 10_000;
 
@@ -100,8 +101,7 @@ public class DrumMap implements Closeable {
 		return _numEntries;
 	}
 	
-	// TODO use a CrawlDbUrl as the one parameter, call it to get key, value, payload
-	public boolean add(long key, Object value, Payload payload) throws IOException {
+	public boolean add(long key, Object value, IPayload payload) throws IOException {
 		
 		_keys[_numEntries] = key;
 		_values[_numEntries] = value;
@@ -124,32 +124,27 @@ public class DrumMap implements Closeable {
 	 * @param payload
 	 * @return offset of data written, or NO_PAYLOAD_OFFSET
 	 */
-	private int writePayload(Payload payload) throws IOException {
-		// Write the payload to our file, and return the offset of the data
-		int result = _payloadOut.getBytesWritten();
-		payload.write(_payloadOut);
-		return result;
+	private int writePayload(IPayload payload) throws IOException {
+		if (payload == null) {
+			return NO_PAYLOAD_OFFSET;
+		} else {
+			// Write the payload to our file, and return the offset of the data
+			int result = _payloadOut.getBytesWritten();
+			payload.write(_payloadOut);
+			return result;
+		}
 	}
 
 	/**
 	 * Merge our in-memory array and related payload file with the persisted version
+	 * 
+	 * TODO - take everything here we need to do the merge, or provide that up above?
 	 */
-	private void merge() {
+	public void merge() {
 		DrumMapSorter.quickSort(_keys, 0, _numEntries - 1, _offsets, _values);
 
+		
 		// TODO do the merge
-		
-	}
-
-	public void getFetchable(PriorityQueue<FetchUrl> urls) {
-		// TODO trigger a merge if needed.
-		Payload payload = null;
-		
-		for (int i = 0; i < _numEntries; i++) {
-			int payloadOffset = _offsets[i];
-			
-			// TODO make it so
-		}
 		
 	}
 
@@ -173,7 +168,7 @@ public class DrumMap implements Closeable {
 	 * @param payload
 	 * @return
 	 */
-	public Object getInMemoryEntry(long key, Payload payload) throws IOException {
+	public Object getInMemoryEntry(long key, IPayload payload) throws IOException {
 		if (_payloadOut != null) {
 			throw new IllegalStateException("Must be closed first!");
 		}

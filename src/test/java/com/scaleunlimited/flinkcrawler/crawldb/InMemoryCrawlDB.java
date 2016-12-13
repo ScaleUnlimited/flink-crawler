@@ -13,19 +13,19 @@ public class InMemoryCrawlDB extends BaseCrawlDB {
 	private Map<String, CrawlStateUrl> _crawlState;
 
 	@Override
-	public void open(FetchQueue fetchQueue) {
+	public void open(FetchQueue fetchQueue) throws Exception {
 		super.open(fetchQueue);
 		
 		_crawlState = new HashMap<>();
 	}
 
 	@Override
-	public void close() {
+	public void close() throws Exception {
 		// TODO need to force a merge, but without adding any urls to the active queue
 	}
 
 	@Override
-	public void add(CrawlStateUrl url) {
+	public void add(CrawlStateUrl url) throws Exception {
 		// We need to track the status of a URL.
 		String key = url.getUrl();
 		synchronized (_crawlState) {
@@ -62,7 +62,7 @@ public class InMemoryCrawlDB extends BaseCrawlDB {
 	 * This can get called at the same time as the add, so we have to synchronize.
 	 */
 	@Override
-	public void merge() {
+	public void merge() throws Exception {
 		synchronized (_crawlState) {
 			for (String url : _crawlState.keySet()) {
 				CrawlStateUrl curState = _crawlState.get(url);

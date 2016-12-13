@@ -1,5 +1,6 @@
 package com.scaleunlimited.flinkcrawler.webgraph;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -15,8 +16,7 @@ public class SimpleWebGraph extends BaseWebGraph {
 	private BaseUrlNormalizer _normalizer;
 	
 	public SimpleWebGraph(BaseUrlNormalizer normalizer) {
-		_graph = new HashMap<>();
-		_normalizer = normalizer;
+		this(normalizer, new ArrayList<String>());
 	}
 	
 	/**
@@ -31,7 +31,8 @@ public class SimpleWebGraph extends BaseWebGraph {
 	 * 
 	 * @param nodes
 	 */
-	public SimpleWebGraph(List<String> nodes) {
+	public SimpleWebGraph(BaseUrlNormalizer normalizer, List<String> nodes) {
+		_normalizer = normalizer;
 		_graph = new HashMap<>(nodes.size());
 		
 		for (String node : nodes) {

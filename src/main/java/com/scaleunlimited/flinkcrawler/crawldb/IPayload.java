@@ -4,11 +4,8 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
-public abstract class Payload {
+public interface IPayload {
 
-	public Payload() {
-	}
-	
 	public abstract void write(DataOutput out) throws IOException;
 	
 	public abstract void readFields(DataInput in) throws IOException;

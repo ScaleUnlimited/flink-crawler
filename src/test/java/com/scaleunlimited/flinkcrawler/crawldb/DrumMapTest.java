@@ -62,7 +62,7 @@ public class DrumMapTest {
 		}
 	}
 	
-	private static class LongPayload extends Payload {
+	private static class LongPayload implements IPayload {
 
 		private Long _payload;
 		

@@ -10,6 +10,9 @@ import java.util.Iterator;
 
 import org.junit.Test;
 
+import com.scaleunlimited.flinkcrawler.urls.BaseUrlNormalizer;
+import com.scaleunlimited.flinkcrawler.urls.SimpleUrlNormalizer;
+
 public class SimpleWebGraphTest {
 
 	@Test
@@ -24,24 +27,25 @@ public class SimpleWebGraphTest {
 				"domain1.com/page2\tdomain2.com\tdomain1.com\tdomain1.com/page1"
 		};
 		
-		BaseWebGraph webGraph = new SimpleWebGraph(Arrays.asList(graph));
+		BaseUrlNormalizer normalizer = new SimpleUrlNormalizer();
+		BaseWebGraph webGraph = new SimpleWebGraph(normalizer, Arrays.asList(graph));
 		assertNull(webGraph.getChildren("bogus"));
 		
-		Iterator<String> children = webGraph.getChildren("domain1.com");
+		Iterator<String> children = webGraph.getChildren(normalizer.normalize("domain1.com"));
 		assertNotNull(children);
-		assertEquals("domain1.com/page1", children.next());
-		assertEquals("domain1.com/page2", children.next());
+		assertEquals(normalizer.normalize("domain1.com/page1"), children.next());
+		assertEquals(normalizer.normalize("domain1.com/page2"), children.next());
 		assertFalse(children.hasNext());
 		
-		children = webGraph.getChildren("domain1.com/page1");
+		children = webGraph.getChildren(normalizer.normalize("domain1.com/page1"));
 		assertNotNull(children);
 		assertFalse(children.hasNext());
 
-		children = webGraph.getChildren("domain1.com/page2");
+		children = webGraph.getChildren(normalizer.normalize("domain1.com/page2"));
 		assertNotNull(children);
-		assertEquals("domain2.com", children.next());
-		assertEquals("domain1.com", children.next());
-		assertEquals("domain1.com/page1", children.next());
+		assertEquals(normalizer.normalize("domain2.com"), children.next());
+		assertEquals(normalizer.normalize("domain1.com"), children.next());
+		assertEquals(normalizer.normalize("domain1.com/page1"), children.next());
 	}
 
 }
