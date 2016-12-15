@@ -3,11 +3,6 @@ package com.scaleunlimited.flinkcrawler.pojos;
 @SuppressWarnings("serial")
 public class FetchUrl extends ScoredUrl {
 
-	public FetchUrl() {
-		// Empty constructor so it's a POJO
-		super();
-	}
-	
 	public FetchUrl(String url, String pld, float estimatedScore, float actualScore) {
 		super(url, pld, estimatedScore, actualScore);
 		

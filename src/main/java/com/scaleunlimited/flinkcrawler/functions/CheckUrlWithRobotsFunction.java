@@ -8,19 +8,21 @@ import org.apache.flink.streaming.api.functions.RichProcessFunction;
 import org.apache.flink.util.Collector;
 
 import com.scaleunlimited.flinkcrawler.fetcher.BaseFetcher;
+import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.robots.BaseRobotsParser;
 import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
 @SuppressWarnings("serial")
-public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tuple2<FetchStatus, FetchUrl>> {
+public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tuple2<CrawlStateUrl, FetchUrl>> {
 
 	// TODO pick good time for this
 	private static final long QUEUE_CHECK_DELAY = 10;
+	protected static final long DEFAULT_RETRY_INTERVAL_MS = 100_000 * 1000L;
 
 	private BaseFetcher _fetcher;
-	private BaseRobotsParser _checker;
+	private BaseRobotsParser _parser;
 	
 	// TODO we need a map from domain to rules & refresh time, that we maintain here
 	// Actually the key needs to be protocol + full domain (not just PLD) + port, as robots are
@@ -29,9 +31,9 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 	
 	private transient ConcurrentLinkedQueue<FetchUrl> _queue;
 	
-	public CheckUrlWithRobotsFunction(BaseFetcher fetcher, BaseRobotsParser checker) {
+	public CheckUrlWithRobotsFunction(BaseFetcher fetcher, BaseRobotsParser parser) {
 		_fetcher = fetcher;
-		_checker = checker;
+		_parser = parser;
 	}
 	
 	@Override
@@ -42,7 +44,7 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 	}
 	
 	@Override
-	public void processElement(final FetchUrl url, Context context, Collector<Tuple2<FetchStatus, FetchUrl>> collector) throws Exception {
+	public void processElement(final FetchUrl url, Context context, Collector<Tuple2<CrawlStateUrl, FetchUrl>> collector) throws Exception {
 		UrlLogger.record(this.getClass(), url);
 		
 		_queue.add(url);
@@ -52,13 +54,28 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 	}
 
 	@Override
-	public void onTimer(long time, OnTimerContext context, Collector<Tuple2<FetchStatus, FetchUrl>> collector) throws Exception {
+	public void onTimer(long time, OnTimerContext context, Collector<Tuple2<CrawlStateUrl, FetchUrl>> collector) throws Exception {
 		if (!_queue.isEmpty()) {
 			FetchUrl url = _queue.remove();
-			System.out.println("Url passed robots check: " + url);
-			collector.collect(new Tuple2<FetchStatus, FetchUrl>(null, url));
 			
-			// TODO If we don't pass robots, we should instead collect a (status, url)
+			// TODO Replace the following hack with real code that makes use of a Fetcher (see above)
+			if (url.getUrl().endsWith("blocked")) {
+				
+				// TODO Where do we get the next fetch time, etc?
+				long now = System.currentTimeMillis();
+				CrawlStateUrl crawlStateUrl = new CrawlStateUrl(url.getUrl(), 
+																FetchStatus.SKIPPED_BLOCKED, 
+																url.getPLD(), 
+																url.getActualScore(), 
+																url.getEstimatedScore(), 
+																now, 
+																now+DEFAULT_RETRY_INTERVAL_MS);
+				System.out.println("Url blocked by robots check: " + url);
+				collector.collect(new Tuple2<CrawlStateUrl, FetchUrl>(crawlStateUrl, url));
+			} else {
+				System.out.println("Url passed robots check: " + url);
+				collector.collect(new Tuple2<CrawlStateUrl, FetchUrl>(null, url));
+			}
 		}
 
 		context.timerService().registerProcessingTimeTimer(context.timerService().currentProcessingTime() + QUEUE_CHECK_DELAY);

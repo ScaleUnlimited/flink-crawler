@@ -5,10 +5,6 @@ public class ScoredUrl extends RawUrl {
 
 	private float _actualScore;
 
-	public ScoredUrl() {
-		super();
-	}
-	
 	public ScoredUrl(String url, String pld, float estimatedScore, float actualScore) {
 		super(url, pld, estimatedScore);
 		

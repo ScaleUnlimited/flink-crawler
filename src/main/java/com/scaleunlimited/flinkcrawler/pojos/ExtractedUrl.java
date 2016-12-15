@@ -9,20 +9,18 @@ import crawlercommons.url.PaidLevelDomain;
 @SuppressWarnings("serial")
 public class ExtractedUrl extends BaseUrl {
 
-    private String _toUrl;
     private String _pld;
     private String _anchorText;
     private String _relAttributes;
     // TODO does an outlink get an estimated score to begin with ?
 
-    public ExtractedUrl(String toUrl, String anchorText, String relAttributes) throws MalformedURLException {
-    	super();
+    public ExtractedUrl(String url, String anchorText, String relAttributes) throws MalformedURLException {
+    	super(url);
     	
-        _toUrl = toUrl;
         _anchorText = anchorText;
         _relAttributes = relAttributes;
         
-		_pld = PaidLevelDomain.getPLD(new URL(toUrl));
+		_pld = PaidLevelDomain.getPLD(new URL(url));
     }
     
 	@Override
@@ -30,14 +28,6 @@ public class ExtractedUrl extends BaseUrl {
 		return _pld;
 	}
 
-    public String getToUrl() {
-        return _toUrl;
-    }
-
-    public void setToUrl(String toUrl) {
-    	_toUrl = toUrl;
-    }
-    
     public String getAnchorText() {
         return _anchorText;
     }
@@ -57,6 +47,6 @@ public class ExtractedUrl extends BaseUrl {
     @Override
     public String toString() {
         // TODO add more fields
-        return _toUrl;
+        return _url;
     }
 }

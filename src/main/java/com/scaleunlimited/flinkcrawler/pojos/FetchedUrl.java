@@ -11,7 +11,6 @@ import crawlercommons.url.PaidLevelDomain;
 @SuppressWarnings("serial")
 public class FetchedUrl extends BaseUrl {
 
-	private String _baseUrl;
 	private String _pld;
 	private String _fetchedUrl;
 	private long _fetchTime;
@@ -20,9 +19,9 @@ public class FetchedUrl extends BaseUrl {
 	private String _contentType;
 	private int _responseRate;
 	
-	public FetchedUrl(String baseUrl, String fetchedUrl, long fetchTime, Metadata headers,
+	public FetchedUrl(String url, String fetchedUrl, long fetchTime, Metadata headers,
 			byte[] content, String contentType, int responseRate) throws MalformedURLException {
-		_baseUrl = baseUrl;
+		super(url);
 		_fetchedUrl= fetchedUrl;
 		_fetchTime = fetchTime;
 		_headers = headers;
@@ -30,7 +29,7 @@ public class FetchedUrl extends BaseUrl {
 		_contentType = contentType;
 		_responseRate = responseRate;
 		
-		_pld = PaidLevelDomain.getPLD(new URL(_baseUrl));
+		_pld = PaidLevelDomain.getPLD(new URL(url));
 		
 		// TODO do we need redirects or new baseUrl ?
 	}
@@ -40,16 +39,6 @@ public class FetchedUrl extends BaseUrl {
 		return _pld;
 	};
 	
-	public String getBaseUrl() {
-		return _baseUrl;
-	}
-
-
-	public void setBaseUrl(String baseUrl) {
-		_baseUrl = baseUrl;
-	}
-
-
 	public String getFetchedUrl() {
 		return _fetchedUrl;
 	}
@@ -111,7 +100,7 @@ public class FetchedUrl extends BaseUrl {
 
 	@Override
 	public String toString() {
-		return String.format("%s (%s)", getBaseUrl(), getContentType());
+		return String.format("%s (%s)", _url, getContentType());
 	}
 	
 }

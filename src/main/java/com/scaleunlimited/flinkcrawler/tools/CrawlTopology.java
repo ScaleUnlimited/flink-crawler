@@ -72,8 +72,6 @@ public class CrawlTopology {
 
         private static final int DEFAULT_PARALLELISM = -1;
 
-		protected static final long DEFAULT_ROBOTS_RETRY_INTERVAL_MS = 100_000 * 1000L;
-
         private StreamExecutionEnvironment _env;
         private String _jobName = "flink-crawler";
         private long _runTime = TickleSource.INFINITE_RUN_TIME;
@@ -190,7 +188,7 @@ public class CrawlTopology {
             
             // TODO Make sure we have info about what went wrong in CrawlStateUrl
             IterativeStream<CrawlStateUrl> crawlDbIteration = cleanedUrls.iterate(5000);
-            DataStream<Tuple2<FetchStatus, FetchUrl>> postRobotsUrls = crawlDbIteration
+            DataStream<Tuple2<CrawlStateUrl, FetchUrl>> postRobotsUrls = crawlDbIteration
             		.keyBy(new UrlKeySelector<CrawlStateUrl>())
             		.process(new CrawlDBFunction(_crawlDB))
             		.keyBy(new UrlKeySelector<FetchUrl>())
@@ -198,57 +196,46 @@ public class CrawlTopology {
             
             // TODO need to split this stream and send rejected URLs back to crawlDB. Probably need to
             // merge this CrawlStateUrl stream with CrawlStateUrl streams from outlinks and fetch results.
-            SplitStream<Tuple2<FetchStatus, FetchUrl>> statusOrUrlsToFetch = postRobotsUrls
-            		.split(new OutputSelector<Tuple2<FetchStatus, FetchUrl>>() {
+            SplitStream<Tuple2<CrawlStateUrl, FetchUrl>> blockedOrPassedUrls = postRobotsUrls
+            		.split(new OutputSelector<Tuple2<CrawlStateUrl, FetchUrl>>() {
                         
-            			private final List<String> STATUS_STREAM = Arrays.asList("status");
-                        private final List<String> FETCH_URL_STREAM = Arrays.asList("fetch_url");
+            			private final List<String> BLOCKED_STREAM = Arrays.asList("blocked");
+                        private final List<String> PASSED_STREAM = Arrays.asList("passed");
 
                         @Override
-                        public Iterable<String> select(Tuple2<FetchStatus, FetchUrl> statusOrUrlsToFetch) {
-                            if (statusOrUrlsToFetch.f0 != null) {
-                                return STATUS_STREAM;
-                            } else if (statusOrUrlsToFetch.f1 != null) {
-                                return FETCH_URL_STREAM;
+                        public Iterable<String> select(Tuple2<CrawlStateUrl, FetchUrl> blockedOrPassedUrl) {
+                            if (blockedOrPassedUrl.f0 != null) {
+                                return BLOCKED_STREAM;
+                            } else if (blockedOrPassedUrl.f1 != null) {
+                                return PASSED_STREAM;
                             } else {
-                                throw new RuntimeException("Invalid case of neither status nor fetch_url");
+                                throw new RuntimeException("Invalid case of neither blocked nor passed");
                             }
                         }
             		});
             
-            // TODO Need to run statusOrUrlsToFetch.select("status") back into cleanedUrlsIterator
-            // along with Vivek's fetch failures.
-            DataStream<CrawlStateUrl> robotRejectedUrls = statusOrUrlsToFetch.select("status")
-            		.map(new MapFunction<Tuple2<FetchStatus,FetchUrl>, CrawlStateUrl>() {
+            // Run statusOrUrlsToFetch.select("status") back into cleanedUrlsIterator
+            // like Vivek's fetch failures.
+            DataStream<CrawlStateUrl> robotBlockedUrls = blockedOrPassedUrls.select("blocked")
+            		.map(new MapFunction<Tuple2<CrawlStateUrl,FetchUrl>, CrawlStateUrl>() {
 
 						@Override
-						public CrawlStateUrl map(Tuple2<FetchStatus, FetchUrl> justHasStatus)
+						public CrawlStateUrl map(Tuple2<CrawlStateUrl, FetchUrl> blockedUrl)
 								throws Exception {
-							FetchStatus status = justHasStatus.f0;
-							FetchUrl url = justHasStatus.f1;
-							
-							// TODO Where do we get the next fetch time, etc?
-							long now = System.currentTimeMillis();
-							return new CrawlStateUrl(	url.getUrl(), 
-														status, 
-														url.getPLD(), 
-														url.getActualScore(), 
-														url.getEstimatedScore(), 
-														now, 
-														now+DEFAULT_ROBOTS_RETRY_INTERVAL_MS);
+							return blockedUrl.f0;
 						}
 					});
-            crawlDbIteration.closeWith(robotRejectedUrls);
+            crawlDbIteration.closeWith(robotBlockedUrls);
             
             // TODO need a Tuple3 with a FetchedUrl(?) that has status update, which we can merge back in with
             // rejected robots URLs and outlinks. The fetcher code would want to handle settings no outlink(s) or
             // content and just a FetchedUrl for case of a fetch failure or if the content fetched isn't the
             // type that we want (e.g. image file)
-            DataStream<Tuple2<ExtractedUrl, ParsedUrl>> fetchedUrls = statusOrUrlsToFetch.select("fetch_url")
-            		.map(new MapFunction<Tuple2<FetchStatus,FetchUrl>, FetchUrl>() {
+            DataStream<Tuple2<ExtractedUrl, ParsedUrl>> fetchedUrls = blockedOrPassedUrls.select("passed")
+            		.map(new MapFunction<Tuple2<CrawlStateUrl,FetchUrl>, FetchUrl>() {
 
 						@Override
-						public FetchUrl map(Tuple2<FetchStatus, FetchUrl> justHasFetchUrl)
+						public FetchUrl map(Tuple2<CrawlStateUrl, FetchUrl> justHasFetchUrl)
 								throws Exception {
 							return justHasFetchUrl.f1;
 						}

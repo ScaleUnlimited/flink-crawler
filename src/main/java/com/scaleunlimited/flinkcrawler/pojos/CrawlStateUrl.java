@@ -15,7 +15,6 @@ public class CrawlStateUrl extends BaseUrl implements IPayload {
 	private FetchStatus _status;		// TODO make this an enum ?
 	
 	// Data kept in the CrawlDB on-disk payload
-	private String _url;
 	private String _pld;
 	private float _actualScore;			// TODO do we maintain separate page and link scores ?
 	private float _estimatedScore;
@@ -23,9 +22,8 @@ public class CrawlStateUrl extends BaseUrl implements IPayload {
 	private long _nextFetchTime;
 
 	public CrawlStateUrl(String url, FetchStatus status, String pld, float actualScore, float estimatedScore, long lastFetchedTime, long nextFetchTime) {
-		super();
+		super(url);
 
-		_url = url;
 		_status = status;
 		_pld = pld;
 		_actualScore = actualScore;
@@ -37,13 +35,6 @@ public class CrawlStateUrl extends BaseUrl implements IPayload {
 	@Override
 	public String getPartitionKey() {
 		return _pld;
-	}
-
-	public String getUrl() {
-		return _url;
-	}
-	public void setUrl(String url) {
-		_url = url;
 	}
 
 	public long makeKey() {

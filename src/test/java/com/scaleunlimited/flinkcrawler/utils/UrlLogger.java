@@ -125,10 +125,29 @@ public class UrlLogger {
 			return this;
 		}
 		
-		public UrlLoggerResults assertLoggedBy(Class<?> clazz, BaseUrl url, int numCalls) {
+		public UrlLoggerResults assertUrlLoggedBy(Class<?> clazz, BaseUrl url, int numCalls) {
 			int foundCalls = 0;
 			for (Tuple2<Class<?>, BaseUrl> entry : _log) {
 				if (entry.f0.equals(clazz) && entry.f1.equals(url)) {
+					foundCalls += 1;
+				}
+			}
+			
+			if (foundCalls != numCalls) {
+				if (foundCalls == 0) {
+					fail(String.format("URL '%s' not logged by %s", url, clazz));
+				} else {
+					fail(String.format("URL '%s' was logged %d times by %s, expected %d", url, foundCalls, clazz, numCalls));
+				}
+			}
+			
+			return this;
+		}
+		
+		public UrlLoggerResults assertUrlLoggedBy(Class<?> clazz, String url, int numCalls) {
+			int foundCalls = 0;
+			for (Tuple2<Class<?>, BaseUrl> entry : _log) {
+				if (entry.f0.equals(clazz) && entry.f1.getUrl().equals(url)) {
 					foundCalls += 1;
 				}
 			}
@@ -177,6 +196,16 @@ public class UrlLogger {
 		public UrlLoggerResults assertUrlNotLoggedBy(Class<?> clazz, BaseUrl url) {
 			for (Tuple2<Class<?>, BaseUrl> entry : _log) {
 				if (entry.f0.equals(clazz) && entry.f1.equals(url)) {
+					fail(String.format("Found URL '%s' logged by %s", url, clazz));
+				}
+			}
+			
+			return this;
+		}
+		
+		public UrlLoggerResults assertUrlNotLoggedBy(Class<?> clazz, String url) {
+			for (Tuple2<Class<?>, BaseUrl> entry : _log) {
+				if (entry.f0.equals(clazz) && entry.f1.getUrl().equals(url)) {
 					fail(String.format("Found URL '%s' logged by %s", url, clazz));
 				}
 			}
