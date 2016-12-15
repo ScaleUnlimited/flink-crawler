@@ -72,6 +72,8 @@ public class CrawlTopology {
 
         private static final int DEFAULT_PARALLELISM = -1;
 
+		protected static final long DEFAULT_ROBOTS_RETRY_INTERVAL_MS = 100_000 * 1000L;
+
         private StreamExecutionEnvironment _env;
         private String _jobName = "flink-crawler";
         private long _runTime = TickleSource.INFINITE_RUN_TIME;
@@ -164,12 +166,12 @@ public class CrawlTopology {
         @SuppressWarnings("serial")
         public CrawlTopology build() {
             // TODO use single topology parallelism? But likely will want different levels for different parts.
-            DataStreamSource<RawUrl> rawUrlsSource = _env.addSource(_urlSource);
+            DataStreamSource<RawUrl> seedUrlsSource = _env.addSource(_urlSource);
             if (_parallelism != DEFAULT_PARALLELISM) {
-                rawUrlsSource = rawUrlsSource.setParallelism(_parallelism);
+                seedUrlsSource = seedUrlsSource.setParallelism(_parallelism);
             }
             
-            KeyedStream<RawUrl, String> rawUrls = rawUrlsSource
+            KeyedStream<RawUrl, String> seedUrls = seedUrlsSource
             		.name("Seed urls source")
             		.keyBy(new UrlKeySelector<RawUrl>());
             
@@ -178,15 +180,17 @@ public class CrawlTopology {
             // TickleSource keeps pumping out tickle tuples we won't terminate, so we don't need to worry about
             // something like a full CrawlDB merge causing us to time out. So in that case maybe just use double the
             // tickle interval here? But setting it to 200 when tickle is 100 causes us to not terminate :(
-            IterativeStream<RawUrl> iteration = rawUrls.iterate(5000);
-            DataStream<CrawlStateUrl> cleanedUrls = iteration
+            IterativeStream<RawUrl> newUrlsIteration = seedUrls.iterate(5000);
+            DataStream<CrawlStateUrl> cleanedUrls = newUrlsIteration
             		.keyBy(new UrlKeySelector<RawUrl>())
                     .process(new LengthenUrlsFunction(_urlLengthener)).name("LengthenUrlsFunction")
                     .flatMap(new NormalizeUrlsFunction(_urlNormalizer)).name("NormalizeUrlsFunction")
                     .filter(new ValidUrlsFilter(_urlFilter)).name("FilterUrlsFunction")
                     .map(new RawToStateUrlFunction());
-
-            DataStream<Tuple2<FetchStatus, FetchUrl>> postRobotsUrls = cleanedUrls
+            
+            // TODO Make sure we have info about what went wrong in CrawlStateUrl
+            IterativeStream<CrawlStateUrl> crawlDbIteration = cleanedUrls.iterate(5000);
+            DataStream<Tuple2<FetchStatus, FetchUrl>> postRobotsUrls = crawlDbIteration
             		.keyBy(new UrlKeySelector<CrawlStateUrl>())
             		.process(new CrawlDBFunction(_crawlDB))
             		.keyBy(new UrlKeySelector<FetchUrl>())
@@ -214,6 +218,27 @@ public class CrawlTopology {
             
             // TODO Need to run statusOrUrlsToFetch.select("status") back into cleanedUrlsIterator
             // along with Vivek's fetch failures.
+            DataStream<CrawlStateUrl> robotRejectedUrls = statusOrUrlsToFetch.select("status")
+            		.map(new MapFunction<Tuple2<FetchStatus,FetchUrl>, CrawlStateUrl>() {
+
+						@Override
+						public CrawlStateUrl map(Tuple2<FetchStatus, FetchUrl> justHasStatus)
+								throws Exception {
+							FetchStatus status = justHasStatus.f0;
+							FetchUrl url = justHasStatus.f1;
+							
+							// TODO Where do we get the next fetch time, etc?
+							long now = System.currentTimeMillis();
+							return new CrawlStateUrl(	url.getUrl(), 
+														status, 
+														url.getPLD(), 
+														url.getActualScore(), 
+														url.getEstimatedScore(), 
+														now, 
+														now+DEFAULT_ROBOTS_RETRY_INTERVAL_MS);
+						}
+					});
+            crawlDbIteration.closeWith(robotRejectedUrls);
             
             // TODO need a Tuple3 with a FetchedUrl(?) that has status update, which we can merge back in with
             // rejected robots URLs and outlinks. The fetcher code would want to handle settings no outlink(s) or
@@ -252,7 +277,7 @@ public class CrawlTopology {
 
             DataStream<RawUrl> newUrls = outlinksOrContent.select("outlink").map(new OutlinkToStateUrlFunction());
 
-            iteration.closeWith(newUrls);
+            newUrlsIteration.closeWith(newUrls);
 
             // Save off parsed page content. So just extract the parsed content piece of the Tuple2, and
             // then pass it on to the provided content sink function.
