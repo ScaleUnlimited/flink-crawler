@@ -71,7 +71,7 @@ public abstract class BaseFetchException extends Exception {
         return _url.compareTo(e._url);
     }
 
-    public abstract FetchStatus mapToUrlStatus();
+    public abstract FetchStatus mapToFetchStatus();
 
     @Override
     public String getMessage() {

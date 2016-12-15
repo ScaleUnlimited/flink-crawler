@@ -49,7 +49,7 @@ public class AbortedFetchException extends BaseFetchException implements Writabl
     }
 
     @Override
-    public FetchStatus mapToUrlStatus() {
+    public FetchStatus mapToFetchStatus() {
         switch (_abortReason) {
         case SLOW_RESPONSE_RATE:
             return FetchStatus.ABORTED_SLOW_RESPONSE;

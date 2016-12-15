@@ -36,7 +36,7 @@ public class IOFetchException extends BaseFetchException implements WritableComp
     }
 
     @Override
-    public FetchStatus mapToUrlStatus() {
+    public FetchStatus mapToFetchStatus() {
         return FetchStatus.ERROR_IOEXCEPTION;
     }
     

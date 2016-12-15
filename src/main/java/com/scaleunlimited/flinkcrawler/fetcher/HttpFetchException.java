@@ -64,7 +64,7 @@ public class HttpFetchException extends BaseFetchException {
     }
     
     @Override
-    public FetchStatus mapToUrlStatus() {
+    public FetchStatus mapToFetchStatus() {
         switch (_httpStatus) {
         case HttpStatus.SC_FORBIDDEN:
             return FetchStatus.HTTP_FORBIDDEN;

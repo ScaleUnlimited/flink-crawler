@@ -36,7 +36,7 @@ public class UrlFetchException extends BaseFetchException implements WritableCom
     }
 
     @Override
-    public FetchStatus mapToUrlStatus() {
+    public FetchStatus mapToFetchStatus() {
         return FetchStatus.ERROR_INVALID_URL;
     }
     

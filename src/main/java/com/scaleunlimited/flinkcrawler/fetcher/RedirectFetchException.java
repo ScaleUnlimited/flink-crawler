@@ -57,7 +57,7 @@ public class RedirectFetchException extends BaseFetchException implements Writab
     }
     
     @Override
-    public FetchStatus mapToUrlStatus() {
+    public FetchStatus mapToFetchStatus() {
         if (_reason == RedirectExceptionReason.TOO_MANY_REDIRECTS) {
             return FetchStatus.HTTP_TOO_MANY_REDIRECTS;
         } else if (_reason == RedirectExceptionReason.TEMP_REDIRECT_DISALLOWED) {
