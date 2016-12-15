@@ -32,6 +32,7 @@ import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
+import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.robots.BaseRobotsParser;
@@ -244,7 +245,7 @@ public class CrawlTopology {
             // rejected robots URLs and outlinks. The fetcher code would want to handle settings no outlink(s) or
             // content and just a FetchedUrl for case of a fetch failure or if the content fetched isn't the
             // type that we want (e.g. image file)
-            DataStream<Tuple2<ExtractedUrl, ParsedUrl>> fetchedUrls = statusOrUrlsToFetch.select("fetch_url")
+            DataStream<Tuple2<CrawlStateUrl, FetchedUrl>> fetchUrls = statusOrUrlsToFetch.select("fetch_url")
             		.map(new MapFunction<Tuple2<FetchStatus,FetchUrl>, FetchUrl>() {
 
 						@Override
@@ -254,10 +255,37 @@ public class CrawlTopology {
 						}
 					})
             		.keyBy(new UrlKeySelector<FetchUrl>())
-                    .process(new FetchUrlsFunction(_pageFetcher))
-                    .flatMap(new ParseFunction(_pageParser));
+                    .process(new FetchUrlsFunction(_pageFetcher));
+            
+            // Split the fetchedUrls so that we can parse the ones we have actually fetched versus
+            // the ones that have failed.
+            SplitStream<Tuple2<CrawlStateUrl, FetchedUrl>> failedOrFetchedUrls = fetchUrls.split(new OutputSelector<Tuple2<CrawlStateUrl, FetchedUrl>>() {
+    			private final List<String> FAILED_STREAM = Arrays.asList("failed");
+                private final List<String> FETCHED_URL_STREAM = Arrays.asList("fetched_url");
 
-            SplitStream<Tuple2<ExtractedUrl, ParsedUrl>> outlinksOrContent = fetchedUrls
+				@Override
+				public Iterable<String> select( Tuple2<CrawlStateUrl, FetchedUrl> failedOrFetchedUrls) {
+                    if (failedOrFetchedUrls.f1 != null) {
+                        return FETCHED_URL_STREAM;
+                    } 
+                    return FAILED_STREAM;
+                }
+            });
+            	
+            DataStream<Tuple2<ExtractedUrl, ParsedUrl>> parsedUrls = failedOrFetchedUrls.select("fetched_url")
+            		.map(new MapFunction<Tuple2<CrawlStateUrl, FetchedUrl>, FetchedUrl>() {
+
+						@Override
+						public FetchedUrl map( Tuple2<CrawlStateUrl, FetchedUrl> hasFetchedUrl)
+								throws Exception {
+							return hasFetchedUrl.f1;
+						}
+            			
+            		}).
+            		flatMap(new ParseFunction(_pageParser));
+            
+
+            SplitStream<Tuple2<ExtractedUrl, ParsedUrl>> outlinksOrContent = parsedUrls
                     .split(new OutputSelector<Tuple2<ExtractedUrl, ParsedUrl>>() {
 
                         private final List<String> OUTLINK_STREAM = Arrays.asList("outlink");
