@@ -58,7 +58,7 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 			System.out.println("Url passed robots check: " + url);
 			collector.collect(new Tuple2<FetchStatus, FetchUrl>(null, url));
 			
-			// TODO If we don't pass robots, we should instead collect a (status, null)
+			// TODO If we don't pass robots, we should instead collect a (status, url)
 		}
 
 		context.timerService().registerProcessingTimeTimer(context.timerService().currentProcessingTime() + QUEUE_CHECK_DELAY);
