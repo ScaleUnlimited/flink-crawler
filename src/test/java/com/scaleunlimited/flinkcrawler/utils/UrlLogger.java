@@ -1,14 +1,14 @@
 package com.scaleunlimited.flinkcrawler.utils;
 
+import static org.junit.Assert.fail;
+import static org.junit.Assert.assertTrue;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.Assert.*;
-
-import org.apache.flink.api.java.tuple.Tuple2;
-import org.junit.Assert;
+import org.apache.flink.api.java.tuple.Tuple3;
 
 import com.scaleunlimited.flinkcrawler.pojos.BaseUrl;
 
@@ -16,15 +16,24 @@ public class UrlLogger {
 
 	private static UrlLogger LOGGER = new UrlLogger();
 	
-	public static void record(Class<?> clazz, BaseUrl url) {
-		LOGGER.recordImpl(clazz, url);
+	public static void record(Class<?> clazz, BaseUrl url, String... metaData) {
+		Map<String, String> metaDataMap = makeMetaDataMap(metaData);
+		LOGGER.recordImpl(clazz, url, metaDataMap);
+	}
+
+	public static Map<String, String> makeMetaDataMap(String... metaData) {
+		Map<String, String> metaDataMap = new HashMap<String, String>();
+		for (int i = 0; i < metaData.length; i++) {
+			metaDataMap.put(metaData[i], metaData[i++]);
+		}
+		return metaDataMap;
 	}
 	
 	public static List<BaseUrl> getByClass(Class<?> clazz) {
 		return LOGGER.getByClassImpl(clazz);
 	}
 
-	public static List<Tuple2<Class<?>, BaseUrl>> getLog() {
+	public static List<Tuple3<Class<?>, BaseUrl, Map<String, String>>> getLog() {
 		return LOGGER.getLogImpl();
 	}
 	
@@ -37,7 +46,7 @@ public class UrlLogger {
 	// ====================================================================================
 
 	private Map<Class<?>, List<BaseUrl>> _byClass;
-	private List<Tuple2<Class<?>, BaseUrl>> _log;
+	private List<Tuple3<Class<?>, BaseUrl, Map<String, String>>> _log;
 	
 	private UrlLogger() {
 		// TODO check system property for whether we're logging, skip otherwise.
@@ -45,7 +54,7 @@ public class UrlLogger {
 		_log = new ArrayList<>();
 	}
 	
-	private void recordImpl(Class<?> clazz, BaseUrl url) {
+	private void recordImpl(Class<?> clazz, BaseUrl url, Map<String, String> metaData) {
 		// TODO use slf4j logging at debug level
 		System.out.format("%s: %s\n", clazz.getSimpleName(), url);
 		
@@ -57,14 +66,14 @@ public class UrlLogger {
 		
 		urls.add(url);
 		
-		_log.add(new Tuple2<Class<?>, BaseUrl>(clazz, url));
+		_log.add(new Tuple3<Class<?>, BaseUrl, Map<String, String>>(clazz, url, metaData));
 	}
 	
 	private List<BaseUrl> getByClassImpl(Class<?> clazz) {
 		return _byClass.get(clazz);
 	}
 	
-	private List<Tuple2<Class<?>, BaseUrl>> getLogImpl() {
+	private List<Tuple3<Class<?>, BaseUrl, Map<String, String>>> getLogImpl() {
 		return _log;
 	}
 	
@@ -74,9 +83,9 @@ public class UrlLogger {
 
 	public static class UrlLoggerResults {
 
-		private List<Tuple2<Class<?>, BaseUrl>> _log;
+		private List<Tuple3<Class<?>, BaseUrl, Map<String, String>>> _log;
 		
-		protected UrlLoggerResults(List<Tuple2<Class<?>, BaseUrl>> log) {
+		protected UrlLoggerResults(List<Tuple3<Class<?>, BaseUrl, Map<String, String>>> log) {
 			_log = log;
 		}
 		
@@ -87,7 +96,7 @@ public class UrlLogger {
 		 * @return
 		 */
 		public UrlLoggerResults assertLogging(Class<?> clazz) {
-			for (Tuple2<Class<?>, BaseUrl> entry : _log) {
+			for (Tuple3<Class<?>, BaseUrl, Map<String, String>> entry : _log) {
 				if (entry.f0.equals(clazz)) {
 					return this;
 				}
@@ -108,7 +117,7 @@ public class UrlLogger {
 		 */
 		public UrlLoggerResults assertLoggedBy(Class<?> clazz, int numCalls) {
 			int foundCalls = 0;
-			for (Tuple2<Class<?>, BaseUrl> entry : _log) {
+			for (Tuple3<Class<?>, BaseUrl, Map<String, String>> entry : _log) {
 				if (entry.f0.equals(clazz)) {
 					foundCalls += 1;
 				}
@@ -125,10 +134,14 @@ public class UrlLogger {
 			return this;
 		}
 		
-		public UrlLoggerResults assertUrlLoggedBy(Class<?> clazz, BaseUrl url, int numCalls) {
+		public UrlLoggerResults assertUrlLoggedBy(Class<?> clazz, BaseUrl url, int numCalls, String... metaData) {
 			int foundCalls = 0;
-			for (Tuple2<Class<?>, BaseUrl> entry : _log) {
+			for (Tuple3<Class<?>, BaseUrl, Map<String, String>> entry : _log) {
 				if (entry.f0.equals(clazz) && entry.f1.equals(url)) {
+					Map<String, String> metaDataMap = makeMetaDataMap(metaData);
+					for (Map.Entry<String, String> metaDatum : metaDataMap.entrySet()) {
+						assertTrue(entry.f2.get(metaDatum.getKey()).equals(metaDatum.getValue()));
+					}
 					foundCalls += 1;
 				}
 			}
@@ -144,10 +157,12 @@ public class UrlLogger {
 			return this;
 		}
 		
-		public UrlLoggerResults assertUrlLoggedBy(Class<?> clazz, String url, int numCalls) {
+		public UrlLoggerResults assertUrlLoggedBy(Class<?> clazz, String url, int numCalls, String... metaData) {
 			int foundCalls = 0;
-			for (Tuple2<Class<?>, BaseUrl> entry : _log) {
+			for (Tuple3<Class<?>, BaseUrl, Map<String, String>> entry : _log) {
 				if (entry.f0.equals(clazz) && entry.f1.getUrl().equals(url)) {
+					Map<String, String> metaDataMap = makeMetaDataMap(metaData);
+					assertTrue(entry.f2.equals(metaDataMap));
 					foundCalls += 1;
 				}
 			}
@@ -170,7 +185,7 @@ public class UrlLogger {
 		 * @return
 		 */
 		public UrlLoggerResults assertNotCalledBy(Class<?> clazz) {
-			for (Tuple2<Class<?>, BaseUrl> entry : _log) {
+			for (Tuple3<Class<?>, BaseUrl, Map<String, String>> entry : _log) {
 				if (entry.f0.equals(clazz)) {
 					fail(String.format("Found URL '%s' logged by %s", entry.f1, clazz));
 				}
@@ -181,7 +196,7 @@ public class UrlLogger {
 		
 
 		public UrlLoggerResults assertUrlLogged(BaseUrl url) {
-			for (Tuple2<Class<?>, BaseUrl> entry : _log) {
+			for (Tuple3<Class<?>, BaseUrl, Map<String, String>> entry : _log) {
 				if (entry.f1.equals(url)) {
 					return this;
 				}
@@ -194,7 +209,7 @@ public class UrlLogger {
 		}
 		
 		public UrlLoggerResults assertUrlNotLoggedBy(Class<?> clazz, BaseUrl url) {
-			for (Tuple2<Class<?>, BaseUrl> entry : _log) {
+			for (Tuple3<Class<?>, BaseUrl, Map<String, String>> entry : _log) {
 				if (entry.f0.equals(clazz) && entry.f1.equals(url)) {
 					fail(String.format("Found URL '%s' logged by %s", url, clazz));
 				}
@@ -204,7 +219,7 @@ public class UrlLogger {
 		}
 		
 		public UrlLoggerResults assertUrlNotLoggedBy(Class<?> clazz, String url) {
-			for (Tuple2<Class<?>, BaseUrl> entry : _log) {
+			for (Tuple3<Class<?>, BaseUrl, Map<String, String>> entry : _log) {
 				if (entry.f0.equals(clazz) && entry.f1.getUrl().equals(url)) {
 					fail(String.format("Found URL '%s' logged by %s", url, clazz));
 				}

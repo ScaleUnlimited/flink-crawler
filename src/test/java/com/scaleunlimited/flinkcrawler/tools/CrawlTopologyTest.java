@@ -1,6 +1,8 @@
 package com.scaleunlimited.flinkcrawler.tools;
 
-import org.apache.flink.api.java.tuple.Tuple2;
+import java.util.Map;
+
+import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
@@ -15,6 +17,7 @@ import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.ParseFunction;
 import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
 import com.scaleunlimited.flinkcrawler.pojos.BaseUrl;
+import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.robots.SimpleRobotsParser;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
@@ -53,11 +56,13 @@ public class CrawlTopologyTest {
 		builder.build().execute();
 		
 		// TODO add support for validating calls (e.g.n calls to class x, or class x called with y,z,blah values)
-		for (Tuple2<Class<?>, BaseUrl> entry : UrlLogger.getLog()) {
+		for (Tuple3<Class<?>, BaseUrl, Map<String, String>> entry : UrlLogger.getLog()) {
 			System.out.format("%s: %s\n", entry.f0, entry.f1);
 		}
 		
 		UrlLogger.getResults()
+			.assertUrlLoggedBy(FetchUrlsFunction.class, normalizer.normalize("domain1.com/page1"), 1, FetchStatus.class.getSimpleName(), FetchStatus.FETCHED.toString())
+			
 			.assertUrlLoggedBy(CheckUrlWithRobotsFunction.class, normalizer.normalize("domain2.com/page1"), 1)
 			.assertUrlLoggedBy(FetchUrlsFunction.class, normalizer.normalize("domain2.com/page1"), 1)
 			.assertUrlNotLoggedBy(ParseFunction.class, normalizer.normalize("domain2.com/page1"))
