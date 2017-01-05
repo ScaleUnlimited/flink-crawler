@@ -55,13 +55,12 @@ public class CrawlTopologyTest {
 
 		builder.build().execute();
 		
-		// TODO add support for validating calls (e.g.n calls to class x, or class x called with y,z,blah values)
 		for (Tuple3<Class<?>, BaseUrl, Map<String, String>> entry : UrlLogger.getLog()) {
 			System.out.format("%s: %s\n", entry.f0, entry.f1);
 		}
 		
 		UrlLogger.getResults()
-			.assertUrlLoggedBy(FetchUrlsFunction.class, normalizer.normalize("domain1.com/page1"), 1, FetchStatus.class.getSimpleName(), FetchStatus.FETCHED.toString())
+			.assertUrlLoggedBy(CrawlDBFunction.class, normalizer.normalize("domain1.com/page1"), 1, FetchStatus.class.getSimpleName(), FetchStatus.FETCHED.toString())
 			
 			.assertUrlLoggedBy(CheckUrlWithRobotsFunction.class, normalizer.normalize("domain2.com/page1"), 1)
 			.assertUrlLoggedBy(FetchUrlsFunction.class, normalizer.normalize("domain2.com/page1"), 1)

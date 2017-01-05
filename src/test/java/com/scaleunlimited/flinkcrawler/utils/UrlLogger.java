@@ -16,16 +16,23 @@ public class UrlLogger {
 
 	private static UrlLogger LOGGER = new UrlLogger();
 	
+	private static final Map<String, String> EMPTY_MAP = new HashMap<>();
+	
 	public static void record(Class<?> clazz, BaseUrl url, String... metaData) {
 		Map<String, String> metaDataMap = makeMetaDataMap(metaData);
 		LOGGER.recordImpl(clazz, url, metaDataMap);
 	}
 
 	public static Map<String, String> makeMetaDataMap(String... metaData) {
-		Map<String, String> metaDataMap = new HashMap<String, String>();
-		for (int i = 0; i < metaData.length; i++) {
-			metaDataMap.put(metaData[i], metaData[i++]);
+		if (metaData.length == 0) {
+			return EMPTY_MAP;
 		}
+		
+		Map<String, String> metaDataMap = new HashMap<String, String>();
+		for (int i = 0; i < metaData.length; i += 2) {
+			metaDataMap.put(metaData[i], metaData[i+1]);
+		}
+		
 		return metaDataMap;
 	}
 	
@@ -157,13 +164,28 @@ public class UrlLogger {
 			return this;
 		}
 		
-		public UrlLoggerResults assertUrlLoggedBy(Class<?> clazz, String url, int numCalls, String... metaData) {
+		public UrlLoggerResults assertUrlLoggedBy(Class<?> clazz, String url, int numCalls, String... targetMetaData) {
+			Map<String, String> targetMetaDataMap = makeMetaDataMap(targetMetaData);
+
 			int foundCalls = 0;
 			for (Tuple3<Class<?>, BaseUrl, Map<String, String>> entry : _log) {
 				if (entry.f0.equals(clazz) && entry.f1.getUrl().equals(url)) {
-					Map<String, String> metaDataMap = makeMetaDataMap(metaData);
-					assertTrue(entry.f2.equals(metaDataMap));
-					foundCalls += 1;
+					// For every entry that we care about in the target metadata, make sure it exists
+					// and has the same value.
+					boolean metaDataMatches = true;
+					for (String targetMetaDataKey : targetMetaDataMap.keySet()) {
+						if (!entry.f2.containsKey(targetMetaDataKey)) {
+							metaDataMatches = false;
+							break;
+						} else if (!entry.f2.get(targetMetaDataKey).equals(targetMetaDataMap.get(targetMetaDataKey))) {
+							metaDataMatches = false;
+							break;
+						}
+ 					}
+					
+					if (metaDataMatches) {
+						foundCalls += 1;
+					}
 				}
 			}
 			
