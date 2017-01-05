@@ -7,6 +7,7 @@ import org.apache.flink.util.Collector;
 
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDB;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
+import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
 import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
@@ -66,7 +67,7 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 
 	@Override
 	public void processElement(CrawlStateUrl url, Context context, Collector<FetchUrl> collector) throws Exception {
-		UrlLogger.record(this.getClass(), url);
+		UrlLogger.record(this.getClass(), url, FetchStatus.class.getSimpleName(), url.getStatus().toString());
 		
 		// Add to our in-memory queue. If this is full, it might trigger a merge
 		_crawlDB.add(url);
