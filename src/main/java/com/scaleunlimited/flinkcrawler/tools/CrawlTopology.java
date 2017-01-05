@@ -36,7 +36,6 @@ import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.robots.BaseRobotsParser;
 import com.scaleunlimited.flinkcrawler.sources.BaseUrlSource;
-import com.scaleunlimited.flinkcrawler.sources.TickleSource;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlLengthener;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlValidator;
@@ -74,7 +73,6 @@ public class CrawlTopology {
 
         private StreamExecutionEnvironment _env;
         private String _jobName = "flink-crawler";
-        private long _runTime = TickleSource.INFINITE_RUN_TIME;
         private int _parallelism = DEFAULT_PARALLELISM;
 
         private BaseUrlSource _urlSource;
@@ -147,12 +145,6 @@ public class CrawlTopology {
 
         public CrawlTopologyBuilder setUrlFilter(BaseUrlValidator urlValidator) {
             _urlFilter = urlValidator;
-            return this;
-        }
-
-        public CrawlTopologyBuilder setRunTime(long runTime) {
-        	// TODO this won't work
-            _runTime = runTime;
             return this;
         }
 

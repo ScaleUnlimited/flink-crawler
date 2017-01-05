@@ -48,8 +48,7 @@ public class CrawlTopologyTest {
 			.setContentSink(new DiscardingSink<ParsedUrl>())
 			.setUrlNormalizer(normalizer)
 			.setUrlFilter(new SimpleUrlValidator())
-			.setPageFetcher(new WebGraphFetcher(graph))
-			.setRunTime(5000);
+			.setPageFetcher(new WebGraphFetcher(graph));
 
 		builder.build().execute();
 		

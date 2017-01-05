@@ -33,8 +33,7 @@ public class CrawlTool {
 				.setContentSink(new DiscardingSink<ParsedUrl>())
 				.setUrlNormalizer(new SimpleUrlNormalizer())
 				.setUrlFilter(new SimpleUrlValidator())
-				.setPageFetcher(new SimpleFetcher(new UserAgent("bogus", "bogus@domain.com", "http://domain.com")))
-				.setRunTime(1000);
+				.setPageFetcher(new SimpleFetcher(new UserAgent("bogus", "bogus@domain.com", "http://domain.com")));
 			
 			builder.build().execute();
 		} catch (Throwable t) {
