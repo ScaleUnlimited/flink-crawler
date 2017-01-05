@@ -164,7 +164,7 @@ public class CrawlTopology {
 
         @SuppressWarnings("serial")
         public CrawlTopology build() {
-            // TODO use single topology parallelism? But likely will want different levels for different parts.
+            // FUTURE use single topology parallelism? But likely will want different levels for different parts.
             DataStreamSource<RawUrl> seedUrlsSource = _env.addSource(_urlSource);
             if (_parallelism != DEFAULT_PARALLELISM) {
                 seedUrlsSource = seedUrlsSource.setParallelism(_parallelism);
@@ -174,11 +174,11 @@ public class CrawlTopology {
             		.name("Seed urls source")
             		.keyBy(new UrlKeySelector<RawUrl>());
             
-            // TODO use something like double the fetch timeout here? or add fetch timeout to parse timeout? Maybe we
-            // need to be able to ask each operation how long it might take, and use that. Note that as long as the
-            // TickleSource keeps pumping out tickle tuples we won't terminate, so we don't need to worry about
-            // something like a full CrawlDB merge causing us to time out. So in that case maybe just use double the
-            // tickle interval here? But setting it to 200 when tickle is 100 causes us to not terminate :(
+            // FUTURE use something like double the fetch timeout here? or add fetch timeout to parse timeout? Maybe we
+            // need to be able to ask each operation how long it might take, and use that. Note that we'd also need to
+            // worry about a CrawlDB full merge causing us to time out, unless that's run as a background thread.
+            // Easiest might be for now to let the caller set this, so for normal testing this is something very short,
+            // but we crank it up under production.
             IterativeStream<RawUrl> newUrlsIteration = seedUrls.iterate(5000);
             DataStream<CrawlStateUrl> cleanedUrls = newUrlsIteration
             		.keyBy(new UrlKeySelector<RawUrl>())
@@ -226,12 +226,8 @@ public class CrawlTopology {
 							return blockedUrl.f0;
 						}
 					});
-            crawlDbIteration.closeWith(robotBlockedUrls);
             
-            // TODO need a Tuple3 with a FetchedUrl(?) that has status update, which we can merge back in with
-            // rejected robots URLs and outlinks. The fetcher code would want to handle settings no outlink(s) or
-            // content and just a FetchedUrl for case of a fetch failure or if the content fetched isn't the
-            // type that we want (e.g. image file)
+            // Fetch the URLs that passed our robots filter
             DataStream<Tuple2<CrawlStateUrl, FetchedUrl>> fetchedUrls = blockedOrPassedUrls.select("passed")
             		.map(new MapFunction<Tuple2<CrawlStateUrl,FetchUrl>, FetchUrl>() {
 
@@ -246,20 +242,34 @@ public class CrawlTopology {
             
             // Split the fetchedUrls so that we can parse the ones we have actually fetched versus
             // the ones that have failed.
-            SplitStream<Tuple2<CrawlStateUrl, FetchedUrl>> failedOrFetchedUrls = fetchedUrls.split(new OutputSelector<Tuple2<CrawlStateUrl, FetchedUrl>>() {
-    			private final List<String> FAILED_STREAM = Arrays.asList("failed");
-                private final List<String> FETCHED_URL_STREAM = Arrays.asList("fetched_url");
+            SplitStream<Tuple2<CrawlStateUrl, FetchedUrl>> fetchAttemptedUrls = fetchedUrls.split(new OutputSelector<Tuple2<CrawlStateUrl, FetchedUrl>>() {
+    			private final List<String> FETCH_STATUS_STREAM = Arrays.asList("fetch_status");
+                private final List<String> FETCHED_URL_STREAMS = Arrays.asList("fetch_status", "fetched_url");
 
 				@Override
-				public Iterable<String> select( Tuple2<CrawlStateUrl, FetchedUrl> failedOrFetchedUrls) {
-                    if (failedOrFetchedUrls.f1 != null) {
-                        return FETCHED_URL_STREAM;
-                    } 
-                    return FAILED_STREAM;
+				public Iterable<String> select(Tuple2<CrawlStateUrl, FetchedUrl> url) {
+                    if (url.f1 != null) {
+                        return FETCHED_URL_STREAMS;
+                    } else {
+                    	return FETCH_STATUS_STREAM;
+                    }
                 }
             });
-            	
-            DataStream<Tuple2<ExtractedUrl, ParsedUrl>> parsedUrls = failedOrFetchedUrls.select("fetched_url")
+            
+            // Get the status of all URLs we've attempted to fetch, union them with URLs blocked by robots, and iterate those back into the crawl DB.
+            DataStream<CrawlStateUrl> fetchStatus = fetchAttemptedUrls.select("fetch_status")
+            		.map(new MapFunction<Tuple2<CrawlStateUrl, FetchedUrl>, CrawlStateUrl>() {
+
+						@Override
+						public CrawlStateUrl map(Tuple2<CrawlStateUrl, FetchedUrl> url) throws Exception {
+							return url.f0;
+						}
+					});
+
+            // We need to merge robotBlockedUrls with the "status" stream from fetchAttemptedUrls
+            crawlDbIteration.closeWith(robotBlockedUrls.union(fetchStatus));
+            
+            DataStream<Tuple2<ExtractedUrl, ParsedUrl>> parsedUrls = fetchAttemptedUrls.select("fetched_url")
             		.map(new MapFunction<Tuple2<CrawlStateUrl, FetchedUrl>, FetchedUrl>() {
 
 						@Override
