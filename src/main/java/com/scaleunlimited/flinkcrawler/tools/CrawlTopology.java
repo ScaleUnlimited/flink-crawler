@@ -30,7 +30,6 @@ import com.scaleunlimited.flinkcrawler.functions.ValidUrlsFilter;
 import com.scaleunlimited.flinkcrawler.parser.BasePageParser;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
-import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
@@ -187,7 +186,7 @@ public class CrawlTopology {
                     .filter(new ValidUrlsFilter(_urlFilter)).name("FilterUrlsFunction")
                     .map(new RawToStateUrlFunction());
             
-            // TODO Make sure we have info about what went wrong in CrawlStateUrl
+            // Update the Crawl DB, then run URLs it emits through robots filtering.
             IterativeStream<CrawlStateUrl> crawlDbIteration = cleanedUrls.iterate(5000);
             DataStream<Tuple2<CrawlStateUrl, FetchUrl>> postRobotsUrls = crawlDbIteration
             		.keyBy(new UrlKeySelector<CrawlStateUrl>())
@@ -195,8 +194,7 @@ public class CrawlTopology {
             		.keyBy(new UrlKeySelector<FetchUrl>())
                     .process(new CheckUrlWithRobotsFunction(_robotsFetcher, _robotsParser));
             
-            // TODO need to split this stream and send rejected URLs back to crawlDB. Probably need to
-            // merge this CrawlStateUrl stream with CrawlStateUrl streams from outlinks and fetch results.
+            // Split this stream into passed and blocked.
             SplitStream<Tuple2<CrawlStateUrl, FetchUrl>> blockedOrPassedUrls = postRobotsUrls
             		.split(new OutputSelector<Tuple2<CrawlStateUrl, FetchUrl>>() {
                         
@@ -215,8 +213,8 @@ public class CrawlTopology {
                         }
             		});
             
-            // Run statusOrUrlsToFetch.select("status") back into cleanedUrlsIterator
-            // like Vivek's fetch failures.
+            // Split off rejected URLs. These will get unioned (merged) with the status of URLs that we
+            // attempt to fetch, and then fed back into the crawl DB via the inner iteration.
             DataStream<CrawlStateUrl> robotBlockedUrls = blockedOrPassedUrls.select("blocked")
             		.map(new MapFunction<Tuple2<CrawlStateUrl,FetchUrl>, CrawlStateUrl>() {
 
@@ -257,7 +255,7 @@ public class CrawlTopology {
             });
             
             // Get the status of all URLs we've attempted to fetch, union them with URLs blocked by robots, and iterate those back into the crawl DB.
-            DataStream<CrawlStateUrl> fetchStatus = fetchAttemptedUrls.select("fetch_status")
+            DataStream<CrawlStateUrl> fetchStatusUrls = fetchAttemptedUrls.select("fetch_status")
             		.map(new MapFunction<Tuple2<CrawlStateUrl, FetchedUrl>, CrawlStateUrl>() {
 
 						@Override
@@ -267,7 +265,7 @@ public class CrawlTopology {
 					});
 
             // We need to merge robotBlockedUrls with the "status" stream from fetchAttemptedUrls
-            crawlDbIteration.closeWith(robotBlockedUrls.union(fetchStatus));
+            crawlDbIteration.closeWith(robotBlockedUrls.union(fetchStatusUrls));
             
             DataStream<Tuple2<ExtractedUrl, ParsedUrl>> parsedUrls = fetchAttemptedUrls.select("fetched_url")
             		.map(new MapFunction<Tuple2<CrawlStateUrl, FetchedUrl>, FetchedUrl>() {
