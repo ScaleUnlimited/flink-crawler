@@ -1,7 +1,9 @@
 package com.scaleunlimited.flinkcrawler.tools;
 
+import java.io.File;
 import java.util.Map;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -53,7 +55,14 @@ public class CrawlTopologyTest {
 			.setUrlFilter(new SimpleUrlValidator())
 			.setPageFetcher(new WebGraphFetcher(graph));
 
-		builder.build().execute();
+		CrawlTopology ct = builder.build();
+		
+		File testDir = new File("target/CrawlTopologyTest/");
+		testDir.mkdirs();
+		File dotFile = new File(testDir, "topology.dot");
+		ct.printDotFile(dotFile);
+		
+		ct.execute();
 		
 		for (Tuple3<Class<?>, BaseUrl, Map<String, String>> entry : UrlLogger.getLog()) {
 			System.out.format("%s: %s\n", entry.f0, entry.f1);
