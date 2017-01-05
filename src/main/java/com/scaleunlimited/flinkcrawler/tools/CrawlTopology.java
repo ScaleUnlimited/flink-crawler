@@ -1,8 +1,11 @@
 package com.scaleunlimited.flinkcrawler.tools;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.flink.api.common.JobExecutionResult;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.java.tuple.Tuple2;
@@ -39,6 +42,7 @@ import com.scaleunlimited.flinkcrawler.sources.BaseUrlSource;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlLengthener;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlValidator;
+import com.scaleunlimited.flinkcrawler.utils.FlinkUtils;
 
 /**
  * A Flink streaming workflow that can be executed.
@@ -63,6 +67,11 @@ public class CrawlTopology {
         _jobName = jobName;
     }
 
+    public void printDotFile(File outputFile) throws IOException {
+    	String dotAsString = FlinkUtils.planToDot(_env.getExecutionPlan());
+    	FileUtils.write(outputFile, dotAsString, "UTF-8");
+    }
+    
     public JobExecutionResult execute() throws Exception {
         return _env.execute(_jobName);
     }
@@ -157,6 +166,7 @@ public class CrawlTopology {
         public CrawlTopology build() {
             // FUTURE use single topology parallelism? But likely will want different levels for different parts.
             DataStreamSource<RawUrl> seedUrlsSource = _env.addSource(_urlSource);
+            
             if (_parallelism != DEFAULT_PARALLELISM) {
                 seedUrlsSource = seedUrlsSource.setParallelism(_parallelism);
             }
@@ -173,18 +183,24 @@ public class CrawlTopology {
             IterativeStream<RawUrl> newUrlsIteration = seedUrls.iterate(5000);
             DataStream<CrawlStateUrl> cleanedUrls = newUrlsIteration
             		.keyBy(new UrlKeySelector<RawUrl>())
-                    .process(new LengthenUrlsFunction(_urlLengthener)).name("LengthenUrlsFunction")
-                    .flatMap(new NormalizeUrlsFunction(_urlNormalizer)).name("NormalizeUrlsFunction")
-                    .filter(new ValidUrlsFilter(_urlFilter)).name("FilterUrlsFunction")
-                    .map(new RawToStateUrlFunction());
+                    .process(new LengthenUrlsFunction(_urlLengthener))
+                    .name("LengthenUrlsFunction")
+                    .flatMap(new NormalizeUrlsFunction(_urlNormalizer))
+                    .name("NormalizeUrlsFunction")
+                    .filter(new ValidUrlsFilter(_urlFilter))
+                    .name("FilterUrlsFunction")
+                    .map(new RawToStateUrlFunction())
+                    .name("RawToStateUrlFunction");
             
             // Update the Crawl DB, then run URLs it emits through robots filtering.
             IterativeStream<CrawlStateUrl> crawlDbIteration = cleanedUrls.iterate(5000);
             DataStream<Tuple2<CrawlStateUrl, FetchUrl>> postRobotsUrls = crawlDbIteration
             		.keyBy(new UrlKeySelector<CrawlStateUrl>())
             		.process(new CrawlDBFunction(_crawlDB))
+            		.name("CrawlDBFunction")
             		.keyBy(new UrlKeySelector<FetchUrl>())
-                    .process(new CheckUrlWithRobotsFunction(_robotsFetcher, _robotsParser));
+                    .process(new CheckUrlWithRobotsFunction(_robotsFetcher, _robotsParser))
+                    .name("CheckUrlWithRobotsFunction");
             
             // Split this stream into passed and blocked.
             SplitStream<Tuple2<CrawlStateUrl, FetchUrl>> blockedOrPassedUrls = postRobotsUrls
@@ -215,7 +231,8 @@ public class CrawlTopology {
 								throws Exception {
 							return blockedUrl.f0;
 						}
-					});
+					})
+					.name("Select blocked URLs");
             
             // Fetch the URLs that passed our robots filter
             DataStream<Tuple2<CrawlStateUrl, FetchedUrl>> fetchedUrls = blockedOrPassedUrls.select("passed")
@@ -227,8 +244,10 @@ public class CrawlTopology {
 							return justHasFetchUrl.f1;
 						}
 					})
+					.name("Select passed URLs")
             		.keyBy(new UrlKeySelector<FetchUrl>())
-                    .process(new FetchUrlsFunction(_pageFetcher));
+                    .process(new FetchUrlsFunction(_pageFetcher))
+                    .name("FetchUrlsFunction");
             
             // Split the fetchedUrls so that we can parse the ones we have actually fetched versus
             // the ones that have failed.
@@ -254,7 +273,8 @@ public class CrawlTopology {
 						public CrawlStateUrl map(Tuple2<CrawlStateUrl, FetchedUrl> url) throws Exception {
 							return url.f0;
 						}
-					});
+					})
+					.name("Select fetch status");
 
             // We need to merge robotBlockedUrls with the "status" stream from fetchAttemptedUrls
             crawlDbIteration.closeWith(robotBlockedUrls.union(fetchStatusUrls));
@@ -268,8 +288,10 @@ public class CrawlTopology {
 							return hasFetchedUrl.f1;
 						}
             			
-            		}).
-            		flatMap(new ParseFunction(_pageParser));
+            		})
+            		.name("Select fetched URLs")
+            		.flatMap(new ParseFunction(_pageParser))
+            		.name("ParseFunction");
             
 
             SplitStream<Tuple2<ExtractedUrl, ParsedUrl>> outlinksOrContent = parsedUrls
@@ -290,19 +312,25 @@ public class CrawlTopology {
                         }
                     });
 
-            DataStream<RawUrl> newUrls = outlinksOrContent.select("outlink").map(new OutlinkToStateUrlFunction());
+            DataStream<RawUrl> newUrls = outlinksOrContent.select("outlink")
+            		.map(new OutlinkToStateUrlFunction())
+            		.name("OutlinkToStateUrlFunction");
 
             newUrlsIteration.closeWith(newUrls);
 
             // Save off parsed page content. So just extract the parsed content piece of the Tuple2, and
             // then pass it on to the provided content sink function.
-            outlinksOrContent.select("content").map(new MapFunction<Tuple2<ExtractedUrl, ParsedUrl>, ParsedUrl>() {
+            outlinksOrContent.select("content")
+            	.map(new MapFunction<Tuple2<ExtractedUrl, ParsedUrl>, ParsedUrl>() {
 
-                @Override
-                public ParsedUrl map(Tuple2<ExtractedUrl, ParsedUrl> in) throws Exception {
-                    return in.f1;
-                }
-            }).addSink(_contentSink);
+	                @Override
+	                public ParsedUrl map(Tuple2<ExtractedUrl, ParsedUrl> in) throws Exception {
+	                    return in.f1;
+	                }
+	            })
+	            .name("Select fetched content")
+            	.addSink(_contentSink)
+            	.name("ContentSink");
 
             return new CrawlTopology(_env, _jobName);
         }
