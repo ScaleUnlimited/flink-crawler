@@ -164,6 +164,10 @@ public class UrlLogger {
 			return this;
 		}
 		
+		public UrlLoggerResults assertUrlLoggedBy(Class<?> clazz, String url, String... targetMetaData) {
+			return assertUrlLoggedBy(clazz, url, 1, targetMetaData);
+		}
+
 		public UrlLoggerResults assertUrlLoggedBy(Class<?> clazz, String url, int numCalls, String... targetMetaData) {
 			Map<String, String> targetMetaDataMap = makeMetaDataMap(targetMetaData);
 

@@ -60,13 +60,13 @@ public class CrawlTopologyTest {
 		}
 		
 		UrlLogger.getResults()
-			.assertUrlLoggedBy(CrawlDBFunction.class, normalizer.normalize("domain1.com/page1"), 1, FetchStatus.class.getSimpleName(), FetchStatus.FETCHED.toString())
+			.assertUrlLoggedBy(CrawlDBFunction.class, normalizer.normalize("domain1.com/page1"), FetchStatus.class.getSimpleName(), FetchStatus.FETCHED.toString())
 			
-			.assertUrlLoggedBy(CheckUrlWithRobotsFunction.class, normalizer.normalize("domain2.com/page1"), 1)
-			.assertUrlLoggedBy(FetchUrlsFunction.class, normalizer.normalize("domain2.com/page1"), 1)
+			.assertUrlLoggedBy(CheckUrlWithRobotsFunction.class, normalizer.normalize("domain2.com/page1"))
+			.assertUrlLoggedBy(FetchUrlsFunction.class, normalizer.normalize("domain2.com/page1"))
 			.assertUrlNotLoggedBy(ParseFunction.class, normalizer.normalize("domain2.com/page1"))
 			
-			.assertUrlLoggedBy(CheckUrlWithRobotsFunction.class, normalizer.normalize("domain1.com/blocked"), 1)
+			.assertUrlLoggedBy(CheckUrlWithRobotsFunction.class, normalizer.normalize("domain1.com/blocked"))
 			.assertUrlNotLoggedBy(FetchUrlsFunction.class, normalizer.normalize("domain1.com/blocked"))
 			.assertUrlLoggedBy(CrawlDBFunction.class, normalizer.normalize("domain1.com/blocked"), 2);
 	}
