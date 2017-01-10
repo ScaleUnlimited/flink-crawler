@@ -3,7 +3,6 @@ package com.scaleunlimited.flinkcrawler.tools;
 import java.io.File;
 import java.util.Map;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
