@@ -67,15 +67,32 @@ public class CrawlTopologyTest {
 			System.out.format("%s: %s\n", entry.f0, entry.f1);
 		}
 		
+		String domain1page1 = normalizer.normalize("domain1.com/page1");
+		String domain1page2 = normalizer.normalize("domain1.com/page2");
+		String domain2page1 = normalizer.normalize("domain2.com/page1");
+		String domain1blockedPage = normalizer.normalize("domain1.com/blocked");
 		UrlLogger.getResults()
-			.assertUrlLoggedBy(CrawlDBFunction.class, normalizer.normalize("domain1.com/page1"), FetchStatus.class.getSimpleName(), FetchStatus.FETCHED.toString())
+			.assertUrlLoggedBy(CheckUrlWithRobotsFunction.class, domain1page1, 1)
+			.assertUrlLoggedBy(FetchUrlsFunction.class, domain1page1, 1)
+			.assertUrlLoggedBy(	CrawlDBFunction.class, domain1page1, 1,
+								FetchStatus.class.getSimpleName(), FetchStatus.FETCHED.toString())
+			.assertUrlLoggedBy(ParseFunction.class, domain1page1)
 			
-			.assertUrlLoggedBy(CheckUrlWithRobotsFunction.class, normalizer.normalize("domain2.com/page1"))
-			.assertUrlLoggedBy(FetchUrlsFunction.class, normalizer.normalize("domain2.com/page1"))
-			.assertUrlNotLoggedBy(ParseFunction.class, normalizer.normalize("domain2.com/page1"))
+			.assertUrlLoggedBy(CheckUrlWithRobotsFunction.class, domain1page2, 1)
+			.assertUrlLoggedBy(FetchUrlsFunction.class, domain1page2, 1)
+			.assertUrlLoggedBy(	CrawlDBFunction.class, domain1page2, 1,
+								FetchStatus.class.getSimpleName(), FetchStatus.FETCHED.toString())
+			.assertUrlLoggedBy(ParseFunction.class, domain1page2)
 			
-			.assertUrlLoggedBy(CheckUrlWithRobotsFunction.class, normalizer.normalize("domain1.com/blocked"))
-			.assertUrlNotLoggedBy(FetchUrlsFunction.class, normalizer.normalize("domain1.com/blocked"))
-			.assertUrlLoggedBy(CrawlDBFunction.class, normalizer.normalize("domain1.com/blocked"), 2);
+			.assertUrlLoggedBy(CheckUrlWithRobotsFunction.class, domain2page1, 1)
+			.assertUrlLoggedBy(FetchUrlsFunction.class, domain2page1, 1)
+			.assertUrlLoggedBy(	CrawlDBFunction.class, domain2page1, 1,
+								FetchStatus.class.getSimpleName(), FetchStatus.HTTP_NOT_FOUND.toString())
+			.assertUrlNotLoggedBy(ParseFunction.class, domain2page1)
+			
+			.assertUrlLoggedBy(CheckUrlWithRobotsFunction.class, domain1blockedPage)
+			.assertUrlNotLoggedBy(FetchUrlsFunction.class, domain1blockedPage)
+			.assertUrlNotLoggedBy(ParseFunction.class, domain1blockedPage)
+			.assertUrlLoggedBy(CrawlDBFunction.class, domain1blockedPage, 2);
 	}
 }
