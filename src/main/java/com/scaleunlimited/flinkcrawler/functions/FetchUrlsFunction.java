@@ -1,5 +1,6 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
+import com.scaleunlimited.flinkcrawler.utils.ExceptionUtils;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -11,15 +12,18 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.RichProcessFunction;
 import org.apache.flink.util.Collector;
 
-import com.scaleunlimited.flinkcrawler.fetcher.BaseFetchException;
-import com.scaleunlimited.flinkcrawler.fetcher.BaseFetcher;
-import com.scaleunlimited.flinkcrawler.fetcher.FetchedResult;
-import com.scaleunlimited.flinkcrawler.fetcher.HttpFetchException;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
+
+import crawlercommons.fetcher.BaseFetchException;
+import crawlercommons.fetcher.FetchedResult;
+import crawlercommons.fetcher.HttpFetchException;
+import crawlercommons.fetcher.http.BaseHttpFetcher;
+
+
 
 @SuppressWarnings("serial")
 public class FetchUrlsFunction extends RichProcessFunction<FetchUrl, Tuple2<CrawlStateUrl, FetchedUrl>> {
@@ -32,7 +36,7 @@ public class FetchUrlsFunction extends RichProcessFunction<FetchUrl, Tuple2<Craw
 	// TODO pick good time for this
 	private static final long QUEUE_CHECK_DELAY = 10;
 
-	private BaseFetcher _fetcher;
+	private BaseHttpFetcher _fetcher;
 	
 	private transient ConcurrentLinkedQueue<Tuple2<CrawlStateUrl, FetchedUrl>> _output;
 	private transient ThreadPoolExecutor _executor;
@@ -42,7 +46,7 @@ public class FetchUrlsFunction extends RichProcessFunction<FetchUrl, Tuple2<Craw
 	 * the FetchedUrl is set to null.
 	 * @param fetcher
 	 */
-	public FetchUrlsFunction(BaseFetcher fetcher) {
+	public FetchUrlsFunction(BaseHttpFetcher fetcher) {
 		_fetcher = fetcher;
 	}
 
@@ -79,7 +83,7 @@ public class FetchUrlsFunction extends RichProcessFunction<FetchUrl, Tuple2<Craw
 				System.out.println("Fetching " + url);
 				
 				try {
-					FetchedResult result = _fetcher.get(url);
+					FetchedResult result = _fetcher.get(url.getUrl(), null);
 					FetchedUrl fetchedUrl = new FetchedUrl(result.getBaseUrl(), result.getFetchedUrl(),
 														result.getFetchTime(), result.getHeaders(), 
 														result.getContent(), result.getContentType(),
@@ -89,11 +93,11 @@ public class FetchUrlsFunction extends RichProcessFunction<FetchUrl, Tuple2<Craw
 					_output.add(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url.getUrl(), FetchStatus.FETCHED, url.getPLD(), 0, 0, fetchedUrl.getFetchTime(), 0L), fetchedUrl));
 				} catch (HttpFetchException e) {
 					// Generate Tuple2 with fetch status tuple but no FetchedUrl
-					_output.add(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url.getUrl(), e.mapToFetchStatus(), url.getPLD(), 0, 0, System.currentTimeMillis(), 0L), null));
+					_output.add(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url.getUrl(), ExceptionUtils.mapToFetchStatus(e), url.getPLD(), 0, 0, System.currentTimeMillis(), 0L), null));
 				} catch (Exception e) {
 					if (e instanceof BaseFetchException) {
 						BaseFetchException bfe = (BaseFetchException)e;
-						_output.add(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url.getUrl(), bfe.mapToFetchStatus(), url.getPLD(), 0, 0, System.currentTimeMillis(), 0L), null));
+						_output.add(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url.getUrl(), ExceptionUtils.mapToFetchStatus(e), url.getPLD(), 0, 0, System.currentTimeMillis(), 0L), null));
 					} else {
 						throw new RuntimeException("Exception fetching " + url, e);
 					}

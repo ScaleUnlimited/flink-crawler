@@ -11,9 +11,7 @@ import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 
-import com.scaleunlimited.flinkcrawler.config.UserAgent;
 import com.scaleunlimited.flinkcrawler.crawldb.InMemoryCrawlDB;
-import com.scaleunlimited.flinkcrawler.fetcher.SimpleFetcher;
 import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.robots.SimpleRobotsParser;
@@ -23,6 +21,9 @@ import com.scaleunlimited.flinkcrawler.tools.CrawlTopology.CrawlTopologyBuilder;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlLengthener;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlValidator;
+
+import crawlercommons.fetcher.http.SimpleHttpFetcher;
+import crawlercommons.fetcher.http.UserAgent;
 
 public class CrawlTool {
 
@@ -75,13 +76,13 @@ public class CrawlTool {
 				.setUrlSource(createSeedUrlSource(seedUrlsFile))
 				.setCrawlDB(new InMemoryCrawlDB())
 				.setUrlLengthener(new SimpleUrlLengthener())
-				.setRobotsFetcher(new SimpleFetcher(new UserAgent("bogus", "bogus@domain.com", "http://domain.com")))
+				.setRobotsFetcher(new SimpleHttpFetcher(new UserAgent("bogus", "bogus@domain.com", "http://domain.com")))
 				.setRobotsParser(new SimpleRobotsParser())
 				.setPageParser(new SimplePageParser())
 				.setContentSink(new DiscardingSink<ParsedUrl>())
 				.setUrlNormalizer(new SimpleUrlNormalizer())
 				.setUrlFilter(new SimpleUrlValidator())
-				.setPageFetcher(new SimpleFetcher(new UserAgent("bogus", "bogus@domain.com", "http://domain.com")));
+				.setPageFetcher(new SimpleHttpFetcher(new UserAgent("bogus", "bogus@domain.com", "http://domain.com")));
 			
 			builder.build().execute();
 		} catch (Throwable t) {

@@ -7,12 +7,13 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.RichProcessFunction;
 import org.apache.flink.util.Collector;
 
-import com.scaleunlimited.flinkcrawler.fetcher.BaseFetcher;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.robots.BaseRobotsParser;
 import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
+
+import crawlercommons.fetcher.BaseFetcher;
 
 @SuppressWarnings("serial")
 public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tuple2<CrawlStateUrl, FetchUrl>> {
