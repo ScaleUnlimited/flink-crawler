@@ -1,9 +1,9 @@
 package com.scaleunlimited.flinkcrawler.tools;
 
 import java.io.File;
+import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -21,7 +21,6 @@ import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
 import com.scaleunlimited.flinkcrawler.pojos.BaseUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
-import com.scaleunlimited.flinkcrawler.robots.SimpleRobotsParser;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
 import com.scaleunlimited.flinkcrawler.tools.CrawlTopology.CrawlTopologyBuilder;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlLengthener;
@@ -30,7 +29,10 @@ import com.scaleunlimited.flinkcrawler.urls.SimpleUrlValidator;
 import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 import com.scaleunlimited.flinkcrawler.webgraph.SimpleWebGraph;
 
+import crawlercommons.robots.SimpleRobotRulesParser;
+
 public class CrawlTopologyTest {
+    private static final String CRLF = "\r\n";
 
 	@Test
 	public void test() throws Exception {
@@ -43,16 +45,22 @@ public class CrawlTopologyTest {
 			.add("domain1.com/page2", "domain2.com", "domain1.com", "domain1.com/page1")
 			.add("domain2.com", "domain2.com/page1");
 
+		Map<String, String> robotPages = new HashMap<String, String>();
+		robotPages.put("http://domain1.com/robots.txt", "User-agent: *" + CRLF + "Disallow: /blocked" + CRLF);
+		
 		CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
 			.setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
 			.setUrlLengthener(new SimpleUrlLengthener())
 			.setCrawlDB(new InMemoryCrawlDB())
-			.setRobotsFetcher(new MockRobotsFetcher())
-			.setRobotsParser(new SimpleRobotsParser())
+			.setRobotsFetcher(new MockRobotsFetcher(robotPages))
+			.setRobotsParser(new SimpleRobotRulesParser())
 			.setPageParser(new SimplePageParser())
 			.setContentSink(new DiscardingSink<ParsedUrl>())
 			.setUrlNormalizer(normalizer)
 			.setUrlFilter(new SimpleUrlValidator())
+			// You can increase this value to say 100000 if you need time inside of a threaded
+			// executor before the cluster terminates.
+			.setMaxWaitTime(3000)
 			.setPageFetcher(new WebGraphFetcher(graph));
 
 		CrawlTopology ct = builder.build();

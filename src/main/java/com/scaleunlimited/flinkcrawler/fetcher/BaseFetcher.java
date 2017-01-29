@@ -58,7 +58,6 @@ public abstract class BaseFetcher implements Serializable {
         return this;
     }
 
-    // TODO - 
     public boolean isValidMimeType(String mimeType) {
     	return _validMimeTypes.isEmpty() || _validMimeTypes.contains(mimeType);
     }

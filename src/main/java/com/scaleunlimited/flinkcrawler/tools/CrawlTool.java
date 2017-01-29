@@ -9,11 +9,12 @@ import com.scaleunlimited.flinkcrawler.crawldb.InMemoryCrawlDB;
 import com.scaleunlimited.flinkcrawler.fetcher.SimpleFetcher;
 import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
-import com.scaleunlimited.flinkcrawler.robots.SimpleRobotsParser;
 import com.scaleunlimited.flinkcrawler.tools.CrawlTopology.CrawlTopologyBuilder;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlLengthener;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlValidator;
+
+import crawlercommons.robots.SimpleRobotRulesParser;
 
 public class CrawlTool {
 
@@ -28,7 +29,7 @@ public class CrawlTool {
 				.setCrawlDB(new InMemoryCrawlDB())
 				.setUrlLengthener(new SimpleUrlLengthener())
 				.setRobotsFetcher(new SimpleFetcher(new UserAgent("bogus", "bogus@domain.com", "http://domain.com")))
-				.setRobotsParser(new SimpleRobotsParser())
+				.setRobotsParser(new SimpleRobotRulesParser())
 				.setPageParser(new SimplePageParser())
 				.setContentSink(new DiscardingSink<ParsedUrl>())
 				.setUrlNormalizer(new SimpleUrlNormalizer())

@@ -22,8 +22,6 @@ import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
  * contains actual CrawlStateUrl tuples. The other stream is a timed "trigger" stream that regularly
  * generates an ignorable Tuple that we .
  * 
- * TODO - Use the Timelyxxx function approach, versus the CoFlatMap with a tickler approach?
- *
  */
 @SuppressWarnings("serial")
 public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl> {

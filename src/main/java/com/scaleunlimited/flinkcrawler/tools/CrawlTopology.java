@@ -37,12 +37,13 @@ import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
-import com.scaleunlimited.flinkcrawler.robots.BaseRobotsParser;
 import com.scaleunlimited.flinkcrawler.sources.BaseUrlSource;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlLengthener;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlValidator;
 import com.scaleunlimited.flinkcrawler.utils.FlinkUtils;
+
+import crawlercommons.robots.SimpleRobotRulesParser;
 
 /**
  * A Flink streaming workflow that can be executed.
@@ -83,13 +84,14 @@ public class CrawlTopology {
         private StreamExecutionEnvironment _env;
         private String _jobName = "flink-crawler";
         private int _parallelism = DEFAULT_PARALLELISM;
-
+        private long _maxWaitTime = 5000;
+        
         private BaseUrlSource _urlSource;
 
         private BaseCrawlDB _crawlDB;
         
         private BaseFetcher _robotsFetcher;
-        private BaseRobotsParser _robotsParser;
+        private SimpleRobotRulesParser _robotsParser;
 
         private BaseUrlLengthener _urlLengthener;
         private SinkFunction<ParsedUrl> _contentSink;
@@ -104,6 +106,11 @@ public class CrawlTopology {
 
         public CrawlTopologyBuilder setJobName(String jobName) {
             _jobName = jobName;
+            return this;
+        }
+
+        public CrawlTopologyBuilder setMaxWaitTime(long maxWaitTime) {
+        	_maxWaitTime = maxWaitTime;
             return this;
         }
 
@@ -127,7 +134,7 @@ public class CrawlTopology {
             return this;
         }
 
-        public CrawlTopologyBuilder setRobotsParser(BaseRobotsParser robotsParser) {
+        public CrawlTopologyBuilder setRobotsParser(SimpleRobotRulesParser robotsParser) {
         	_robotsParser = robotsParser;
             return this;
         }
@@ -180,7 +187,7 @@ public class CrawlTopology {
             // worry about a CrawlDB full merge causing us to time out, unless that's run as a background thread.
             // Easiest might be for now to let the caller set this, so for normal testing this is something very short,
             // but we crank it up under production.
-            IterativeStream<RawUrl> newUrlsIteration = seedUrls.iterate(5000);
+            IterativeStream<RawUrl> newUrlsIteration = seedUrls.iterate(_maxWaitTime);
             DataStream<CrawlStateUrl> cleanedUrls = newUrlsIteration
             		.keyBy(new UrlKeySelector<RawUrl>())
                     .process(new LengthenUrlsFunction(_urlLengthener))
@@ -193,7 +200,7 @@ public class CrawlTopology {
                     .name("RawToStateUrlFunction");
             
             // Update the Crawl DB, then run URLs it emits through robots filtering.
-            IterativeStream<CrawlStateUrl> crawlDbIteration = cleanedUrls.iterate(5000);
+            IterativeStream<CrawlStateUrl> crawlDbIteration = cleanedUrls.iterate(_maxWaitTime);
             DataStream<Tuple2<CrawlStateUrl, FetchUrl>> postRobotsUrls = crawlDbIteration
             		.keyBy(new UrlKeySelector<CrawlStateUrl>())
             		.process(new CrawlDBFunction(_crawlDB))

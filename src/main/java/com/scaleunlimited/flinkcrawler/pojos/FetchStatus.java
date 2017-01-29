@@ -23,14 +23,12 @@ public enum FetchStatus {
     
     // Not fetched due to pre-fetch operations
     SKIPPED_BLOCKED,            // Blocked by robots.txt
-    SKIPPED_UNKNOWN_HOST,       // Hostname couldn't be resolved to IP address
     SKIPPED_INVALID_URL,        // URL invalid
     SKIPPED_DEFERRED,           // Deferred because robots.txt couldn't be processed.
-    SKIPPED_BY_SCORER,          // Skipped explicitly by scorer or grouper
     SKIPPED_BY_SCORE,           // Skipped because score wasn't high enough
-    SKIPPED_TIME_LIMIT,         // Ran out of time (also during fetch)
     SKIPPED_FILTERED,           // Filtered out during processing
     SKIPPED_PER_SERVER_LIMIT,   // Too many URLs per server
+    SKIPPED_CRAWLDELAY,			// Skipped because URL showed up too quickly after last one we processed
     
     // Not fetched due to mid-fetch issues
     SKIPPED_INTERRUPTED,        // Fetch process was interrupted.
