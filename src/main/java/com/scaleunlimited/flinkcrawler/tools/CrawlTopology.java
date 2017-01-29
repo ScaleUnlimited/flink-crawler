@@ -19,7 +19,6 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDB;
-import com.scaleunlimited.flinkcrawler.fetcher.BaseFetcher;
 import com.scaleunlimited.flinkcrawler.functions.CheckUrlWithRobotsFunction;
 import com.scaleunlimited.flinkcrawler.functions.CrawlDBFunction;
 import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
@@ -43,6 +42,8 @@ import com.scaleunlimited.flinkcrawler.urls.BaseUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlValidator;
 import com.scaleunlimited.flinkcrawler.utils.FlinkUtils;
 
+import crawlercommons.fetcher.BaseFetcher;
+import crawlercommons.fetcher.http.BaseHttpFetcher;
 import crawlercommons.robots.SimpleRobotRulesParser;
 
 /**
@@ -90,14 +91,14 @@ public class CrawlTopology {
 
         private BaseCrawlDB _crawlDB;
         
-        private BaseFetcher _robotsFetcher;
+        private BaseHttpFetcher _robotsFetcher;
         private SimpleRobotRulesParser _robotsParser;
 
         private BaseUrlLengthener _urlLengthener;
         private SinkFunction<ParsedUrl> _contentSink;
         private BaseUrlNormalizer _urlNormalizer;
         private BaseUrlValidator _urlFilter;
-        private BaseFetcher _pageFetcher;
+        private BaseHttpFetcher _pageFetcher;
         private BasePageParser _pageParser;
 
         public CrawlTopologyBuilder(StreamExecutionEnvironment env) {
@@ -129,7 +130,7 @@ public class CrawlTopology {
             return this;
         }
 
-        public CrawlTopologyBuilder setRobotsFetcher(BaseFetcher robotsFetcher) {
+        public CrawlTopologyBuilder setRobotsFetcher(BaseHttpFetcher robotsFetcher) {
             _robotsFetcher = robotsFetcher;
             return this;
         }
@@ -139,7 +140,7 @@ public class CrawlTopology {
             return this;
         }
 
-        public CrawlTopologyBuilder setPageFetcher(BaseFetcher pageFetcher) {
+        public CrawlTopologyBuilder setPageFetcher(BaseHttpFetcher pageFetcher) {
             _pageFetcher = pageFetcher;
             return this;
         }

@@ -1,7 +1,6 @@
 package com.scaleunlimited.flinkcrawler.utils;
 
 import static org.junit.Assert.fail;
-import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -103,26 +102,29 @@ public class UrlLogger {
 		 * @return
 		 */
 		public UrlLoggerResults assertLogging(Class<?> clazz) {
-			for (Tuple3<Class<?>, BaseUrl, Map<String, String>> entry : _log) {
-				if (entry.f0.equals(clazz)) {
-					return this;
-				}
-			}
-			
-			fail("No URLs logged by " + clazz);
-			
-			// Keep Eclipse happy
-			return this;
+			return assertLoggedBy(clazz, 1, Integer.MAX_VALUE);
 		}
 		
 		/**
 		 * Verify we have exactly <numCalls> calls logged by <clazz>.
 		 * 
 		 * @param clazz
-		 * @param numCalls
+		 * @param minCalls
 		 * @return
 		 */
 		public UrlLoggerResults assertLoggedBy(Class<?> clazz, int numCalls) {
+			return assertLoggedBy(clazz, numCalls, numCalls);
+		}
+		
+		/**
+		 * Verify we have between <minCalls> and <maxCalls> calls logged by <clazz>.
+		 * 
+		 * @param clazz
+		 * @param minCalls
+		 * @param maxCalls
+		 * @return
+		 */
+		public UrlLoggerResults assertLoggedBy(Class<?> clazz, int minCalls, int maxCalls) {
 			int foundCalls = 0;
 			for (Tuple3<Class<?>, BaseUrl, Map<String, String>> entry : _log) {
 				if (entry.f0.equals(clazz)) {
@@ -130,34 +132,13 @@ public class UrlLogger {
 				}
 			}
 			
-			if (foundCalls != numCalls) {
+			if ((foundCalls < minCalls) || (foundCalls > maxCalls)) {
 				if (foundCalls == 0) {
 					fail("No URLs logged by " + clazz);
+				} else if (minCalls == maxCalls) {
+					fail(String.format("Found %d URLs logged by %s, expected %d", foundCalls, clazz, minCalls));
 				} else {
-					fail(String.format("Found %d URLs logged by %s, expected %d", foundCalls, clazz, numCalls));
-				}
-			}
-			
-			return this;
-		}
-		
-		public UrlLoggerResults assertUrlLoggedBy(Class<?> clazz, BaseUrl url, int numCalls, String... metaData) {
-			int foundCalls = 0;
-			for (Tuple3<Class<?>, BaseUrl, Map<String, String>> entry : _log) {
-				if (entry.f0.equals(clazz) && entry.f1.equals(url)) {
-					Map<String, String> metaDataMap = makeMetaDataMap(metaData);
-					for (Map.Entry<String, String> metaDatum : metaDataMap.entrySet()) {
-						assertTrue(entry.f2.get(metaDatum.getKey()).equals(metaDatum.getValue()));
-					}
-					foundCalls += 1;
-				}
-			}
-			
-			if (foundCalls != numCalls) {
-				if (foundCalls == 0) {
-					fail(String.format("URL '%s' not logged by %s", url, clazz));
-				} else {
-					fail(String.format("URL '%s' was logged %d times by %s, expected %d", url, foundCalls, clazz, numCalls));
+					fail(String.format("Found %d URLs logged by %s, expected between %d and %d", foundCalls, clazz, minCalls, maxCalls));
 				}
 			}
 			
@@ -165,10 +146,14 @@ public class UrlLogger {
 		}
 		
 		public UrlLoggerResults assertUrlLoggedBy(Class<?> clazz, String url, String... targetMetaData) {
-			return assertUrlLoggedBy(clazz, url, 1, targetMetaData);
+			return assertUrlLoggedBy(clazz, url, 1, Integer.MAX_VALUE, targetMetaData);
 		}
 
-		public UrlLoggerResults assertUrlLoggedBy(Class<?> clazz, String url, int numCalls, String... targetMetaData) {
+		public UrlLoggerResults assertUrlLoggedBy(Class<?> clazz, String url, int minCalls, String... targetMetaData) {
+			return assertUrlLoggedBy(clazz, url, minCalls, minCalls, targetMetaData);
+		}
+
+		public UrlLoggerResults assertUrlLoggedBy(Class<?> clazz, String url, int minCalls, int maxCalls, String... targetMetaData) {
 			Map<String, String> targetMetaDataMap = makeMetaDataMap(targetMetaData);
 
 			int foundCalls = 0;
@@ -193,11 +178,13 @@ public class UrlLogger {
 				}
 			}
 			
-			if (foundCalls != numCalls) {
+			if ((foundCalls < minCalls) || (foundCalls > maxCalls)) {
 				if (foundCalls == 0) {
 					fail(String.format("URL '%s' not logged by %s", url, clazz));
+				} else if (minCalls == maxCalls) {
+					fail(String.format("URL '%s' was logged %d times by %s, expected %d", url, foundCalls, clazz, minCalls));
 				} else {
-					fail(String.format("URL '%s' was logged %d times by %s, expected %d", url, foundCalls, clazz, numCalls));
+					fail(String.format("URL '%s' was logged %d times by %s, expected between %d and %d", foundCalls, clazz, minCalls, maxCalls));
 				}
 			}
 			
@@ -221,9 +208,9 @@ public class UrlLogger {
 		}
 		
 
-		public UrlLoggerResults assertUrlLogged(BaseUrl url) {
+		public UrlLoggerResults assertUrlLogged(String url) {
 			for (Tuple3<Class<?>, BaseUrl, Map<String, String>> entry : _log) {
-				if (entry.f1.equals(url)) {
+				if (entry.f1.getUrl().equals(url)) {
 					return this;
 				}
 			}
@@ -231,16 +218,6 @@ public class UrlLogger {
 			fail(String.format("Didn't find any logging of URL '%s'", url));
 			
 			// Keep Eclipse happy
-			return this;
-		}
-		
-		public UrlLoggerResults assertUrlNotLoggedBy(Class<?> clazz, BaseUrl url) {
-			for (Tuple3<Class<?>, BaseUrl, Map<String, String>> entry : _log) {
-				if (entry.f0.equals(clazz) && entry.f1.equals(url)) {
-					fail(String.format("Found URL '%s' logged by %s", url, clazz));
-				}
-			}
-			
 			return this;
 		}
 		

@@ -16,8 +16,6 @@ import org.apache.flink.streaming.api.functions.RichProcessFunction;
 import org.apache.flink.util.Collector;
 import org.apache.http.HttpStatus;
 
-import com.scaleunlimited.flinkcrawler.fetcher.BaseFetcher;
-import com.scaleunlimited.flinkcrawler.fetcher.FetchedResult;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
@@ -25,6 +23,9 @@ import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
 import crawlercommons.robots.BaseRobotRules;
 import crawlercommons.robots.SimpleRobotRulesParser;
+import crawlercommons.fetcher.BaseFetcher;
+import crawlercommons.fetcher.FetchedResult;
+import crawlercommons.fetcher.http.BaseHttpFetcher;
 
 @SuppressWarnings("serial")
 public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tuple2<CrawlStateUrl, FetchUrl>> {
@@ -38,7 +39,7 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 	private static final int MIN_THREAD_COUNT = 10;
 	private static final int MAX_THREAD_COUNT = 100;
 
-	private BaseFetcher _fetcher;
+	private BaseHttpFetcher _fetcher;
 	private SimpleRobotRulesParser _parser;
 	
 	private transient ThreadPoolExecutor _executor;
@@ -50,7 +51,7 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 	private transient Map<String, BaseRobotRules> _rules;
 	private transient ConcurrentLinkedQueue<Tuple2<CrawlStateUrl, FetchUrl>> _output;
 	
-	public CheckUrlWithRobotsFunction(BaseFetcher fetcher, SimpleRobotRulesParser parser) {
+	public CheckUrlWithRobotsFunction(BaseHttpFetcher fetcher, SimpleRobotRulesParser parser) {
 		_fetcher = fetcher;
 		_parser = parser;
 	}
@@ -97,7 +98,7 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 		}
 		
 		// We don't have robots yet, so queue up the URL for fetching code
-		final FetchUrl robotsUrl = new FetchUrl(robotsKey + "/robots.txt");
+		final String robotsUrl = robotsKey + "/robots.txt";
 		_executor.execute(new Runnable() {
 			
 			@Override
@@ -114,7 +115,7 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 						// TODO set different retry interval for missing.
 						robotFetchRetryTime += 24L * 60 * 60 * 1000;
 					} else {
-						rules = _parser.parseContent(robotsUrl.getUrl(), result.getContent(), result.getContentType(), _fetcher.getUserAgent().getAgentName());
+						rules = _parser.parseContent(robotsUrl, result.getContent(), result.getContentType(), _fetcher.getUserAgent().getAgentName());
 					}
 				} catch (Exception e) {
 					rules = _parser.failedFetch(HttpStatus.SC_INTERNAL_SERVER_ERROR);

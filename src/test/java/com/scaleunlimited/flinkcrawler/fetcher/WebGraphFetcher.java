@@ -6,12 +6,20 @@ import java.util.Iterator;
 import org.apache.http.HttpStatus;
 import org.apache.tika.metadata.Metadata;
 
-import com.scaleunlimited.flinkcrawler.config.UserAgent;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.webgraph.BaseWebGraph;
 
+import crawlercommons.fetcher.AbortedFetchException;
+import crawlercommons.fetcher.AbortedFetchReason;
+import crawlercommons.fetcher.BaseFetchException;
+import crawlercommons.fetcher.FetchedResult;
+import crawlercommons.fetcher.HttpFetchException;
+import crawlercommons.fetcher.Payload;
+import crawlercommons.fetcher.http.BaseHttpFetcher;
+import crawlercommons.fetcher.http.UserAgent;
+
 @SuppressWarnings("serial")
-public class WebGraphFetcher extends BaseFetcher {
+public class WebGraphFetcher extends BaseHttpFetcher {
 
 	private static final String TEMPLATE = "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\"\n"
         + "\"http://www.w3.org/TR/html4/loose.dtd\">\n"
@@ -29,14 +37,13 @@ public class WebGraphFetcher extends BaseFetcher {
 	private BaseWebGraph _graph;
 	
 	public WebGraphFetcher(BaseWebGraph graph) {
-		super(new UserAgent("WebGraphFetcher", "flink-crawler@scaleunlimited.com", "http://www.scaleunlimited.com"));
+		super(1, new UserAgent("WebGraphFetcher", "flink-crawler@scaleunlimited.com", "http://www.scaleunlimited.com"));
 		
 		_graph = graph;
 	}
 	
 	@Override
-	public FetchedResult get(FetchUrl url) throws BaseFetchException {
-		String urlToFetch = url.getUrl();
+	public FetchedResult get(String urlToFetch, Payload payload) throws BaseFetchException {
 		Iterator<String> outlinksIter = _graph.getChildren(urlToFetch);
 		
 		if (outlinksIter == null) {
@@ -56,8 +63,13 @@ public class WebGraphFetcher extends BaseFetcher {
 			}
 			
 			String contentAsStr = String.format(TEMPLATE, linksList);
-			return new FetchedResult(urlToFetch, urlToFetch, System.currentTimeMillis(), new Metadata(), contentAsStr.getBytes(UTF_8), HTML_MIME_TYPE, DEFAULT_MIN_RESPONSE_RATE, null, 0, HttpStatus.SC_OK);
+			return new FetchedResult(urlToFetch, urlToFetch, System.currentTimeMillis(), new Metadata(), contentAsStr.getBytes(UTF_8), HTML_MIME_TYPE, DEFAULT_MIN_RESPONSE_RATE, null, contentAsStr, 0, contentAsStr, HttpStatus.SC_OK, contentAsStr);
 		}
+	}
+
+	// TODO -
+	private boolean isValidMimeType(String htmlMimeType) {
+		return _validMimeTypes.isEmpty() || _validMimeTypes.contains(htmlMimeType);
 	}
 
 	@Override
@@ -65,4 +77,5 @@ public class WebGraphFetcher extends BaseFetcher {
 		// nothing to abort
 	}
 
+	
 }

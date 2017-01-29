@@ -36,6 +36,7 @@ under the License.
 		<tika.version>1.13</tika.version>
 		<log4j.version>1.2.17</log4j.version>
 		<crawlercommons.version>0.6</crawlercommons.version>
+		<http-fetcher.version>0.1-SNAPSHOT</http-fetcher.version>
 		
 		<javac.src.version>1.7</javac.src.version>
 		<javac.target.version>1.7</javac.target.version>
@@ -122,6 +123,12 @@ under the License.
 		</dependency>
 		
 		<dependency>
+			<groupId>com.github.crawler-commons</groupId>
+			<artifactId>http-fetcher</artifactId>
+			<version>${http-fetcher.version}</version>
+		</dependency>
+		
+		<dependency>
 			<groupId>org.apache.tika</groupId>
 			<artifactId>tika-parsers</artifactId>
 			<version>${tika.version}</version>
@@ -191,6 +198,12 @@ under the License.
 	            	<artifactId>isoparser</artifactId>
 	            </exclusion>
 			</exclusions>
+		</dependency>
+		
+		<dependency>
+			<groupId>args4j</groupId>
+			<artifactId>args4j</artifactId>
+			<version>2.33</version>
 		</dependency>
 		
 		<!-- Test scope -->
