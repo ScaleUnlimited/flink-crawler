@@ -8,11 +8,14 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.pojos.BaseUrl;
 
 public class UrlLoggerImpl implements IUrlLogger {
-
+	static final Logger LOGGER = LoggerFactory.getLogger(UrlLoggerImpl.class);
+	
 	private static final Map<String, String> EMPTY_METADATA_MAP = new HashMap<>();
 	
 	private Map<Class<?>, List<BaseUrl>> _byClass;
@@ -29,8 +32,7 @@ public class UrlLoggerImpl implements IUrlLogger {
 	}
 	
 	public void record(Class<?> clazz, BaseUrl url, Map<String, String> metaData) {
-		// TODO use slf4j logging at debug level
-		System.out.format("%s: %s\n", clazz.getSimpleName(), url);
+		LOGGER.debug(String.format("%s: %s", clazz.getSimpleName(), url));
 		
 		List<BaseUrl> urls = _byClass.get(clazz);
 		if (urls == null) {

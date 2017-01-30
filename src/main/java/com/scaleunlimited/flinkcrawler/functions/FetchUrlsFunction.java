@@ -1,6 +1,7 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
 import com.scaleunlimited.flinkcrawler.utils.ExceptionUtils;
+
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -11,6 +12,8 @@ import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.RichProcessFunction;
 import org.apache.flink.util.Collector;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
@@ -27,7 +30,8 @@ import crawlercommons.fetcher.http.BaseHttpFetcher;
 
 @SuppressWarnings("serial")
 public class FetchUrlsFunction extends RichProcessFunction<FetchUrl, Tuple2<CrawlStateUrl, FetchedUrl>> {
-
+    static final Logger LOGGER = LoggerFactory.getLogger(FetchUrlsFunction.class);
+    
 	private static final int MIN_THREAD_COUNT = 10;
 	private static final int MAX_THREAD_COUNT = 100;
 	
@@ -80,7 +84,7 @@ public class FetchUrlsFunction extends RichProcessFunction<FetchUrl, Tuple2<Craw
 			
 			@Override
 			public void run() {
-				System.out.println("Fetching " + url);
+				LOGGER.debug("Fetching " + url);
 				
 				try {
 					FetchedResult result = _fetcher.get(url.getUrl(), null);
@@ -89,7 +93,7 @@ public class FetchUrlsFunction extends RichProcessFunction<FetchUrl, Tuple2<Craw
 														result.getContent(), result.getContentType(),
 														result.getResponseRate());
 					
-					System.out.println("Fetched " + result);
+					LOGGER.info("Fetched " + result);
 					_output.add(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url.getUrl(), FetchStatus.FETCHED, url.getPLD(), 0, 0, fetchedUrl.getFetchTime(), 0L), fetchedUrl));
 				} catch (HttpFetchException e) {
 					// Generate Tuple2 with fetch status tuple but no FetchedUrl
@@ -116,7 +120,7 @@ public class FetchUrlsFunction extends RichProcessFunction<FetchUrl, Tuple2<Craw
 		
 		if (!_output.isEmpty()) {
 			Tuple2<CrawlStateUrl,FetchedUrl> url = _output.remove();
-			System.out.println("Removing URL from fetched queue: " + url);
+			LOGGER.debug("Removing URL from fetched queue: " + url);
 			collector.collect(url);
 		}
 		

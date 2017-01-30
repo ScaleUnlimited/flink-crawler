@@ -1,6 +1,8 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
 import org.apache.flink.api.common.functions.RichFilterFunction;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlValidator;
@@ -8,7 +10,8 @@ import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
 @SuppressWarnings("serial")
 public class ValidUrlsFilter extends RichFilterFunction<RawUrl> {
-
+	static final Logger LOGGER = LoggerFactory.getLogger(ValidUrlsFilter.class);
+	
 	private BaseUrlValidator _urlValidator;
 	
 	public ValidUrlsFilter(BaseUrlValidator urlValidator) {
@@ -22,9 +25,9 @@ public class ValidUrlsFilter extends RichFilterFunction<RawUrl> {
 		String url = input.getUrl();
 		boolean result = _urlValidator.isValid(url);
 		if (result) {
-			System.out.println("Not filtering " + url);
+			LOGGER.debug("Not filtering " + url);
 		} else {
-			System.out.println("Filtering " + url);
+			LOGGER.debug("Filtering " + url);
 		}
 		
 		return result;
