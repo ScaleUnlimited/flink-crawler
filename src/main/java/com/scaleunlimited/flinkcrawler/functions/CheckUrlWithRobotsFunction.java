@@ -23,7 +23,6 @@ import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
 import crawlercommons.robots.BaseRobotRules;
 import crawlercommons.robots.SimpleRobotRulesParser;
-import crawlercommons.fetcher.BaseFetcher;
 import crawlercommons.fetcher.FetchedResult;
 import crawlercommons.fetcher.http.BaseHttpFetcher;
 
@@ -83,7 +82,7 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 	public void processElement(final FetchUrl url, Context context, Collector<Tuple2<CrawlStateUrl, FetchUrl>> collector) throws Exception {
 		UrlLogger.record(this.getClass(), url);
 		
-		String robotsKey = null;
+		final String robotsKey;
 		
 		try {
 			robotsKey = makeRobotsKey(url);
@@ -97,19 +96,28 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 			return;
 		}
 		
+		/*
+		 * 
+. What if multiple threads fetch at same time? Block if rules are null in map? Would need to handle this case as well in non-threaded code.
+		 */
 		// We don't have robots yet, so queue up the URL for fetching code
 		final String robotsUrl = robotsKey + "/robots.txt";
 		_executor.execute(new Runnable() {
 			
 			@Override
 			public void run() {
-				
+				// We might, in the thread, get a URL that we've already processed because multiple were queued up.
+				// So do the check again, then fetch if needed. We might also have multiple threads processing URLs
+				// for the same domain, but for now let's not worry about that case (just slightly less efficient).
 				long robotFetchRetryTime = System.currentTimeMillis();
-				BaseRobotRules rules = null;
+				BaseRobotRules rules = _rules.get(robotsKey);
+				if (rules != null) {
+					_output.add(processUrl(rules, url));
+					return;
+				}
 				
 				try {
 					FetchedResult result = _fetcher.get(robotsUrl);
-					// TODO if it's a 404, then treat it as allow all
 					if (result.getStatusCode() != HttpStatus.SC_OK) {
 						rules = _parser.failedFetch(result.getStatusCode());
 						// TODO set different retry interval for missing.
@@ -123,6 +131,7 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 					robotFetchRetryTime += 24L * 60 * 60 * 1000;
 				}
 				
+				// TODO use robotFetchRetryTime to set up when we want to purge our rules
 				try {
 					_rules.put(makeRobotsKey(url), rules);
 					_output.add(processUrl(rules, url));
@@ -130,8 +139,6 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 					_output.add(invalidUrl(url));
 				}
 			}
-
-
 		});
 		
 		// Every time we get called, we'll set up a new timer that fires
