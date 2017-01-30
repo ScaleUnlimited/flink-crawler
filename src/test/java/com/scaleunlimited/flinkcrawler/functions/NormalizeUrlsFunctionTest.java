@@ -18,6 +18,7 @@ import static org.hamcrest.Matchers.lessThanOrEqualTo;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 
 //import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
+// TODO re-implement this without using flinkspector, which requires Java 8.
 public class NormalizeUrlsFunctionTest /* extends DataSetTestBase */ {
 
 	@Before

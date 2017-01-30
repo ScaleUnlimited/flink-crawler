@@ -242,6 +242,7 @@ under the License.
 		</dependency>
 		
 		<!--
+		TODO decide if we want to switch to Java 8, so we can use flinkspector.
 		<dependency>
 		    <groupId>org.flinkspector</groupId>
 		    <artifactId>flinkspector-dataset_2.10</artifactId>
