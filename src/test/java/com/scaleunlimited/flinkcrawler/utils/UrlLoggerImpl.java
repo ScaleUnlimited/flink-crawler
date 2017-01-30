@@ -11,56 +11,24 @@ import org.apache.flink.api.java.tuple.Tuple3;
 
 import com.scaleunlimited.flinkcrawler.pojos.BaseUrl;
 
-public class UrlLogger {
+public class UrlLoggerImpl implements IUrlLogger {
 
-	private static UrlLogger LOGGER = new UrlLogger();
+	private static final Map<String, String> EMPTY_METADATA_MAP = new HashMap<>();
 	
-	private static final Map<String, String> EMPTY_MAP = new HashMap<>();
-	
-	public static void record(Class<?> clazz, BaseUrl url, String... metaData) {
-		Map<String, String> metaDataMap = makeMetaDataMap(metaData);
-		LOGGER.recordImpl(clazz, url, metaDataMap);
-	}
-
-	public static Map<String, String> makeMetaDataMap(String... metaData) {
-		if (metaData.length == 0) {
-			return EMPTY_MAP;
-		}
-		
-		Map<String, String> metaDataMap = new HashMap<String, String>();
-		for (int i = 0; i < metaData.length; i += 2) {
-			metaDataMap.put(metaData[i], metaData[i+1]);
-		}
-		
-		return metaDataMap;
-	}
-	
-	public static List<BaseUrl> getByClass(Class<?> clazz) {
-		return LOGGER.getByClassImpl(clazz);
-	}
-
-	public static List<Tuple3<Class<?>, BaseUrl, Map<String, String>>> getLog() {
-		return LOGGER.getLogImpl();
-	}
-	
-	public static UrlLoggerResults getResults() {
-		return new UrlLoggerResults(LOGGER.getLogImpl());
-	}
-	
-	// ====================================================================================
-	// Private implementation methods
-	// ====================================================================================
-
 	private Map<Class<?>, List<BaseUrl>> _byClass;
 	private List<Tuple3<Class<?>, BaseUrl, Map<String, String>>> _log;
 	
-	private UrlLogger() {
+	public UrlLoggerImpl() {
 		// TODO check system property for whether we're logging, skip otherwise.
 		_byClass = new HashMap<>();
 		_log = new ArrayList<>();
 	}
 	
-	private void recordImpl(Class<?> clazz, BaseUrl url, Map<String, String> metaData) {
+	public void record(Class<?> clazz, BaseUrl url, String... metaData) {
+		record(clazz, url, makeMetaDataMap(metaData));
+	}
+	
+	public void record(Class<?> clazz, BaseUrl url, Map<String, String> metaData) {
 		// TODO use slf4j logging at debug level
 		System.out.format("%s: %s\n", clazz.getSimpleName(), url);
 		
@@ -75,13 +43,23 @@ public class UrlLogger {
 		_log.add(new Tuple3<Class<?>, BaseUrl, Map<String, String>>(clazz, url, metaData));
 	}
 	
-	private List<BaseUrl> getByClassImpl(Class<?> clazz) {
-		return _byClass.get(clazz);
-	}
-	
-	private List<Tuple3<Class<?>, BaseUrl, Map<String, String>>> getLogImpl() {
+	public List<Tuple3<Class<?>, BaseUrl, Map<String, String>>> getLog() {
 		return _log;
 	}
+	
+	private static Map<String, String> makeMetaDataMap(String... metaData) {
+		if (metaData.length == 0) {
+			return EMPTY_METADATA_MAP;
+		}
+		
+		Map<String, String> metaDataMap = new HashMap<String, String>();
+		for (int i = 0; i < metaData.length; i += 2) {
+			metaDataMap.put(metaData[i], metaData[i+1]);
+		}
+		
+		return metaDataMap;
+	}
+	
 	
 	// ====================================================================================
 	// Results that can be used with asserts
@@ -91,7 +69,7 @@ public class UrlLogger {
 
 		private List<Tuple3<Class<?>, BaseUrl, Map<String, String>>> _log;
 		
-		protected UrlLoggerResults(List<Tuple3<Class<?>, BaseUrl, Map<String, String>>> log) {
+		public UrlLoggerResults(List<Tuple3<Class<?>, BaseUrl, Map<String, String>>> log) {
 			_log = log;
 		}
 		

@@ -4,11 +4,11 @@ import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.tuple.Tuple1;
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.flinkspector.core.collection.ExpectedRecords;
-import org.flinkspector.core.quantify.MatchTuples;
-import org.flinkspector.core.quantify.OutputMatcher;
-import org.flinkspector.core.trigger.FinishAtCount;
-import org.flinkspector.dataset.DataSetTestBase;
+//import org.flinkspector.core.collection.ExpectedRecords;
+//import org.flinkspector.core.quantify.MatchTuples;
+//import org.flinkspector.core.quantify.OutputMatcher;
+//import org.flinkspector.core.trigger.FinishAtCount;
+//import org.flinkspector.dataset.DataSetTestBase;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -18,7 +18,7 @@ import static org.hamcrest.Matchers.lessThanOrEqualTo;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 
 //import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
-public class NormalizeUrlsFunctionTest extends DataSetTestBase {
+public class NormalizeUrlsFunctionTest /* extends DataSetTestBase */ {
 
 	@Before
 	public void setUp() throws Exception {

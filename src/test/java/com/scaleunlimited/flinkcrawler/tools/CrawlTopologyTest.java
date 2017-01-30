@@ -27,6 +27,7 @@ import com.scaleunlimited.flinkcrawler.urls.SimpleUrlLengthener;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlValidator;
 import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
+import com.scaleunlimited.flinkcrawler.utils.UrlLoggerImpl.UrlLoggerResults;
 import com.scaleunlimited.flinkcrawler.webgraph.SimpleWebGraph;
 
 import crawlercommons.robots.SimpleRobotRulesParser;
@@ -80,7 +81,9 @@ public class CrawlTopologyTest {
 		String domain1page2 = normalizer.normalize("domain1.com/page2");
 		String domain2page1 = normalizer.normalize("domain2.com/page1");
 		String domain1blockedPage = normalizer.normalize("domain1.com/blocked");
-		UrlLogger.getResults()
+		UrlLoggerResults results = new UrlLoggerResults(UrlLogger.getLog());
+		
+		results
 			.assertUrlLoggedBy(CheckUrlWithRobotsFunction.class, domain1page1, 1)
 			.assertUrlLoggedBy(FetchUrlsFunction.class, domain1page1, 1)
 			.assertUrlLoggedBy(	CrawlDBFunction.class, domain1page1, 1,

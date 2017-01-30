@@ -241,6 +241,7 @@ under the License.
 			</exclusions>
 		</dependency>
 		
+		<!--
 		<dependency>
 		    <groupId>org.flinkspector</groupId>
 		    <artifactId>flinkspector-dataset_2.10</artifactId>
@@ -254,7 +255,8 @@ under the License.
 		    <version>0.4</version>
 		    <scope>test</scope>
 		</dependency>	
-		
+		  -->
+		  
 		<dependency>
 		    <groupId>org.hamcrest</groupId>
 		    <artifactId>hamcrest-all</artifactId>
