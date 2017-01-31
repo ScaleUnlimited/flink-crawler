@@ -69,7 +69,7 @@ public class CrawlTool {
 		}
 		
 		try {
-			LocalStreamEnvironment env = StreamExecutionEnvironment.createLocalEnvironment();
+			StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 			
 			
 			CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
