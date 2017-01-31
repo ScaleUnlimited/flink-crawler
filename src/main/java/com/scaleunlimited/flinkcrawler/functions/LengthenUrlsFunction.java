@@ -9,6 +9,8 @@ import java.util.concurrent.TimeUnit;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.RichProcessFunction;
 import org.apache.flink.util.Collector;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlLengthener;
@@ -16,7 +18,8 @@ import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
 @SuppressWarnings({ "serial" })
 public class LengthenUrlsFunction extends RichProcessFunction<RawUrl, RawUrl> {
-
+	static final Logger LOGGER = LoggerFactory.getLogger(LengthenUrlsFunction.class);
+	
 	private static final int MIN_THREAD_COUNT = 10;
 	private static final int MAX_THREAD_COUNT = 100;
 	
@@ -62,7 +65,7 @@ public class LengthenUrlsFunction extends RichProcessFunction<RawUrl, RawUrl> {
 			
 			@Override
 			public void run() {
-				System.out.println("Lengthening " + url);
+				LOGGER.debug("Lengthening " + url);
 				_output.add(_lengthener.lengthen(url));
 			}
 		});
@@ -76,7 +79,7 @@ public class LengthenUrlsFunction extends RichProcessFunction<RawUrl, RawUrl> {
 		// TODO use a loop?
 		if (!_output.isEmpty()) {
 			RawUrl lengthenedUrl = _output.remove();
-			System.out.println("Removing URL from lengthening queue: " + lengthenedUrl);
+			LOGGER.debug("Removing URL from lengthening queue: " + lengthenedUrl);
 			collector.collect(lengthenedUrl);
 		}
 		

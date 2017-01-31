@@ -3,13 +3,17 @@ package com.scaleunlimited.flinkcrawler.crawldb;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
 
 @SuppressWarnings("serial")
 public class InMemoryCrawlDB extends BaseCrawlDB {
-
+    static final Logger LOGGER = LoggerFactory.getLogger(InMemoryCrawlDB.class);
+    
 	private Map<String, CrawlStateUrl> _crawlState;
 
 	@Override
@@ -31,7 +35,7 @@ public class InMemoryCrawlDB extends BaseCrawlDB {
 		synchronized (_crawlState) {
 			CrawlStateUrl curState = _crawlState.get(key);
 			if (curState == null) {
-				System.out.format("Adding new URL %s to the crawlDB (%s)\n", key, _crawlState.values());
+				LOGGER.debug(String.format("Adding new URL %s to the crawlDB (%s)", key, _crawlState.values()));
 				// TODO here we'd want to check on size, and force a merge (in the background) if we're too big.
 				// But this is testing only code, so don't worry about it.
 				_crawlState.put(key, url);
@@ -42,14 +46,14 @@ public class InMemoryCrawlDB extends BaseCrawlDB {
 				FetchStatus newStatus = url.getStatus();
 				if (newStatus == FetchStatus.UNFETCHED) {
 					// Current always wins, all done.
-					System.out.format("Ignoring new unfetched URL %s, already in crawlDB\n", url);
+					LOGGER.debug(String.format("Ignoring new unfetched URL %s, already in crawlDB", url));
 				} else if ((curStatus == FetchStatus.UNFETCHED) || (curStatus == FetchStatus.FETCHING)) {
 					// We know new status isn't unfetched, so we always want to update
-					System.out.format("Updating previously unfetched URL %s in crawlDB\n", url);
+					LOGGER.debug(String.format("Updating previously unfetched URL %s in crawlDB", url));
 					_crawlState.put(key, url);
 				} else {
 					// we have "real" status for both current and new, so we have to merge
-					System.out.format("Merging current status of %s in crawlDB with new status of %s for %s\n", curStatus, newStatus, url);
+					LOGGER.debug(String.format("Merging current status of %s in crawlDB with new status of %s for %s", curStatus, newStatus, url));
 					// TODO make it so
 				}
 			}
@@ -67,7 +71,7 @@ public class InMemoryCrawlDB extends BaseCrawlDB {
 			for (String url : _crawlState.keySet()) {
 				CrawlStateUrl curState = _crawlState.get(url);
 				if (_fetchQueue.add(curState)) {
-					System.out.format("Added URL from crawlDB to fetchable queue: %s\n", curState);
+					LOGGER.debug(String.format("Added URL from crawlDB to fetchable queue: %s", curState));
 					curState.setStatus(FetchStatus.FETCHING);
 				}
 			}

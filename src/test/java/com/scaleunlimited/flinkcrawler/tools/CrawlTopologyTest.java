@@ -9,6 +9,8 @@ import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.crawldb.InMemoryCrawlDB;
 import com.scaleunlimited.flinkcrawler.fetcher.MockRobotsFetcher;
@@ -33,6 +35,8 @@ import com.scaleunlimited.flinkcrawler.webgraph.SimpleWebGraph;
 import crawlercommons.robots.SimpleRobotRulesParser;
 
 public class CrawlTopologyTest {
+	static final Logger LOGGER = LoggerFactory.getLogger(CrawlTopologyTest.class);
+	
     private static final String CRLF = "\r\n";
 
 	@Test
@@ -74,7 +78,7 @@ public class CrawlTopologyTest {
 		ct.execute();
 		
 		for (Tuple3<Class<?>, BaseUrl, Map<String, String>> entry : UrlLogger.getLog()) {
-			System.out.format("%s: %s\n", entry.f0, entry.f1);
+			LOGGER.info(String.format("%s: %s\n", entry.f0, entry.f1));
 		}
 		
 		String domain1page1 = normalizer.normalize("domain1.com/page1");

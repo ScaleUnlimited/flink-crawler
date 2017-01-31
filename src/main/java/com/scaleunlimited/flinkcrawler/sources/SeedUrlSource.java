@@ -4,6 +4,8 @@ import java.net.URL;
 import java.util.LinkedList;
 
 import org.apache.flink.configuration.Configuration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 
@@ -17,6 +19,7 @@ import crawlercommons.url.PaidLevelDomain;
  */
 @SuppressWarnings("serial")
 public class SeedUrlSource extends BaseUrlSource {
+	static final Logger LOGGER = LoggerFactory.getLogger(SeedUrlSource.class);
 
 	private RawUrl[] _unpartitioned;
 	
@@ -63,7 +66,7 @@ public class SeedUrlSource extends BaseUrlSource {
 		
 		while (_keepRunning && !_urls.isEmpty()) {
 			RawUrl url = _urls.pop();
-			System.out.format("Emitting %s for %d of %d\n", url, _index, _parallelism);
+			LOGGER.debug(String.format("Emitting %s for %d of %d", url, _index, _parallelism));
 			context.collect(url);
 		}
 	}

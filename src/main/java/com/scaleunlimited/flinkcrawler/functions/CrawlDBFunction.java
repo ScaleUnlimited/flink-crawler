@@ -4,6 +4,8 @@ import org.apache.flink.api.common.functions.RuntimeContext;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.RichProcessFunction;
 import org.apache.flink.util.Collector;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDB;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
@@ -25,7 +27,8 @@ import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
  */
 @SuppressWarnings("serial")
 public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl> {
-
+    static final Logger LOGGER = LoggerFactory.getLogger(CrawlDBFunction.class);
+    
 	// TODO configure this
 	private static final int MAX_ACTIVE_URLS = 10_000;
 	
@@ -80,7 +83,7 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 		FetchUrl url = _fetchQueue.poll();
 		
 		if (url != null) {
-			System.out.format("CrawlDBFunction emitting URL %s to fetch (partition %d of %d)\n", url, _index, _parallelism);
+			LOGGER.debug(String.format("CrawlDBFunction emitting URL %s to fetch (partition %d of %d)", url, _index, _parallelism));
 			collector.collect(url);
 		} else {
 			// We don't have any active URLs to fetch.

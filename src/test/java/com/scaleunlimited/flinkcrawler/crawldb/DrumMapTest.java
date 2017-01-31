@@ -10,9 +10,12 @@ import java.io.IOException;
 import java.util.Random;
 
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class DrumMapTest {
-
+	static final Logger LOGGER = LoggerFactory.getLogger(DrumMapTest.class);
+			
 	@Test
 	public void testPayload() throws Exception {
 		DrumMap dm = new DrumMap(1000);
@@ -57,7 +60,7 @@ public class DrumMapTest {
 			}
 			
 			long deltaTime = System.currentTimeMillis() - startTime;
-			System.out.format("Took %dms\n", deltaTime);
+			LOGGER.info(String.format("Took %dms", deltaTime));
 			dm.close();
 		}
 	}
