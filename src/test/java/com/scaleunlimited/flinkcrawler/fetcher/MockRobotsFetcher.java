@@ -34,7 +34,6 @@ public class MockRobotsFetcher extends BaseHttpFetcher {
 		final int responseRate = 1000;
 		
 		if (page == null) {
-			// TODO we have to pass in non-null content & type, otherwise FetchedResult will complain...does this make sense?
 			return new FetchedResult(	robotsUrl, 
 										robotsUrl, 
 										0, 

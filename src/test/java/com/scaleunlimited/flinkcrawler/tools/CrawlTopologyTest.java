@@ -51,7 +51,7 @@ public class CrawlTopologyTest {
 			.add("domain2.com", "domain2.com/page1");
 
 		Map<String, String> robotPages = new HashMap<String, String>();
-		robotPages.put("http://domain1.com/robots.txt", "User-agent: *" + CRLF + "Disallow: /blocked" + CRLF);
+		robotPages.put("http://domain1.com:80/robots.txt", "User-agent: *" + CRLF + "Disallow: /blocked" + CRLF);
 		
 		CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
 			.setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
@@ -63,7 +63,7 @@ public class CrawlTopologyTest {
 			.setContentSink(new DiscardingSink<ParsedUrl>())
 			.setUrlNormalizer(normalizer)
 			.setUrlFilter(new SimpleUrlValidator())
-			// You can increase this value to say 100000 if you need time inside of a threaded
+			// You can increase this value from 3000 to say 100000 if you need time inside of a threaded
 			// executor before the cluster terminates.
 			.setMaxWaitTime(3000)
 			.setPageFetcher(new WebGraphFetcher(graph));
@@ -78,7 +78,7 @@ public class CrawlTopologyTest {
 		ct.execute();
 		
 		for (Tuple3<Class<?>, BaseUrl, Map<String, String>> entry : UrlLogger.getLog()) {
-			LOGGER.info(String.format("%s: %s\n", entry.f0, entry.f1));
+			LOGGER.info(String.format("%s: %s", entry.f0, entry.f1));
 		}
 		
 		String domain1page1 = normalizer.normalize("domain1.com/page1");

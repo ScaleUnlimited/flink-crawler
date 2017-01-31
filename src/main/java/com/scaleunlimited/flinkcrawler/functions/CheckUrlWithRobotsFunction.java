@@ -1,7 +1,6 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
 import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -21,10 +20,10 @@ import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
-import crawlercommons.robots.BaseRobotRules;
-import crawlercommons.robots.SimpleRobotRulesParser;
 import crawlercommons.fetcher.FetchedResult;
 import crawlercommons.fetcher.http.BaseHttpFetcher;
+import crawlercommons.robots.BaseRobotRules;
+import crawlercommons.robots.SimpleRobotRulesParser;
 
 @SuppressWarnings("serial")
 public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tuple2<CrawlStateUrl, FetchUrl>> {
@@ -96,10 +95,6 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 			return;
 		}
 		
-		/*
-		 * 
-. What if multiple threads fetch at same time? Block if rules are null in map? Would need to handle this case as well in non-threaded code.
-		 */
 		// We don't have robots yet, so queue up the URL for fetching code
 		final String robotsUrl = robotsKey + "/robots.txt";
 		_executor.execute(new Runnable() {
@@ -176,7 +171,7 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 	}
 
 	private String makeRobotsKey(FetchUrl url) throws MalformedURLException {
-		String robotsKey = String.format("%s://%s%s", url.getProtocol(), url.getHostname(), url.getPort());
+		String robotsKey = String.format("%s://%s:%s", url.getProtocol(), url.getHostname(), url.getPort());
 		return robotsKey;
 	}
 
