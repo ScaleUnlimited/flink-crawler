@@ -76,6 +76,8 @@ public class FetchUrlsFunction extends RichProcessFunction<FetchUrl, Tuple2<Craw
 	public void processElement(final FetchUrl url, Context context, Collector<Tuple2<CrawlStateUrl, FetchedUrl>> collector) throws Exception {
 		UrlLogger.record(this.getClass(), url);
 		
+		// TODO immediately skip the URL if the crawl delay hasn't been long enough for this domain. Note that since robots.txt
+		// is sub-domain specific, we have to use the whole domain, not just the PLD.
 		_executor.execute(new Runnable() {
 			
 			@Override
