@@ -26,7 +26,7 @@ import com.scaleunlimited.flinkcrawler.functions.LengthenUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.NormalizeUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.OutlinkToStateUrlFunction;
 import com.scaleunlimited.flinkcrawler.functions.ParseFunction;
-import com.scaleunlimited.flinkcrawler.functions.RawToStateUrlFunction;
+import com.scaleunlimited.flinkcrawler.functions.PldKeySelector;
 import com.scaleunlimited.flinkcrawler.functions.UrlKeySelector;
 import com.scaleunlimited.flinkcrawler.functions.ValidUrlsFilter;
 import com.scaleunlimited.flinkcrawler.parser.BasePageParser;
@@ -42,7 +42,6 @@ import com.scaleunlimited.flinkcrawler.urls.BaseUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlValidator;
 import com.scaleunlimited.flinkcrawler.utils.FlinkUtils;
 
-import crawlercommons.fetcher.BaseFetcher;
 import crawlercommons.fetcher.http.BaseHttpFetcher;
 import crawlercommons.robots.SimpleRobotRulesParser;
 
@@ -179,6 +178,8 @@ public class CrawlTopology {
                 seedUrlsSource = seedUrlsSource.setParallelism(_parallelism);
             }
             
+            // Key is the full URL, as (a) we don't know that it's a valid URL yet, and (b) after lengthening the
+            // domain might change, and (c) we don't have to enforce any per-domain constraints here.
             KeyedStream<RawUrl, String> seedUrls = seedUrlsSource
             		.name("Seed urls source")
             		.keyBy(new UrlKeySelector<RawUrl>());
@@ -191,22 +192,22 @@ public class CrawlTopology {
             IterativeStream<RawUrl> newUrlsIteration = seedUrls.iterate(_maxWaitTime);
             DataStream<CrawlStateUrl> cleanedUrls = newUrlsIteration
             		.keyBy(new UrlKeySelector<RawUrl>())
+            		// TODO LengthenUrlsFunction needs to just pass along invalid URLs
                     .process(new LengthenUrlsFunction(_urlLengthener))
                     .name("LengthenUrlsFunction")
                     .flatMap(new NormalizeUrlsFunction(_urlNormalizer))
                     .name("NormalizeUrlsFunction")
-                    .filter(new ValidUrlsFilter(_urlFilter))
-                    .name("FilterUrlsFunction")
-                    .map(new RawToStateUrlFunction())
+                    .flatMap(new ValidUrlsFilter(_urlFilter))
+                    .name("ValidUrlsFilter")
                     .name("RawToStateUrlFunction");
             
             // Update the Crawl DB, then run URLs it emits through robots filtering.
             IterativeStream<CrawlStateUrl> crawlDbIteration = cleanedUrls.iterate(_maxWaitTime);
             DataStream<Tuple2<CrawlStateUrl, FetchUrl>> postRobotsUrls = crawlDbIteration
-            		.keyBy(new UrlKeySelector<CrawlStateUrl>())
+            		.keyBy(new PldKeySelector<CrawlStateUrl>())
             		.process(new CrawlDBFunction(_crawlDB))
             		.name("CrawlDBFunction")
-            		.keyBy(new UrlKeySelector<FetchUrl>())
+            		.keyBy(new PldKeySelector<FetchUrl>())
                     .process(new CheckUrlWithRobotsFunction(_robotsFetcher, _robotsParser))
                     .name("CheckUrlWithRobotsFunction");
             
@@ -253,7 +254,7 @@ public class CrawlTopology {
 						}
 					})
 					.name("Select passed URLs")
-            		.keyBy(new UrlKeySelector<FetchUrl>())
+            		.keyBy(new PldKeySelector<FetchUrl>())
                     .process(new FetchUrlsFunction(_pageFetcher))
                     .name("FetchUrlsFunction");
             

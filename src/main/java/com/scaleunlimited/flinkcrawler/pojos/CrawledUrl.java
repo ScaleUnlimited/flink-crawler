@@ -1,31 +1,27 @@
 package com.scaleunlimited.flinkcrawler.pojos;
 
 
-public class CrawledUrl {
+@SuppressWarnings("serial")
+public class CrawledUrl extends ValidUrl {
 
-	private String _url;
 	private String _status;		// TODO make this an enum ?
-	private String _pld;
 	private float _actualScore;	// TODO do we maintain separate page and link scores ?
 	private float _estimatedScore;
 	private long _lastFetchedTime;
 	private long _nextFetchTime;
 	
-	public CrawledUrl(String url, String status, String pld, float actualScore, float estimatedScore, long lastFetchedTime, long nextFetchTime) {
-		_url = url;
+	public CrawledUrl() {
+		super();
+	}
+	
+	public CrawledUrl(ValidUrl url, String status, float actualScore, float estimatedScore, long lastFetchedTime, long nextFetchTime) {
+		super(url);
+		
 		_status = status;
-		_pld = pld;
 		_actualScore = actualScore;
 		_estimatedScore = estimatedScore;
 		_lastFetchedTime = lastFetchedTime;
 		_nextFetchTime = nextFetchTime;
-	}
-	
-	public String getUrl() {
-		return _url;
-	}
-	public void setUrl(String url) {
-		_url = url;
 	}
 	
 	public String getStatus() {
@@ -33,14 +29,6 @@ public class CrawledUrl {
 	}
 	public void setStatus(String status) {
 		_status = status;
-	}
-	
-	public String getPLD() {
-		return _pld;
-	}
-	
-	public void setPLD(String pld) {
-		_pld = pld;
 	}
 	
 	public float getActualScore() {
@@ -74,7 +62,5 @@ public class CrawledUrl {
 	public void setNextFetchTime(long nextFetchTime) {
 		_nextFetchTime = nextFetchTime;
 	}
-	
-
 	
 }

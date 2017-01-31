@@ -2,9 +2,9 @@ package com.scaleunlimited.flinkcrawler.pojos;
 
 import java.util.Map;
 
-public class ParsedUrl {
+@SuppressWarnings("serial")
+public class ParsedUrl extends ValidUrl {
 
-	private String _url;
 	private String _hostAddress;
 	private String _parsedText;
 	private String _language;
@@ -12,23 +12,16 @@ public class ParsedUrl {
 	private Map<String, String> _parsedMeta;
 
 	// TODO extend this to include the passed in scores and status as well
-	public ParsedUrl(String url, String hostAddress, String parsedText,
+	public ParsedUrl(ValidUrl url, String hostAddress, String parsedText,
 			String language, String title, Map<String, String> parsedMeta) {
 
-		_url = url;
+		super(url);
+		
 		_hostAddress = hostAddress;
 		_parsedText = parsedText;
 		_language = language;
 		_title = title;
 		_parsedMeta = parsedMeta;
-	}
-
-	public String getUrl() {
-		return _url;
-	}
-
-	public void setUrl(String url) {
-		_url = url;
 	}
 
 	public String getHostAddress() {

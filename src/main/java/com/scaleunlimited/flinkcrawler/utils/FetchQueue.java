@@ -22,7 +22,7 @@ public class FetchQueue {
 		
 		// TODO make this more sophisticated.
 		if ((_fetchQueue.size() < _maxQueueSize) && (status == FetchStatus.UNFETCHED)) {
-			_fetchQueue.add(new FetchUrl(url.getUrl(), url.getPLD(), url.getEstimatedScore(), url.getActualScore()));
+			_fetchQueue.add(new FetchUrl(url, url.getEstimatedScore(), url.getActualScore()));
 			return true;
 		} else {
 			return false;

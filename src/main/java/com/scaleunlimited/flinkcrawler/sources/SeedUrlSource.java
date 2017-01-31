@@ -1,6 +1,5 @@
 package com.scaleunlimited.flinkcrawler.sources;
 
-import java.net.URL;
 import java.util.LinkedList;
 
 import org.apache.flink.configuration.Configuration;
@@ -8,8 +7,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
-
-import crawlercommons.url.PaidLevelDomain;
 
 /**
  * Source for seed URLs
@@ -31,8 +28,7 @@ public class SeedUrlSource extends BaseUrlSource {
 		
 		for (int i = 0; i < rawUrls.length; i++) {
 			String url = rawUrls[i];
-			String pld = PaidLevelDomain.getPLD(new URL(url));
-			_unpartitioned[i] = new RawUrl(url, pld, estimatedScore);
+			_unpartitioned[i] = new RawUrl(url, estimatedScore);
 		}
 	}
 

@@ -9,36 +9,29 @@ import com.scaleunlimited.flinkcrawler.utils.HashUtils;
 
 
 @SuppressWarnings("serial")
-public class CrawlStateUrl extends BaseUrl implements IPayload {
+public class CrawlStateUrl extends ValidUrl implements IPayload {
 
 	// Data needed in-memory for CrawlDB merging
 	private FetchStatus _status;		// TODO make this an enum ?
 	
 	// Data kept in the CrawlDB on-disk payload
-	private String _pld;
 	private float _actualScore;			// TODO do we maintain separate page and link scores ?
 	private float _estimatedScore;
 	private long _lastFetchedTime;
 	private long _nextFetchTime;
 
-	public CrawlStateUrl(String url, FetchStatus status, String pld, float actualScore, float estimatedScore, long lastFetchedTime, long nextFetchTime) {
+	public CrawlStateUrl(ValidUrl url, FetchStatus status, float actualScore, float estimatedScore, long lastFetchedTime, long nextFetchTime) {
 		super(url);
 
 		_status = status;
-		_pld = pld;
 		_actualScore = actualScore;
 		_estimatedScore = estimatedScore;
 		_lastFetchedTime = lastFetchedTime;
 		_nextFetchTime = nextFetchTime;
 	}
 
-	@Override
-	public String getPartitionKey() {
-		return _pld;
-	}
-
 	public long makeKey() {
-		return HashUtils.longHash(_url);
+		return HashUtils.longHash(getUrl());
 	}
 
 	public FetchStatus getStatus() {
@@ -46,14 +39,6 @@ public class CrawlStateUrl extends BaseUrl implements IPayload {
 	}
 	public void setStatus(FetchStatus status) {
 		_status = status;
-	}
-
-	public String getPLD() {
-		return _pld;
-	}
-
-	public void setPLD(String pld) {
-		_pld = pld;
 	}
 
 	public float getActualScore() {
@@ -91,7 +76,7 @@ public class CrawlStateUrl extends BaseUrl implements IPayload {
 	@Override
 	public String toString() {
 		// TODO add more fields to the response.
-		return String.format("%s (%s)", _url, _status);
+		return String.format("%s (%s)", getUrl(), _status);
 	}
 
 	/**
@@ -107,8 +92,7 @@ public class CrawlStateUrl extends BaseUrl implements IPayload {
 	// write the payload fields out
 	@Override
 	public void write(DataOutput out) throws IOException {
-		out.writeUTF(_url);
-		out.writeUTF(_pld);
+		super.write(out);
 		out.writeFloat(_actualScore);
 		out.writeFloat(_estimatedScore);
 		out.writeLong(_lastFetchedTime);
@@ -118,8 +102,7 @@ public class CrawlStateUrl extends BaseUrl implements IPayload {
 	// Read the payload fields in
 	@Override
 	public void readFields(DataInput in) throws IOException {
-		_url = in.readUTF();
-		_pld = in.readUTF();
+		super.readFields(in);
 		_actualScore = in.readFloat();
 		_estimatedScore = in.readFloat();
 		_lastFetchedTime = in.readLong();
@@ -129,8 +112,8 @@ public class CrawlStateUrl extends BaseUrl implements IPayload {
 	// Clear the payload fields
 	@Override
 	public void clear() {
-		_url = null;
-		_pld = null;
+		super.clear();
+		
 		_actualScore = 0.0f;
 		_estimatedScore = 0.0f;
 		_lastFetchedTime = 0;

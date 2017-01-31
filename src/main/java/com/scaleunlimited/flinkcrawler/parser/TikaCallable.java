@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
+import com.scaleunlimited.flinkcrawler.pojos.ValidUrl;
 
 
 class TikaCallable implements Callable<ParserResult> {
@@ -109,7 +110,11 @@ class TikaCallable implements Callable<ParserResult> {
             _parser.parse(_input, teeContentHandler, _metadata, _parseContext);
             
             String lang = _extractLanguage ? detectLanguage(_metadata, profilingHandler) : "";
-            return new ParserResult(new ParsedUrl(_metadata.get(Metadata.RESOURCE_NAME_KEY), null, _contentExtractor.getContent(), lang,
+            
+            // We have to construct a ValidUrl from a string. We know the URL should be valid, so it should never throw
+            // an exception.
+            // TODO get the hostname (currently passing in null)
+            return new ParserResult(new ParsedUrl(new ValidUrl(_metadata.get(Metadata.RESOURCE_NAME_KEY)), null, _contentExtractor.getContent(), lang,
                     _metadata.get(TikaCoreProperties.TITLE), makeMap(_metadata)),
                     _linkExtractor.getLinks());
         } catch (Exception e) {

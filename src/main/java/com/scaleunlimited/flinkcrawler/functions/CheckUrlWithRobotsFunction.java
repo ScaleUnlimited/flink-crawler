@@ -148,9 +148,8 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 	private Tuple2<CrawlStateUrl, FetchUrl> invalidUrl(FetchUrl url) {
 		// TODO log as error, as this should NEVER happen...the URL should be validated by now.
 		long now = System.currentTimeMillis();
-		CrawlStateUrl crawlStateUrl = new CrawlStateUrl(url.getUrl(), 
+		CrawlStateUrl crawlStateUrl = new CrawlStateUrl(url, 
 														FetchStatus.ERROR_INVALID_URL, 
-														url.getPLD(),
 														url.getActualScore(), 
 														url.getEstimatedScore(), 
 														now,
@@ -166,9 +165,8 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 		} else {
 			// FUTURE use time when robot rules expire to set the refetch time.
 			long now = System.currentTimeMillis();
-			CrawlStateUrl crawlStateUrl = new CrawlStateUrl(url.getUrl(), 
+			CrawlStateUrl crawlStateUrl = new CrawlStateUrl(url,
 															rules.isDeferVisits() ? FetchStatus.SKIPPED_DEFERRED : FetchStatus.SKIPPED_BLOCKED, 
-															url.getPLD(),
 															url.getActualScore(), 
 															url.getEstimatedScore(), 
 															now,
@@ -178,10 +176,7 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 	}
 
 	private String makeRobotsKey(FetchUrl url) throws MalformedURLException {
-		String actualUrl = url.getUrl();
-		URL fullUrl = new URL(actualUrl);
-		// TODO should we try to get the default port for the protocol, for cases where getPort returns -1?
-		String robotsKey = String.format("%s://%s%s", fullUrl.getProtocol(), fullUrl.getHost(), fullUrl.getPort() == -1 ? "" : ":" + fullUrl.getPort());
+		String robotsKey = String.format("%s://%s%s", url.getProtocol(), url.getHostname(), url.getPort());
 		return robotsKey;
 	}
 

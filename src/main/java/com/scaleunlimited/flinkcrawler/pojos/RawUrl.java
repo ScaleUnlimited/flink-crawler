@@ -1,41 +1,32 @@
 package com.scaleunlimited.flinkcrawler.pojos;
 
 import java.net.MalformedURLException;
-import java.net.URL;
-
-import crawlercommons.url.PaidLevelDomain;
-
 
 @SuppressWarnings("serial")
 public class RawUrl extends BaseUrl {
 
-	private String _pld;
 	private float _estimatedScore;
-		
-	public RawUrl(String url, float estimatedScore) throws MalformedURLException {
-		this(url, PaidLevelDomain.getPLD(new URL(url)), estimatedScore);
+	
+	public RawUrl() {
+		super();
 	}
-
-	public RawUrl(String url, String pld, float estimatedScore) {
+	
+	public RawUrl(String url) throws MalformedURLException {
+		this(url, 0.0f);
+	}
+	
+	public RawUrl(String url, float estimatedScore) throws MalformedURLException {
 		super(url);
 		
-		_pld = pld;
-		_estimatedScore = estimatedScore;
+		setEstimatedScore(estimatedScore);
 	}
 
-	@Override
-	public String getPartitionKey() {
-		return _pld;
+	public RawUrl(BaseUrl url, float estimatedScore) {
+		super(url.getUrl());
+		
+		setEstimatedScore(estimatedScore);
 	}
 
-	public String getPLD() {
-	    return _pld;
-	}
-	
-	public void setPLD(String pld) {
-	    _pld = pld;
-	}
-	
 	public float getEstimatedScore() {
 		return _estimatedScore;
 	}
@@ -46,7 +37,7 @@ public class RawUrl extends BaseUrl {
 	
 	@Override
 	public String toString() {
-		return _url;
+		return getUrl();
 	}
 	
 }

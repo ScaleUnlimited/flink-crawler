@@ -90,20 +90,19 @@ public class FetchUrlsFunction extends RichProcessFunction<FetchUrl, Tuple2<Craw
 				
 				try {
 					FetchedResult result = _fetcher.get(url.getUrl(), null);
-					FetchedUrl fetchedUrl = new FetchedUrl(result.getBaseUrl(), result.getFetchedUrl(),
+					FetchedUrl fetchedUrl = new FetchedUrl(url, result.getFetchedUrl(),
 														result.getFetchTime(), result.getHeaders(), 
 														result.getContent(), result.getContentType(),
 														result.getResponseRate());
 					
 					LOGGER.info("Fetched " + result);
-					_output.add(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url.getUrl(), FetchStatus.FETCHED, url.getPLD(), 0, 0, fetchedUrl.getFetchTime(), 0L), fetchedUrl));
+					_output.add(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url, FetchStatus.FETCHED, 0, 0, fetchedUrl.getFetchTime(), 0L), fetchedUrl));
 				} catch (HttpFetchException e) {
 					// Generate Tuple2 with fetch status tuple but no FetchedUrl
-					_output.add(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url.getUrl(), ExceptionUtils.mapToFetchStatus(e), url.getPLD(), 0, 0, System.currentTimeMillis(), 0L), null));
+					_output.add(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url, ExceptionUtils.mapToFetchStatus(e), 0, 0, System.currentTimeMillis(), 0L), null));
 				} catch (Exception e) {
 					if (e instanceof BaseFetchException) {
-						BaseFetchException bfe = (BaseFetchException)e;
-						_output.add(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url.getUrl(), ExceptionUtils.mapToFetchStatus(e), url.getPLD(), 0, 0, System.currentTimeMillis(), 0L), null));
+						_output.add(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url, ExceptionUtils.mapToFetchStatus(e), 0, 0, System.currentTimeMillis(), 0L), null));
 					} else {
 						throw new RuntimeException("Exception fetching " + url, e);
 					}

@@ -1,17 +1,11 @@
 package com.scaleunlimited.flinkcrawler.pojos;
 
-import java.net.MalformedURLException;
-import java.net.URL;
-
 import org.apache.tika.metadata.Metadata;
-
-import crawlercommons.url.PaidLevelDomain;
 
 
 @SuppressWarnings("serial")
-public class FetchedUrl extends BaseUrl {
+public class FetchedUrl extends ValidUrl {
 
-	private String _pld;
 	private String _fetchedUrl;
 	private long _fetchTime;
 	private Metadata _headers;
@@ -19,9 +13,10 @@ public class FetchedUrl extends BaseUrl {
 	private String _contentType;
 	private int _responseRate;
 	
-	public FetchedUrl(String url, String fetchedUrl, long fetchTime, Metadata headers,
-			byte[] content, String contentType, int responseRate) throws MalformedURLException {
+	public FetchedUrl(ValidUrl url, String fetchedUrl, long fetchTime, Metadata headers,
+			byte[] content, String contentType, int responseRate) {
 		super(url);
+		
 		_fetchedUrl= fetchedUrl;
 		_fetchTime = fetchTime;
 		_headers = headers;
@@ -29,30 +24,20 @@ public class FetchedUrl extends BaseUrl {
 		_contentType = contentType;
 		_responseRate = responseRate;
 		
-		_pld = PaidLevelDomain.getPLD(new URL(url));
-		
 		// TODO do we need redirects or new baseUrl ?
 	}
 
-	@Override
-	public String getPartitionKey() {
-		return _pld;
-	};
-	
 	public String getFetchedUrl() {
 		return _fetchedUrl;
 	}
-
 
 	public void setFetchedUrl(String fetchedUrl) {
 		_fetchedUrl = fetchedUrl;
 	}
 
-
 	public long getFetchTime() {
 		return _fetchTime;
 	}
-
 
 	public void setFetchTime(long fetchTime) {
 		_fetchTime = fetchTime;
@@ -100,7 +85,7 @@ public class FetchedUrl extends BaseUrl {
 
 	@Override
 	public String toString() {
-		return String.format("%s (%s)", _url, getContentType());
+		return String.format("%s (%s)", getUrl(), getContentType());
 	}
 	
 }

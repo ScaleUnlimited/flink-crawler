@@ -1,27 +1,50 @@
 package com.scaleunlimited.flinkcrawler.pojos;
 
+import java.io.DataInput;
+import java.io.DataOutput;
+import java.io.IOException;
 import java.io.Serializable;
 
 @SuppressWarnings("serial")
 public abstract class BaseUrl implements Serializable {
 	
-	// This is the full URL
-	protected String _url;
-
-	// TODO add protocol, hostname, port, path, etc as pieces.
+	private String _url;
 	
-	// TODO put pld field here.
-	
-	// TODO split up URL. So this will throw a malformed url exception
-	public BaseUrl(String url) {
-		_url = url;
+	public BaseUrl() {
+		// Constructor so it's a valid POJO
 	}
 	
-	// TODO rename asString()
+	public BaseUrl(String urlAsString) {
+		_url = urlAsString;
+	}
+	
+	public BaseUrl(BaseUrl base) {
+		_url = base.getUrl();
+	}
+	
+	public void setUrlAsString(String urlAsString) {
+		_url = urlAsString;
+	}
+	
 	public String getUrl() {
 		return _url;
 	}
 
-	// TODO just return pld here
-	public abstract String getPartitionKey();
+	public void write(DataOutput out) throws IOException {
+		out.writeUTF(_url);
+	}
+
+	public void readFields(DataInput in) throws IOException {
+		_url = in.readUTF();
+	}
+	
+	public void clear() {
+		_url = null;
+	}
+	
+	@Override
+	public String toString() {
+		return _url;
+	}
+
 }
