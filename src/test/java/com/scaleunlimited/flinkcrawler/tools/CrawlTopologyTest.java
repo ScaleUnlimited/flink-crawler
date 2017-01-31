@@ -48,11 +48,16 @@ public class CrawlTopologyTest {
 			.add("domain1.com", "domain1.com/page1", "domain1.com/page2", "domain1.com/blocked")
 			.add("domain1.com/page1")
 			.add("domain1.com/page2", "domain2.com", "domain1.com", "domain1.com/page1")
-			.add("domain2.com", "domain2.com/page1");
+			.add("domain2.com", "domain2.com/page1", "domain3.com")
+			.add("domain3.com", "domain3.com/page1");
 
 		Map<String, String> robotPages = new HashMap<String, String>();
-		robotPages.put("http://domain1.com:80/robots.txt", "User-agent: *" + CRLF + "Disallow: /blocked" + CRLF);
+		// Block one page, and set no crawl delay.
+		robotPages.put("http://domain1.com:80/robots.txt", "User-agent: *" + CRLF + "Disallow: /blocked" + CRLF + "Crawl-delay: 0" + CRLF);
 		
+		// Set a long crawl delay.
+		robotPages.put("http://domain3.com:80/robots.txt", "User-agent: *" + CRLF + "Crawl-delay: 30" + CRLF);
+
 		CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
 			.setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
 			.setUrlLengthener(new SimpleUrlLengthener())
@@ -63,9 +68,10 @@ public class CrawlTopologyTest {
 			.setContentSink(new DiscardingSink<ParsedUrl>())
 			.setUrlNormalizer(normalizer)
 			.setUrlFilter(new SimpleUrlValidator())
-			// You can increase this value from 3000 to say 100000 if you need time inside of a threaded
+			// You can increase this value from 5000 to say 100000 if you need time inside of a threaded
 			// executor before the cluster terminates.
-			.setMaxWaitTime(3000)
+			.setMaxWaitTime(5000)
+			.setDefaultCrawlDelay(0)
 			.setPageFetcher(new WebGraphFetcher(graph));
 
 		CrawlTopology ct = builder.build();
@@ -85,6 +91,8 @@ public class CrawlTopologyTest {
 		String domain1page2 = normalizer.normalize("domain1.com/page2");
 		String domain2page1 = normalizer.normalize("domain2.com/page1");
 		String domain1blockedPage = normalizer.normalize("domain1.com/blocked");
+		String domain3deferredPage = normalizer.normalize("domain3.com/page1");
+		
 		UrlLoggerResults results = new UrlLoggerResults(UrlLogger.getLog());
 		
 		results
@@ -106,6 +114,13 @@ public class CrawlTopologyTest {
 								FetchStatus.class.getSimpleName(), FetchStatus.HTTP_NOT_FOUND.toString())
 			.assertUrlNotLoggedBy(ParseFunction.class, domain2page1)
 			
+			// domain3.com/page1 should be skipped due to crawl-delay.
+			.assertUrlLoggedBy(CheckUrlWithRobotsFunction.class, domain3deferredPage, 1)
+			.assertUrlLoggedBy(FetchUrlsFunction.class, domain3deferredPage, 1)
+			.assertUrlLoggedBy(	CrawlDBFunction.class, domain3deferredPage, 1,
+								FetchStatus.class.getSimpleName(), FetchStatus.SKIPPED_CRAWLDELAY.toString())
+			.assertUrlNotLoggedBy(ParseFunction.class, domain3deferredPage)
+
 			.assertUrlLoggedBy(CheckUrlWithRobotsFunction.class, domain1blockedPage)
 			.assertUrlNotLoggedBy(FetchUrlsFunction.class, domain1blockedPage)
 			.assertUrlNotLoggedBy(ParseFunction.class, domain1blockedPage)

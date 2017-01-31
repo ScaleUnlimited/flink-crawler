@@ -20,6 +20,10 @@ public class CrawlStateUrl extends ValidUrl implements IPayload {
 	private long _lastFetchedTime;
 	private long _nextFetchTime;
 
+	public CrawlStateUrl(FetchUrl url, FetchStatus status, long nextFetchTime) {
+		this(url, status, url.getActualScore(), url.getEstimatedScore(), 0, nextFetchTime);
+	}
+	
 	public CrawlStateUrl(ValidUrl url, FetchStatus status, float actualScore, float estimatedScore, long lastFetchedTime, long nextFetchTime) {
 		super(url);
 

@@ -39,6 +39,7 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 
 	private BaseHttpFetcher _fetcher;
 	private SimpleRobotRulesParser _parser;
+	private long _defaultCrawlDelay;
 	
 	private transient ThreadPoolExecutor _executor;
 
@@ -49,9 +50,10 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 	private transient Map<String, BaseRobotRules> _rules;
 	private transient ConcurrentLinkedQueue<Tuple2<CrawlStateUrl, FetchUrl>> _output;
 	
-	public CheckUrlWithRobotsFunction(BaseHttpFetcher fetcher, SimpleRobotRulesParser parser) {
+	public CheckUrlWithRobotsFunction(BaseHttpFetcher fetcher, SimpleRobotRulesParser parser, long defaultCrawlDelay) {
 		_fetcher = fetcher;
 		_parser = parser;
+		_defaultCrawlDelay = defaultCrawlDelay;
 	}
 	
 	@Override
@@ -155,7 +157,12 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 	private Tuple2<CrawlStateUrl, FetchUrl> processUrl(BaseRobotRules rules, FetchUrl url) {
 		if (rules.isAllowed(url.getUrl())) {
 			// Add the crawl delay to the url, so that it can be used to do delay limiting in the fetcher
-			url.setCrawlDelay(rules.getCrawlDelay());
+			long crawlDelay = rules.getCrawlDelay();
+			if (crawlDelay == BaseRobotRules.UNSET_CRAWL_DELAY) {
+				crawlDelay = _defaultCrawlDelay;
+			}
+			
+			url.setCrawlDelay(crawlDelay);
 			return new Tuple2<CrawlStateUrl, FetchUrl>(null, url);
 		} else {
 			// FUTURE use time when robot rules expire to set the refetch time.

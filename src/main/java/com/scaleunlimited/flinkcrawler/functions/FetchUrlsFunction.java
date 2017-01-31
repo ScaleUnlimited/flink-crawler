@@ -2,8 +2,10 @@ package com.scaleunlimited.flinkcrawler.functions;
 
 import com.scaleunlimited.flinkcrawler.utils.ExceptionUtils;
 
+import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -25,6 +27,7 @@ import crawlercommons.fetcher.BaseFetchException;
 import crawlercommons.fetcher.FetchedResult;
 import crawlercommons.fetcher.HttpFetchException;
 import crawlercommons.fetcher.http.BaseHttpFetcher;
+import crawlercommons.robots.BaseRobotRules;
 
 
 
@@ -45,6 +48,9 @@ public class FetchUrlsFunction extends RichProcessFunction<FetchUrl, Tuple2<Craw
 	private transient ConcurrentLinkedQueue<Tuple2<CrawlStateUrl, FetchedUrl>> _output;
 	private transient ThreadPoolExecutor _executor;
 	
+	// TODO use native String->long map
+	private transient Map<String, Long> _nextFetch;
+
 	/**
 	 * Returns a Tuple2 of the CrawlStateUrl and FetchedUrl. In the case of an error while fetching
 	 * the FetchedUrl is set to null.
@@ -58,6 +64,7 @@ public class FetchUrlsFunction extends RichProcessFunction<FetchUrl, Tuple2<Craw
 	public void open(Configuration parameters) throws Exception {
 		super.open(parameters);
 		
+		_nextFetch = new ConcurrentHashMap<>();
 		_output = new ConcurrentLinkedQueue<>();
 		
 		BlockingQueue<Runnable> workQueue = new ArrayBlockingQueue<>(MAX_QUEUED_URLS);
@@ -81,11 +88,36 @@ public class FetchUrlsFunction extends RichProcessFunction<FetchUrl, Tuple2<Craw
 		UrlLogger.record(this.getClass(), url);
 		
 		// TODO immediately skip the URL if the crawl delay hasn't been long enough for this domain. Note that since robots.txt
-		// is sub-domain specific, we have to use the whole domain, not just the PLD.
+		// is sub-domain (and port) specific, we have to use the whole domain and port, not just the PLD.
+		final String domainKey = String.format("%s://%s:%d", url.getProtocol(), url.getHostname(), url.getPort());
+		Long nextFetchTime = _nextFetch.get(domainKey);
+		if ((nextFetchTime != null) && (System.currentTimeMillis() < nextFetchTime)) {
+			LOGGER.debug("Skipping (crawl-delay) " + url);
+			_output.add(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url, FetchStatus.SKIPPED_CRAWLDELAY, nextFetchTime), null));
+			return;
+		}
+		
 		_executor.execute(new Runnable() {
 			
 			@Override
 			public void run() {
+				// We need to get a lock on the fetchTime, even though it's concurrent, so that if we add an entry, nobody else is also adding
+				// an entry.
+				synchronized (_nextFetch) {
+					// See if there's been an update since we checked, which might block us.
+					Long nextFetchTime = _nextFetch.get(domainKey);
+					long currentTime = System.currentTimeMillis();
+					if ((nextFetchTime != null) && (currentTime < nextFetchTime)) {
+						LOGGER.debug("Skipping (crawl-delay) " + url);
+						_output.add(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url, FetchStatus.SKIPPED_CRAWLDELAY, nextFetchTime), null));
+						return;
+					}
+					
+					// We know the next fetch time now.
+					// FUTURE - this might not be right, as we could wind up taking a long time to fetch the page.
+					_nextFetch.put(domainKey, currentTime + url.getCrawlDelay());
+				}
+				
 				LOGGER.debug("Fetching " + url);
 				
 				try {
