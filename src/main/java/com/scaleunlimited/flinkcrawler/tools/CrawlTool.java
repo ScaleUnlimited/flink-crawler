@@ -10,8 +10,6 @@ import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.crawldb.InMemoryCrawlDB;
 import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
@@ -28,7 +26,6 @@ import crawlercommons.fetcher.http.SimpleHttpFetcher;
 import crawlercommons.fetcher.http.UserAgent;
 
 public class CrawlTool {
-	private static final Logger LOGGER = LoggerFactory.getLogger(CrawlTool.class);
 
 	static class CrawlToolOptions {
 	    private String _urlsFilename;
@@ -57,7 +54,7 @@ public class CrawlTool {
         try {
             parser.parseArgument(args);
         } catch (CmdLineException e) {
-            LOGGER.error(e.getMessage());
+            System.err.println(e.getMessage());
             printUsageAndExit(parser);
         }
 
@@ -89,7 +86,7 @@ public class CrawlTool {
 			
 			builder.build().execute();
 		} catch (Throwable t) {
-			LOGGER.error("Error running CrawlTool: " + t.getMessage());
+			System.err.println("Error running CrawlTool: " + t.getMessage());
 			t.printStackTrace(System.err);
 			System.exit(-1);
 		}
