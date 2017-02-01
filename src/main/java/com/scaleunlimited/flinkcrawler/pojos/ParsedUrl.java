@@ -5,31 +5,21 @@ import java.util.Map;
 @SuppressWarnings("serial")
 public class ParsedUrl extends ValidUrl {
 
-	private String _hostAddress;
 	private String _parsedText;
 	private String _language;
 	private String _title;
 	private Map<String, String> _parsedMeta;
 
 	// TODO extend this to include the passed in scores and status as well
-	public ParsedUrl(ValidUrl url, String hostAddress, String parsedText,
+	public ParsedUrl(ValidUrl url, String parsedText,
 			String language, String title, Map<String, String> parsedMeta) {
 
 		super(url);
 		
-		_hostAddress = hostAddress;
 		_parsedText = parsedText;
 		_language = language;
 		_title = title;
 		_parsedMeta = parsedMeta;
-	}
-
-	public String getHostAddress() {
-		return _hostAddress;
-	}
-
-	public void setHostAddress(String hostAddress) {
-		_hostAddress = hostAddress;
 	}
 
 	public String getParsedText() {

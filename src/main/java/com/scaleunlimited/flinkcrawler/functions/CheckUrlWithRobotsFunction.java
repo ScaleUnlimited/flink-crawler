@@ -143,7 +143,6 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 	}
 
 	private Tuple2<CrawlStateUrl, FetchUrl> invalidUrl(FetchUrl url) {
-		// TODO log as error, as this should NEVER happen...the URL should be validated by now.
 		long now = System.currentTimeMillis();
 		CrawlStateUrl crawlStateUrl = new CrawlStateUrl(url, 
 														FetchStatus.ERROR_INVALID_URL, 

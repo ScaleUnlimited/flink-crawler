@@ -113,8 +113,8 @@ class TikaCallable implements Callable<ParserResult> {
             
             // We have to construct a ValidUrl from a string. We know the URL should be valid, so it should never throw
             // an exception.
-            // TODO get the hostname (currently passing in null)
-            return new ParserResult(new ParsedUrl(new ValidUrl(_metadata.get(Metadata.RESOURCE_NAME_KEY)), null, _contentExtractor.getContent(), lang,
+            ValidUrl parsedUrl = new ValidUrl(_metadata.get(Metadata.RESOURCE_NAME_KEY));
+            return new ParserResult(new ParsedUrl(parsedUrl, _contentExtractor.getContent(), lang,
                     _metadata.get(TikaCoreProperties.TITLE), makeMap(_metadata)),
                     _linkExtractor.getLinks());
         } catch (Exception e) {
