@@ -4,7 +4,6 @@ import java.io.File;
 import java.util.List;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.kohsuke.args4j.CmdLineException;
@@ -106,6 +105,7 @@ public class CrawlTool {
 		try {
 			StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 			
+			UserAgent userAgent = new UserAgent("flink-crawler", "flink-crawler@scaleunlimited.com", "https://github.com/ScaleUnlimited/flink-crawler/wiki/Crawler-Policy");
 			
 			SimpleUrlValidator urlValidator =
 				(	options.isSingleDomain() ?
@@ -115,13 +115,13 @@ public class CrawlTool {
 				.setUrlSource(createSeedUrlSource(seedUrlsFile))
 				.setCrawlDB(new InMemoryCrawlDB())
 				.setUrlLengthener(new SimpleUrlLengthener())
-				.setRobotsFetcher(new SimpleHttpFetcher(new UserAgent("bogus", "bogus@domain.com", "http://domain.com")))
+				.setRobotsFetcher(new SimpleHttpFetcher(userAgent))
 				.setRobotsParser(new SimpleRobotRulesParser())
 				.setPageParser(new SimplePageParser())
 				.setContentSink(new DiscardingSink<ParsedUrl>())
 				.setUrlNormalizer(new SimpleUrlNormalizer())
 				.setUrlFilter(urlValidator)
-				.setPageFetcher(new SimpleHttpFetcher(new UserAgent("bogus", "bogus@domain.com", "http://domain.com")));
+				.setPageFetcher(new SimpleHttpFetcher(userAgent));
 			
 			builder.build().execute();
 		} catch (Throwable t) {
