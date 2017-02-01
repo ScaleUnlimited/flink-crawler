@@ -1,6 +1,5 @@
 package com.scaleunlimited.flinkcrawler.pojos;
 
-import java.net.MalformedURLException;
 
 
 @SuppressWarnings("serial")
@@ -10,7 +9,7 @@ public class ExtractedUrl extends BaseUrl {
     private String _relAttributes;
     // TODO does an outlink get an estimated score to begin with ?
 
-    public ExtractedUrl(String url, String anchorText, String relAttributes) throws MalformedURLException {
+    public ExtractedUrl(String url, String anchorText, String relAttributes) {
     	super(url);
     	
         _anchorText = anchorText;

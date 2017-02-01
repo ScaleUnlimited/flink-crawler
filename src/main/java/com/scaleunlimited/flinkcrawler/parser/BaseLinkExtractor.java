@@ -1,20 +1,23 @@
 package com.scaleunlimited.flinkcrawler.parser;
 
 import java.io.Serializable;
-import java.net.MalformedURLException;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
 import com.scaleunlimited.flinkcrawler.config.ParserPolicy;
+import com.scaleunlimited.flinkcrawler.crawldb.InMemoryCrawlDB;
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
 
 
 @SuppressWarnings("serial")
 public abstract class BaseLinkExtractor extends DefaultHandler implements Serializable {
+    static final Logger LOGGER = LoggerFactory.getLogger(InMemoryCrawlDB.class);
 
     public static final Set<String> DEFAULT_LINK_TAGS =
         new HashSet<String>() {{
@@ -132,13 +135,8 @@ public abstract class BaseLinkExtractor extends DefaultHandler implements Serial
         super.endElement(uri, localName, name);
 
         if (localName.equalsIgnoreCase(_inAnchorTag)) {
-            try {
-				addLink(new ExtractedUrl(_curUrl, _curAnchor.toString(), _curRelAttributes));
-			} catch (MalformedURLException e) {
-				// TODO LOG the issue, keep going.
-			}
-            
-            _inAnchorTag = null;
+        	addLink(new ExtractedUrl(_curUrl, _curAnchor.toString(), _curRelAttributes));
+        	_inAnchorTag = null;
         }
     }
 
