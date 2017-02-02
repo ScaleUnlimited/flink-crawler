@@ -62,7 +62,7 @@ public class CrawlTopologyTest {
 			.setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
 			.setUrlLengthener(new SimpleUrlLengthener())
 			.setCrawlDB(new InMemoryCrawlDB())
-			.setRobotsFetcher(new MockRobotsFetcher(robotPages))
+			.setRobotsFetcherBuilder(new MockRobotsFetcher.MockRobotsFetcherBuilder(new MockRobotsFetcher(robotPages)))
 			.setRobotsParser(new SimpleRobotRulesParser())
 			.setPageParser(new SimplePageParser())
 			.setContentSink(new DiscardingSink<ParsedUrl>())
@@ -72,7 +72,7 @@ public class CrawlTopologyTest {
 			// executor before the cluster terminates.
 			.setMaxWaitTime(5000)
 			.setDefaultCrawlDelay(0)
-			.setPageFetcher(new WebGraphFetcher(graph));
+			.setPageFetcherBuilder(new WebGraphFetcher.WebGraphFetcherBuilder(new WebGraphFetcher(graph)));
 
 		CrawlTopology ct = builder.build();
 		

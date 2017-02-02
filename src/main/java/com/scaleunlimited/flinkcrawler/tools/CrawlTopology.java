@@ -18,6 +18,7 @@ import org.apache.flink.streaming.api.datastream.SplitStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 
+import com.scaleunlimited.flinkcrawler.config.BaseHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDB;
 import com.scaleunlimited.flinkcrawler.functions.CheckUrlWithRobotsFunction;
 import com.scaleunlimited.flinkcrawler.functions.CrawlDBFunction;
@@ -91,14 +92,14 @@ public class CrawlTopology {
 
         private BaseCrawlDB _crawlDB;
         
-        private BaseHttpFetcher _robotsFetcher;
+        private BaseHttpFetcherBuilder _robotsFetcherBuilder;
         private SimpleRobotRulesParser _robotsParser;
 
         private BaseUrlLengthener _urlLengthener;
         private SinkFunction<ParsedUrl> _contentSink;
         private BaseUrlNormalizer _urlNormalizer;
         private BaseUrlValidator _urlFilter;
-        private BaseHttpFetcher _pageFetcher;
+        private BaseHttpFetcherBuilder _pageFetcherBuilder;
         private BasePageParser _pageParser;
 
         public CrawlTopologyBuilder(StreamExecutionEnvironment env) {
@@ -135,8 +136,8 @@ public class CrawlTopology {
             return this;
         }
 
-        public CrawlTopologyBuilder setRobotsFetcher(BaseHttpFetcher robotsFetcher) {
-            _robotsFetcher = robotsFetcher;
+        public CrawlTopologyBuilder setRobotsFetcherBuilder(BaseHttpFetcherBuilder robotsFetcherBuilder) {
+            _robotsFetcherBuilder = robotsFetcherBuilder;
             return this;
         }
 
@@ -145,8 +146,8 @@ public class CrawlTopology {
             return this;
         }
 
-        public CrawlTopologyBuilder setPageFetcher(BaseHttpFetcher pageFetcher) {
-            _pageFetcher = pageFetcher;
+        public CrawlTopologyBuilder setPageFetcherBuilder(BaseHttpFetcherBuilder pageFetcherBuilder) {
+            _pageFetcherBuilder = pageFetcherBuilder;
             return this;
         }
 
@@ -214,7 +215,7 @@ public class CrawlTopology {
             		.process(new CrawlDBFunction(_crawlDB))
             		.name("CrawlDBFunction")
             		.keyBy(new PldKeySelector<FetchUrl>())
-                    .process(new CheckUrlWithRobotsFunction(_robotsFetcher, _robotsParser, _defaultCrawlDelay))
+                    .process(new CheckUrlWithRobotsFunction(_robotsFetcherBuilder, _robotsParser, _defaultCrawlDelay))
                     .name("CheckUrlWithRobotsFunction");
             
             // Split this stream into passed and blocked.
@@ -261,7 +262,7 @@ public class CrawlTopology {
 					})
 					.name("Select passed URLs")
             		.keyBy(new PldKeySelector<FetchUrl>())
-                    .process(new FetchUrlsFunction(_pageFetcher))
+                    .process(new FetchUrlsFunction(_pageFetcherBuilder))
                     .name("FetchUrlsFunction");
             
             // Split the fetchedUrls so that we can parse the ones we have actually fetched versus

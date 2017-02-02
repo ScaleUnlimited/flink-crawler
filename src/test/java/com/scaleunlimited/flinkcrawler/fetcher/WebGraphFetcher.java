@@ -6,6 +6,7 @@ import java.util.Iterator;
 import org.apache.http.HttpStatus;
 import org.apache.tika.metadata.Metadata;
 
+import com.scaleunlimited.flinkcrawler.config.BaseHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.webgraph.BaseWebGraph;
 
@@ -35,6 +36,21 @@ public class WebGraphFetcher extends BaseHttpFetcher {
 	private static final Charset UTF_8 = Charset.forName("UTF-8");
 	
 	private BaseWebGraph _graph;
+	
+	public static class WebGraphFetcherBuilder extends BaseHttpFetcherBuilder {
+		private WebGraphFetcher _fetcher;
+
+		public WebGraphFetcherBuilder(WebGraphFetcher fetcher) {
+			super(fetcher.getMaxThreads(), fetcher.getUserAgent());
+			_fetcher = fetcher;
+		}
+
+		@Override
+		public BaseHttpFetcher build() {
+			return _fetcher;
+		}
+
+	}
 	
 	public WebGraphFetcher(BaseWebGraph graph) {
 		super(1, new UserAgent("WebGraphFetcher", "flink-crawler@scaleunlimited.com", "http://www.scaleunlimited.com"));
