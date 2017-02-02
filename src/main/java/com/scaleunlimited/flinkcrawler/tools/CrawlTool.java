@@ -1,11 +1,8 @@
 package com.scaleunlimited.flinkcrawler.tools;
 
-import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.List;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.kohsuke.args4j.CmdLineException;
@@ -16,7 +13,6 @@ import com.scaleunlimited.flinkcrawler.config.SimpleHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.crawldb.InMemoryCrawlDB;
 import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
-import com.scaleunlimited.flinkcrawler.sources.BaseUrlSource;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
 import com.scaleunlimited.flinkcrawler.tools.CrawlTopology.CrawlTopologyBuilder;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlLengthener;
@@ -96,6 +92,7 @@ public class CrawlTool {
         } catch (MalformedURLException e) {
             return false;
         }
+        
         return false;
     }
     
@@ -133,14 +130,6 @@ public class CrawlTool {
 
 		// Generate topology, run it
         
-        
-        // TODO For now assume seedUrlsFile is a local file - this needs to change to handle 
-        // other file systems in the future.
-        File seedUrlsFile = new File(options.getSeedUrlsFilename());
-		if (!seedUrlsFile.exists()) {
-			throw new RuntimeException("Seed urls file doesn't exist :" + seedUrlsFile.getAbsolutePath());
-		}
-		
 		try {
 			StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 			
@@ -150,8 +139,9 @@ public class CrawlTool {
 				(	options.isSingleDomain() ?
 					new SingleDomainUrlValidator(options.getSingleDomain())
 				:	new SimpleUrlValidator());
+			
 			CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
-				.setUrlSource(createSeedUrlSource(seedUrlsFile))
+				.setUrlSource(new SeedUrlSource(1.0f, options.getSeedUrlsFilename()))
 				.setCrawlDB(new InMemoryCrawlDB())
 				.setUrlLengthener(new SimpleUrlLengthener())
 				.setRobotsFetcherBuilder(new SimpleHttpFetcherBuilder(userAgent))
@@ -167,17 +157,6 @@ public class CrawlTool {
 			System.err.println("Error running CrawlTool: " + t.getMessage());
 			t.printStackTrace(System.err);
 			System.exit(-1);
-		}
-	}
-
-
-	private static BaseUrlSource createSeedUrlSource(File seedUrlsFile) {
-		try {
-			// TODO Need to handle trim, skip commented lines, etc
-			List<String> rawUrls = FileUtils.readLines(seedUrlsFile);
-			return new SeedUrlSource(1.0f, rawUrls.toArray(new String[rawUrls.size()]));
-		} catch (Exception e) {
-			throw new RuntimeException("Unexpected error reading seed urls file :", e);
 		}
 	}
 

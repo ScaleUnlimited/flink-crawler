@@ -37,6 +37,7 @@ under the License.
 		<log4j.version>1.2.17</log4j.version>
 		<crawlercommons.version>0.6</crawlercommons.version>
 		<http-fetcher.version>0.1-SNAPSHOT</http-fetcher.version>
+		<aws-java-sdk.version>1.11.86</aws-java-sdk.version>
 		
 		<javac.src.version>1.7</javac.src.version>
 		<javac.target.version>1.7</javac.target.version>
@@ -126,6 +127,12 @@ under the License.
 			<groupId>com.github.crawler-commons</groupId>
 			<artifactId>http-fetcher</artifactId>
 			<version>${http-fetcher.version}</version>
+		</dependency>
+		
+		<dependency>
+			<groupId>com.amazonaws</groupId>
+			<artifactId>aws-java-sdk-s3</artifactId>
+			<version>${aws-java-sdk.version}</version>
 		</dependency>
 		
 		<dependency>
