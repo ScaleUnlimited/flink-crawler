@@ -41,7 +41,15 @@ public class SeedUrlSource extends BaseUrlSource {
 	private volatile boolean _keepRunning = false;
 	private transient int _seedUrlIndex;
 
-	public SeedUrlSource(float estimatedScore, String seedUrlsFilename) throws Exception {
+	/**
+	 * Note that we re-order parameters so this doesn't get confused with the constructor that
+	 * takes a variable length array of urls.
+	 * 
+	 * @param seedUrlsFilename
+	 * @param estimatedScore
+	 * @throws Exception
+	 */
+	public SeedUrlSource(String seedUrlsFilename, float estimatedScore) throws Exception {
 		_estimatedScore = estimatedScore;
 		
 		// If it's an S3 file, we delay processing until we're running, as the file could be really
