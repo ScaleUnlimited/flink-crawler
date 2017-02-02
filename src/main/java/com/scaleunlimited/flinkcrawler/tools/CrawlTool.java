@@ -9,6 +9,7 @@ import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 
+import com.scaleunlimited.flinkcrawler.config.SimpleHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.crawldb.InMemoryCrawlDB;
 import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
@@ -143,13 +144,13 @@ public class CrawlTool {
 				.setUrlSource(new SeedUrlSource(1.0f, options.getSeedUrlsFilename()))
 				.setCrawlDB(new InMemoryCrawlDB())
 				.setUrlLengthener(new SimpleUrlLengthener())
-				.setRobotsFetcher(new SimpleHttpFetcher(userAgent))
+				.setRobotsFetcherBuilder(new SimpleHttpFetcherBuilder(userAgent))
 				.setRobotsParser(new SimpleRobotRulesParser())
 				.setPageParser(new SimplePageParser())
 				.setContentSink(new DiscardingSink<ParsedUrl>())
 				.setUrlNormalizer(new SimpleUrlNormalizer())
 				.setUrlFilter(urlValidator)
-				.setPageFetcher(new SimpleHttpFetcher(userAgent));
+				.setPageFetcherBuilder(new SimpleHttpFetcherBuilder(userAgent));
 			
 			builder.build().execute();
 		} catch (Throwable t) {

@@ -7,6 +7,8 @@ import java.util.Map;
 import org.apache.http.HttpStatus;
 import org.apache.tika.metadata.Metadata;
 
+import com.scaleunlimited.flinkcrawler.config.BaseHttpFetcherBuilder;
+
 import crawlercommons.fetcher.BaseFetchException;
 import crawlercommons.fetcher.FetchedResult;
 import crawlercommons.fetcher.Payload;
@@ -16,6 +18,21 @@ import crawlercommons.fetcher.http.UserAgent;
 @SuppressWarnings("serial")
 public class MockRobotsFetcher extends BaseHttpFetcher {
 
+	public static class MockRobotsFetcherBuilder extends BaseHttpFetcherBuilder {
+		private MockRobotsFetcher _fetcher;
+
+		public MockRobotsFetcherBuilder(MockRobotsFetcher fetcher) {
+			super(fetcher.getMaxThreads(), fetcher.getUserAgent());
+			_fetcher = fetcher;
+		}
+
+		@Override
+		public BaseHttpFetcher build() {
+			return _fetcher;
+		}
+
+	}
+	
 	private Map<String, String> _robotPages;
 	
 	public MockRobotsFetcher() {
@@ -23,8 +40,12 @@ public class MockRobotsFetcher extends BaseHttpFetcher {
 	}
 	
 	public MockRobotsFetcher(Map<String, String> robotPages) {
-		super(1, new UserAgent("mock-robots-fetcher", "user@domain.com", "http://domain.com"));
+		super(1, makeUserAgent());
 		_robotPages = robotPages;
+	}
+
+	public static UserAgent makeUserAgent() {
+		return new UserAgent("mock-robots-fetcher", "user@domain.com", "http://domain.com");
 	}
 	
 	@Override

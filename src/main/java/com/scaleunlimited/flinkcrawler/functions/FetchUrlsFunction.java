@@ -17,6 +17,7 @@ import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.scaleunlimited.flinkcrawler.config.BaseHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
@@ -43,6 +44,7 @@ public class FetchUrlsFunction extends RichProcessFunction<FetchUrl, Tuple2<Craw
 	// TODO pick good time for this
 	private static final long QUEUE_CHECK_DELAY = 10;
 
+	private BaseHttpFetcherBuilder _fetcherBuilder;
 	private BaseHttpFetcher _fetcher;
 	
 	private transient ConcurrentLinkedQueue<Tuple2<CrawlStateUrl, FetchedUrl>> _output;
@@ -54,16 +56,17 @@ public class FetchUrlsFunction extends RichProcessFunction<FetchUrl, Tuple2<Craw
 	/**
 	 * Returns a Tuple2 of the CrawlStateUrl and FetchedUrl. In the case of an error while fetching
 	 * the FetchedUrl is set to null.
-	 * @param fetcher
+	 * @param fetcherBuider
 	 */
-	public FetchUrlsFunction(BaseHttpFetcher fetcher) {
-		_fetcher = fetcher;
+	public FetchUrlsFunction(BaseHttpFetcherBuilder fetcherBuilder) {
+		_fetcherBuilder = fetcherBuilder;
 	}
 
 	@Override
 	public void open(Configuration parameters) throws Exception {
 		super.open(parameters);
 		
+		_fetcher = _fetcherBuilder.build();
 		_nextFetch = new ConcurrentHashMap<>();
 		_output = new ConcurrentLinkedQueue<>();
 		

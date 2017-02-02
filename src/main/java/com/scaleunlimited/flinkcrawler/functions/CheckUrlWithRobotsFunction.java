@@ -15,6 +15,7 @@ import org.apache.flink.streaming.api.functions.RichProcessFunction;
 import org.apache.flink.util.Collector;
 import org.apache.http.HttpStatus;
 
+import com.scaleunlimited.flinkcrawler.config.BaseHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
@@ -37,6 +38,7 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 	private static final int MIN_THREAD_COUNT = 10;
 	private static final int MAX_THREAD_COUNT = 100;
 
+	private BaseHttpFetcherBuilder _fetcherBuilder;
 	private BaseHttpFetcher _fetcher;
 	private SimpleRobotRulesParser _parser;
 	private long _defaultCrawlDelay;
@@ -50,8 +52,8 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 	private transient Map<String, BaseRobotRules> _rules;
 	private transient ConcurrentLinkedQueue<Tuple2<CrawlStateUrl, FetchUrl>> _output;
 	
-	public CheckUrlWithRobotsFunction(BaseHttpFetcher fetcher, SimpleRobotRulesParser parser, long defaultCrawlDelay) {
-		_fetcher = fetcher;
+	public CheckUrlWithRobotsFunction(BaseHttpFetcherBuilder fetcherBuider, SimpleRobotRulesParser parser, long defaultCrawlDelay) {
+		_fetcherBuilder = fetcherBuider;
 		_parser = parser;
 		_defaultCrawlDelay = defaultCrawlDelay;
 	}
@@ -60,6 +62,7 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 	public void open(Configuration parameters) throws Exception {
 		super.open(parameters);
 		
+		_fetcher = _fetcherBuilder.build();
 		_output = new ConcurrentLinkedQueue<>();
 		_rules = new ConcurrentHashMap<>();
 		
