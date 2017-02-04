@@ -7,51 +7,53 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.PriorityQueue;
-
-import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 
 /**
  * A DrumMap implements the DRUM storage system as described by the IRLBot paper
  * (see http://irl.cs.tamu.edu/people/hsin-tsang/papers/www2008.pdf)
  * 
  * There's an in-memory array of new key/value pairs, where the key is an 8-byte
- * (long) hash, the value is an (optional) Object of any time, and there's an
- * additional offset into a separate "payload" file, where associated data is kept.
+ * (long) hash, the value is 16 bytes of additional data, and there's an
+ * additional 8-byte offset into a separate "payload" file, where associated data
+ * is kept. For our use case the hash is generated from the URL, the value is
+ * the URL status, score(s), next fetch time, and the payload is the actual URL.
  * 
- * We don't bother de-duping keys as they're added. When the array is full, we'll
- * sort, and then (TODO) dedup if there are enough duplicate entries, otherwise
- * it's time for a merge.
+ * So each entry is 32 bytes of data. This of course requires that the value
+ * (URL status info) fits in 16 bytes - if not, we'd have to expand this.
  * 
- * During de-duplication, a provided DrumEntryMerger class is called to merge the
- * old and new entries. The results might be to ignore the new entry,
- * replace the old entry, or update the old entry with the value and/or the payload
- * from the new entry.
+ * We store this data in a single large byte[], and have a separate
+ * int[] of offsets into the 32-byte "entries" stored in the byte array. This
+ * array of int offsets is what we sort (by hash) before doing  merge (see below).
+ * We don't bother doing any de-duplication while adding values; this happens
+ * during the merge.
  * 
- * When the in-memory array of entries is full, or there's an external trigger, then
- * a merge happens with an on-disk version of the in-memory map, and a separate/associated
- * payload file. During this merge the DrumMap is still usable, as a new in-memory array
+ * A merge is triggered when our array is full, or more URLs are needed for
+ * fetching, or we're shutting down and have to persist state. The merge
+ * process first sorts the in-memory array by hash, then (if it exists) does
+ * a merge with the (sorted) "active" URLs data stored on disk as two files;
+ * one is for the key/value map, and the other is for the payload. Since the
+ * "active" URLs data is also sorted, the merge allocates a small buffer that
+ * is used to read in chunks of the key/value pairs, which are then merged
+ * with the in-memory URLs.
+ * 
+ * A "merger" class is called to handle URL merging. The result of the merge
+ * is classified as either "fetch" (add to fetch queue and put in active list),
+ * "active" (only put in active list), or "archive" (add to separate archive
+ * data). We archive URLs that have too low of a score (can be calculated many
+ * ways) so that they don't clog up processing; this lets us keep the active
+ * data set to a reasonable size, so merging doesn't take forever.
+ * 
+ * The score threshold for fetch vs. active vs. archive is something we probably
+ * want to make dynamic. We'd start with a guesstimate, and adjust as we process
+ * entries to give us the target max # of entries to fetch vs keep active vs.
+ * archive (or could be percentages).
+ * 
+ * During this merge the DrumMap is still usable, as a new in-memory array
  * is allocated, along with a new payload file.
  * 
- * The saved key/value and payload data is sorted by hash as well, so the merge operation
- * allocates a small buffer that is used to read in chunks of the key/value pairs, which
- * are then merged (using the same logic as when adding an existing entry to the in-memory
- * array). The merged results are written to a new key/value file, while new/merged
- * payloads are written to the end of the existing payload file.
- * 
- * During the merge, a DrumMapSplitter is called to decide on what to do with merged
- * entries. The three possibilities are "active" (as described above), "fetch" (which
- * writes to active and also puts the entry in a fetch queue), and "archive" (which
- * write to archives key/value and payload files).
- * 
- * TODO - decide about whether to keep the 'value' as a fixed number of bytes (e.g. 32)
- * We could have an int offset (or index) to the value in the actual map, which is-1 if no value.
- * So that way we avoid lots of objects being allocated. But all state required for
- * merging CrawlDBUrl (doesn't exist yet, but it should) would have to fit in that fixed
- * size. Merging code would treat the 'no value' case as what everything should be for
- * a new outlink with a score below some threshold, as that's what most URLs will be.
- * Hmm, we could have variable size values (e.g. nothing, vs just a score) so that every
- * new URL could have a score, but if there's no other state then we avoid storing that data.
+ * TODO - we could make the data variable size (adds a byte for the length), so
+ * that when we get a new URL (outlink) it's stored with just the hash and the
+ * offset into the payload file (thus taking up less space).
  * 
  */
 public class DrumMap implements Closeable {
