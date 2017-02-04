@@ -7,7 +7,6 @@ import org.apache.http.HttpStatus;
 import org.apache.tika.metadata.Metadata;
 
 import com.scaleunlimited.flinkcrawler.config.BaseHttpFetcherBuilder;
-import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.webgraph.BaseWebGraph;
 
 import crawlercommons.fetcher.AbortedFetchException;

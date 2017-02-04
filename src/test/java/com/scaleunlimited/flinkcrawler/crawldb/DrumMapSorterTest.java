@@ -1,10 +1,8 @@
 package com.scaleunlimited.flinkcrawler.crawldb;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 import org.junit.Test;
-
-import com.scaleunlimited.flinkcrawler.crawldb.DrumMapSorter;
 
 public class DrumMapSorterTest {
 

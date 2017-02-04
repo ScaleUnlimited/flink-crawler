@@ -43,7 +43,6 @@ import com.scaleunlimited.flinkcrawler.urls.BaseUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlValidator;
 import com.scaleunlimited.flinkcrawler.utils.FlinkUtils;
 
-import crawlercommons.fetcher.http.BaseHttpFetcher;
 import crawlercommons.robots.SimpleRobotRulesParser;
 
 /**
