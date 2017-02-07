@@ -19,7 +19,6 @@ import com.scaleunlimited.flinkcrawler.urls.SimpleUrlLengthener;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlValidator;
 
-import crawlercommons.fetcher.http.SimpleHttpFetcher;
 import crawlercommons.fetcher.http.UserAgent;
 import crawlercommons.robots.SimpleRobotRulesParser;
 import crawlercommons.url.PaidLevelDomain;
@@ -29,6 +28,7 @@ public class CrawlTool {
 	static class CrawlToolOptions {
 	    private String _urlsFilename;
 	    private String _singleDomain;
+        private long _defaultCrawlDelay = 10 * 1000L;
 
 		@Option(name = "-seedurls", usage = "text file containing list of seed urls", required = true)
 	    public void setSeedUrlsFilename(String urlsFilename) {
@@ -38,6 +38,11 @@ public class CrawlTool {
 		@Option(name = "-singledomain", usage = "only fetch URLs within this domain (and its sub-domains)", required = false)
 	    public void setSingleDomain(String urlsFilename) {
 			_singleDomain = urlsFilename;
+	    }
+		
+		@Option(name = "-defaultcrawldelay", usage = "use this crawl delay when robots.txt doesn't provide this", required = false)
+	    public void setDefaultCrawlDelay(long defaultCrawlDelay) {
+			_defaultCrawlDelay = defaultCrawlDelay;
 	    }
 		
 		
@@ -51,6 +56,10 @@ public class CrawlTool {
 		
 		public String getSingleDomain() {
 			return _singleDomain;
+		}
+		
+		public long getDefaultCrawlDelay() {
+			return _defaultCrawlDelay;
 		}
 	}
 	
@@ -150,7 +159,8 @@ public class CrawlTool {
 				.setContentSink(new DiscardingSink<ParsedUrl>())
 				.setUrlNormalizer(new SimpleUrlNormalizer())
 				.setUrlFilter(urlValidator)
-				.setPageFetcherBuilder(new SimpleHttpFetcherBuilder(userAgent));
+				.setPageFetcherBuilder(new SimpleHttpFetcherBuilder(userAgent))
+				.setDefaultCrawlDelay(options.getDefaultCrawlDelay());
 			
 			builder.build().execute();
 		} catch (Throwable t) {
