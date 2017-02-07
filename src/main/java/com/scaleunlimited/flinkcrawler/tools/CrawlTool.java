@@ -150,7 +150,7 @@ public class CrawlTool {
 				:	new SimpleUrlValidator());
 			
 			CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
-				.setUrlSource(new SeedUrlSource(1.0f, options.getSeedUrlsFilename()))
+				.setUrlSource(new SeedUrlSource(options.getSeedUrlsFilename(), 1.0f))
 				.setCrawlDB(new InMemoryCrawlDB())
 				.setUrlLengthener(new SimpleUrlLengthener())
 				.setRobotsFetcherBuilder(new SimpleHttpFetcherBuilder(userAgent))
