@@ -1,7 +1,5 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
-import com.scaleunlimited.flinkcrawler.utils.ExceptionUtils;
-
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -22,13 +20,13 @@ import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
+import com.scaleunlimited.flinkcrawler.utils.ExceptionUtils;
 import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
 import crawlercommons.fetcher.BaseFetchException;
 import crawlercommons.fetcher.FetchedResult;
 import crawlercommons.fetcher.HttpFetchException;
 import crawlercommons.fetcher.http.BaseHttpFetcher;
-import crawlercommons.robots.BaseRobotRules;
 
 
 

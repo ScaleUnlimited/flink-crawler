@@ -1,8 +1,5 @@
 package com.scaleunlimited.flinkcrawler.crawldb;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
 import com.scaleunlimited.flinkcrawler.utils.HashUtils;

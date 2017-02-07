@@ -1,9 +1,5 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
-import org.apache.flink.api.common.functions.MapFunction;
-import org.apache.flink.api.java.DataSet;
-import org.apache.flink.api.java.tuple.Tuple1;
-import org.apache.flink.api.java.tuple.Tuple2;
 //import org.flinkspector.core.collection.ExpectedRecords;
 //import org.flinkspector.core.quantify.MatchTuples;
 //import org.flinkspector.core.quantify.OutputMatcher;
@@ -11,11 +7,6 @@ import org.apache.flink.api.java.tuple.Tuple2;
 //import org.flinkspector.dataset.DataSetTestBase;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Test;
-
-import static org.hamcrest.Matchers.isA;
-import static org.hamcrest.Matchers.lessThanOrEqualTo;
-import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 
 //import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 // TODO re-implement this without using flinkspector, which requires Java 8.
