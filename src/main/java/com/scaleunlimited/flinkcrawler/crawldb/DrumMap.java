@@ -7,9 +7,14 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.Arrays;
+
+import org.apache.commons.io.FileUtils;
+
+import com.scaleunlimited.flinkcrawler.utils.ByteUtils;
 
 /**
- * A DrumMap implements the DRUM storage system as described by the IRLBot paper
+ * A DrumMap implements a form of DRUM storage system as described by the IRLBot paper
  * (see http://irl.cs.tamu.edu/people/hsin-tsang/papers/www2008.pdf)
  * 
  * There's an in-memory array of new key/value pairs, where the key is an 8-byte
@@ -23,7 +28,7 @@ import java.io.IOException;
  * 
  * We store this data in a single large byte[], and have a separate
  * int[] of offsets into the 32-byte "entries" stored in the byte array. This
- * array of int offsets is what we sort (by hash) before doing  merge (see below).
+ * array of int offsets is what we sort (by hash) before doing a merge (see below).
  * We don't bother doing any de-duplication while adding values; this happens
  * during the merge.
  * 
@@ -48,53 +53,60 @@ import java.io.IOException;
  * entries to give us the target max # of entries to fetch vs keep active vs.
  * archive (or could be percentages).
  * 
- * During this merge the DrumMap is still usable, as a new in-memory array
- * is allocated, along with a new payload file.
- * 
- * TODO - we could make the data variable size (adds a byte for the length), so
- * that when we get a new URL (outlink) it's stored with just the hash and the
- * offset into the payload file (thus taking up less space).
- * 
  */
 public class DrumMap implements Closeable {
-	private static final int NO_VALUE_INDEX = -1;
 	private static final int NO_PAYLOAD_OFFSET = -1;
 	
-	public static int DEFAULT_MAX_ENTRIES = 10_000;
+	public static final int DEFAULT_MAX_ENTRIES = 10_000;
 
+	private static final int VALUE_SIZE = 15;
+	private static final int ENTRY_SIZE = 8 + 8 + 1 + VALUE_SIZE;
+	
+	private static final String PAYLOAD_FILENAME = "payload.bin";
+	
 	// Max number of entries in the in-memory array
 	private int _maxEntries;
 	
 	// Number of entries in the in-memory arrays.
 	private int _numEntries;
 	
-	// An in-memory array of keys (hashes), which are longs
-	private long[] _keys;
+	// Each entry has an offset into _entryData, where the
+	// hash (8 bytes), payload offset (8 bytes), and value
+	// (16 bytes) are stored.
+	private int[] _entries;
+	private byte[] _entryData;
+	private int _entryDataOffset;
 	
-	// An in-memory array of values, which are generic Objects
-	private Object[] _values;
-	
-	// An in-memory array of offsets into the payload file
-	private int[] _offsets;
+	// Location for payload, spilled entries files.
+	private File _dataDir;
 	
 	// File where the payload data is being kept
 	private File _payloadFile;
 	
 	private DrumDataOutput _payloadOut;
 	
-	public DrumMap(int maxEntries) throws FileNotFoundException, IOException {
+	public DrumMap(int maxEntries, File dataDir) throws FileNotFoundException, IOException {
 		_maxEntries = maxEntries;
 		_numEntries = 0;
 		
-		_keys = new long[_maxEntries];
-		_values = new Object[_maxEntries];
-		_offsets = new int[_maxEntries];
+		_entries = new int[_maxEntries];
+		_entryData = new byte[ENTRY_SIZE * _maxEntries];
+		_entryDataOffset = 0;
 		
-		// TODO gzip the output stream, as it's going to have a lot of compression. But
+		_dataDir = dataDir;
+	}
+	
+	public void open() throws IOException {
+		FileUtils.forceMkdir(_dataDir);
+		
+		// FUTURE gzip the output stream, as it's going to have a lot of compression. But
 		// can we keep track of offsets then? Do these need to be bit offsets? Or maybe
 		// since we only should be walking through the entries linearly, we could just
 		// use an entry id (0...n) vs. an offset, so we don't need locations.
-		_payloadFile = File.createTempFile("drum-payload", "bin");
+		_payloadFile = new File(_dataDir, PAYLOAD_FILENAME);
+		_payloadFile.delete();
+		_payloadFile.createNewFile();
+		
 		_payloadOut = new DrumDataOutput(new FileOutputStream(_payloadFile));
 	}
 	
@@ -103,14 +115,23 @@ public class DrumMap implements Closeable {
 		return _numEntries;
 	}
 	
-	public boolean add(long key, Object value, IPayload payload) throws IOException {
+	public boolean add(long key, byte[] value, IPayload payload) throws IOException {
+		if (value.length > VALUE_SIZE) {
+			throw new IllegalArgumentException("value length is too long, max is " + VALUE_SIZE);
+		}
 		
-		_keys[_numEntries] = key;
-		_values[_numEntries] = value;
-		_offsets[_numEntries] = writePayload(payload);
-
-		_numEntries += 1;
-
+		_entries[_numEntries++] = _entryDataOffset;
+		ByteUtils.longToBytes(key, _entryData, _entryDataOffset);
+		_entryDataOffset += 8;
+		ByteUtils.longToBytes(writePayload(payload), _entryData, _entryDataOffset);
+		_entryDataOffset += 8;
+		
+		_entryData[_entryDataOffset++] = (byte)value.length;
+		if (value.length > 0) {
+			System.arraycopy(value, 0, _entryData, _entryDataOffset, value.length);
+			_entryDataOffset += value.length;
+		}
+		
 		if (_numEntries >= _maxEntries) {
 			merge();
 			return true;
@@ -126,25 +147,28 @@ public class DrumMap implements Closeable {
 	 * @param payload
 	 * @return offset of data written, or NO_PAYLOAD_OFFSET
 	 */
-	private int writePayload(IPayload payload) throws IOException {
+	private long writePayload(IPayload payload) throws IOException {
 		if (payload == null) {
 			return NO_PAYLOAD_OFFSET;
 		} else {
 			// Write the payload to our file, and return the offset of the data
-			int result = _payloadOut.getBytesWritten();
+			long result = _payloadOut.getBytesWritten();
 			payload.write(_payloadOut);
 			return result;
 		}
 	}
 
+	public void sort() {
+		DrumMapSorter.quickSort(_entries, 0, _numEntries - 1, _entryData);
+	}
+	
 	/**
 	 * Merge our in-memory array and related payload file with the persisted version
 	 * 
 	 * TODO - take everything here we need to do the merge, or provide that up above?
 	 */
 	public void merge() {
-		DrumMapSorter.quickSort(_keys, 0, _numEntries - 1, _offsets, _values);
-
+		sort();
 		
 		// TODO do the merge
 		
@@ -170,9 +194,13 @@ public class DrumMap implements Closeable {
 	 * @param payload
 	 * @return
 	 */
-	public Object getInMemoryEntry(long key, IPayload payload) throws IOException {
+	public boolean getInMemoryEntry(long key, byte[] value, IPayload payload) throws IOException {
 		if (_payloadOut != null) {
 			throw new IllegalStateException("Must be closed first!");
+		}
+
+		if (value.length > VALUE_SIZE) {
+			throw new IllegalArgumentException("value length is too long, max is " + VALUE_SIZE);
 		}
 
 		int index = findKey(key);
@@ -181,10 +209,13 @@ public class DrumMap implements Closeable {
 				payload.clear();
 			}
 			
-			return null;
+			return false;
 		} else {
+			int entryDataOffset = _entries[index];
+			entryDataOffset += 8;
+			
 			if (payload != null) {
-				int payloadOffset = _offsets[index];
+				long payloadOffset = ByteUtils.bytesToLong(_entryData, entryDataOffset);
 				// TODO fill in payload. This means reading from the file.
 				// So I think we might need a flush() call, which triggers
 				// no more updates? Or maybe this is a test-only call, so
@@ -197,13 +228,19 @@ public class DrumMap implements Closeable {
 				dis.close();
 			}
 			
-			return _values[index];
+			entryDataOffset += 8;
+			int valueLength = (int)_entryData[entryDataOffset++];
+			if (valueLength > 0) {
+				System.arraycopy(_entryData, entryDataOffset, value, 0, valueLength);
+			}
+			
+			return true;
 		}
 	}
 
 	private int findKey(long key) {
 		for (int i = 0; i < _numEntries; i++) {
-			if (_keys[i] == key) {
+			if (ByteUtils.bytesToLong(_entryData, _entries[i]) == key) {
 				return i;
 			}
 		}

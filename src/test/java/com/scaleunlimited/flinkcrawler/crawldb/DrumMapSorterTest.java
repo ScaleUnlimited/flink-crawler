@@ -4,6 +4,8 @@ import static org.junit.Assert.assertEquals;
 
 import org.junit.Test;
 
+import com.scaleunlimited.flinkcrawler.utils.ByteUtils;
+
 public class DrumMapSorterTest {
 
 	@Test
@@ -23,49 +25,42 @@ public class DrumMapSorterTest {
 	}
 	
 	private void testLinearSequence(int numEntries) {
-		long[] keys = new long[numEntries];
-		int[] offsets = new int[numEntries];
-		Integer[] values = new Integer[numEntries];
+		int[] keyOffsets = new int[numEntries];
+		byte[] keyData = new byte[numEntries * 8];
 		
+		int dataOffset = 0;
 		for (int i = 0; i < numEntries; i++) {
-			keys[i] = numEntries - i;
-			offsets[i] = numEntries - i;
-			values[i] = new Integer(numEntries - i);
+			long key = numEntries - i;
+			keyOffsets[i] = dataOffset;
+			ByteUtils.longToBytes(key, keyData, dataOffset);
+			dataOffset += 8;
 		}
 		
-		DrumMapSorter.quickSort(keys, offsets, values);
+		DrumMapSorter.quickSort(keyOffsets, keyData);
 		for (int i = 0; i < numEntries; i++) {
-			assertEquals(i + 1, keys[i]);
-			assertEquals(i + 1, offsets[i]);
-			assertEquals(i + 1, (int)values[i]);
+			assertEquals(i + 1L, ByteUtils.bytesToLong(keyData, keyOffsets[i]));
 		}
 	}
 
 	private void testDuplicateSequence(int numEntries) {
 		final int dupEntries = numEntries / 2;
 		
-		long[] keys = new long[numEntries];
-		int[] offsets = new int[numEntries];
-		Integer[] values = new Integer[numEntries];
+		int[] keyOffsets = new int[numEntries];
+		byte[] keyData = new byte[numEntries * 8];
 		
+		int dataOffset = 0;
 		for (int i = 0; i < numEntries; i++) {
-			if (i < dupEntries) {
-				keys[i] = 0;
-				offsets[i] = 0;
-				values[i] = new Integer(0);
-			} else {
-				keys[i] = numEntries - i;
-				offsets[i] = numEntries - i;
-				values[i] = new Integer(numEntries - i);
-			}
+			long key = (i < dupEntries) ? 0 : numEntries - i;
+			keyOffsets[i] = dataOffset;
+			ByteUtils.longToBytes(key, keyData, dataOffset);
+			dataOffset += 8;
 		}
 		
-		DrumMapSorter.quickSort(keys, offsets, values);
+		DrumMapSorter.quickSort(keyOffsets, keyData);
 		for (int i = 0; i < numEntries; i++) {
-			int targetValue = i < dupEntries ? 0 : (i + 1) - dupEntries;
-			assertEquals(targetValue, keys[i]);
-			assertEquals(targetValue, offsets[i]);
-			assertEquals(targetValue, (int)values[i]);
+			long targetValue = i < dupEntries ? 0 : (i + 1) - dupEntries;
+			
+			assertEquals(targetValue, ByteUtils.bytesToLong(keyData, keyOffsets[i]));
 		}
 	}
 

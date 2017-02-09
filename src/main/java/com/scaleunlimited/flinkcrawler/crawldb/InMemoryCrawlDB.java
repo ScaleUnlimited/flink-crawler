@@ -29,7 +29,7 @@ public class InMemoryCrawlDB extends BaseCrawlDB {
 	}
 
 	@Override
-	public void add(CrawlStateUrl url) throws Exception {
+	public boolean add(CrawlStateUrl url) throws Exception {
 		// We need to track the status of a URL.
 		String key = url.getUrl();
 		synchronized (_crawlState) {
@@ -58,6 +58,10 @@ public class InMemoryCrawlDB extends BaseCrawlDB {
 				}
 			}
 		}
+		
+		// We pretend like we'll never get full.
+		// TODO have a limit to the size of _crawlState, and return true when it gets too big.
+		return false;
 	}
 
 	/* (non-Javadoc)

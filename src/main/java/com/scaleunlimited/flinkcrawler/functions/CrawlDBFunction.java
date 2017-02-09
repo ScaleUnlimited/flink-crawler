@@ -70,10 +70,17 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 	public void processElement(CrawlStateUrl url, Context context, Collector<FetchUrl> collector) throws Exception {
 		UrlLogger.record(this.getClass(), url, FetchStatus.class.getSimpleName(), url.getStatus().toString());
 		
-		// Add to our in-memory queue. If this is full, it might trigger a merge
-		_crawlDB.add(url);
+		// Add to our in-memory queue. If this is full, it might trigger a merge.
+		// TODO Start the merge in a thread, and use an in-memory array to hold URLs until the merge is done. If this array gets
+		// too big, then we need to block until we're done with the merge.
+		synchronized (_crawlDB) {
+			if (_crawlDB.add(url)) {
+				_crawlDB.merge();
+			}
+		}
 		
-		// Every time we get called, we'll set up a new timer that fires
+		// Every time we get called, we'll set up a new timer that fires, which will call the onTimer() method to
+		// emit URLs.
 		context.timerService().registerProcessingTimeTimer(context.timerService().currentProcessingTime() + QUEUE_CHECK_DELAY);
 	}
 	
@@ -87,8 +94,15 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 			collector.collect(url);
 		} else {
 			// We don't have any active URLs to fetch.
-			// Call the CrawlDB to trigger a merge (if appropriate)
-			_crawlDB.merge();
+			// Call the CrawlDB to trigger a merge.
+			// TODO if we're merging already
+			synchronized (_crawlDB) {
+				// We might have done a merge while waiting to get the lock on the _crawlDB, so only
+				// do the merge if the fetch queue is still empty.
+				if (_fetchQueue.isEmpty()) {
+					_crawlDB.merge();
+				}
+			}
 		}
 
 		context.timerService().registerProcessingTimeTimer(context.timerService().currentProcessingTime() + QUEUE_CHECK_DELAY);

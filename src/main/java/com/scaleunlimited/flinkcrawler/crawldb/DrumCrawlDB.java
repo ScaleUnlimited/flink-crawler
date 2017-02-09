@@ -43,8 +43,8 @@ public class DrumCrawlDB extends BaseCrawlDB {
 	}
 
 	@Override
-	public void add(CrawlStateUrl url) throws Exception {
-		_drumMap.add(HashUtils.longHash(url.getUrl()), url.makeValue(), url);
+	public boolean add(CrawlStateUrl url) throws Exception {
+		return _drumMap.add(HashUtils.longHash(url.getUrl()), url.makeValue(), url);
 	}
 
 	@Override

@@ -9,7 +9,8 @@ public class DrumDataOutput extends DataOutputStream {
 		super(out);
 	}
 	
-	public int getBytesWritten() {
+	// TODO need to track bytes written ourselves, as we want to handle > 2GB
+	public long getBytesWritten() {
 		return written;
 	}
 

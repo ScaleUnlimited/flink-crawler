@@ -5,6 +5,7 @@ import java.io.DataOutput;
 import java.io.IOException;
 
 import com.scaleunlimited.flinkcrawler.crawldb.IPayload;
+import com.scaleunlimited.flinkcrawler.utils.ByteUtils;
 import com.scaleunlimited.flinkcrawler.utils.HashUtils;
 
 
@@ -89,8 +90,10 @@ public class CrawlStateUrl extends ValidUrl implements IPayload {
 	 *  
 	 * @return the new object.
 	 */
-	public Object makeValue() {
-		return _status;
+	public byte[] makeValue() {
+		byte[] result = new byte[2];
+		ByteUtils.intToBytes(_status.ordinal(), result, 0);
+		return result;
 	}
 
 	// write the payload fields out

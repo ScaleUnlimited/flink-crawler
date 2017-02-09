@@ -28,8 +28,9 @@ public abstract class BaseCrawlDB implements Serializable {
 	 * WARNING - this call is asynchronous with respect to the get() call.
 	 * 
 	 * @param url URL to add.
+	 * @return true if a merge is needed before another add() can be done.
 	 */
-	public abstract void add(CrawlStateUrl url) throws Exception;
+	public abstract boolean add(CrawlStateUrl url) throws Exception;
 	
 	/**
 	 * Reload the fetch queue with good entries.
