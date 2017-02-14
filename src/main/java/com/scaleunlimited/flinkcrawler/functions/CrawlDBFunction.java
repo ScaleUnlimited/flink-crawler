@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDB;
+import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDBMerger;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
@@ -36,6 +37,7 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 	private static final long QUEUE_CHECK_DELAY = 10;
 
 	private BaseCrawlDB _crawlDB;
+	private BaseCrawlDBMerger _merger;
 	
 	// List of URLs that are available to be fetched.
 	private transient FetchQueue _fetchQueue;
@@ -43,8 +45,9 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 	private transient int _parallelism;
 	private transient int _index;
 	
-	public CrawlDBFunction(BaseCrawlDB crawlDB) {
+	public CrawlDBFunction(BaseCrawlDB crawlDB, BaseCrawlDBMerger merger) {
 		_crawlDB = crawlDB;
+		_merger = merger;
 	}
 
 	@Override
@@ -57,7 +60,7 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 
 		_fetchQueue = new FetchQueue(MAX_ACTIVE_URLS);
 		
-		_crawlDB.open(_fetchQueue);
+		_crawlDB.open(_fetchQueue, _merger);
 	}
 	
 	@Override
@@ -74,6 +77,7 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 		// TODO Start the merge in a thread, and use an in-memory array to hold URLs until the merge is done. If this array gets
 		// too big, then we need to block until we're done with the merge.
 		synchronized (_crawlDB) {
+			// TODO trigger a merge when the _fetchQueue hits a low water mark, but only if we have something to merge, of course.
 			if (_crawlDB.add(url)) {
 				_crawlDB.merge();
 			}
@@ -95,7 +99,7 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 		} else {
 			// We don't have any active URLs to fetch.
 			// Call the CrawlDB to trigger a merge.
-			// TODO if we're merging already
+			// TODO if we're merging already, don't merge.
 			synchronized (_crawlDB) {
 				// We might have done a merge while waiting to get the lock on the _crawlDB, so only
 				// do the merge if the fetch queue is still empty.

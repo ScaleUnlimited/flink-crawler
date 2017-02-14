@@ -9,6 +9,7 @@ import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
 public abstract class BaseCrawlDB implements Serializable {
 
 	protected FetchQueue _fetchQueue;
+	protected BaseCrawlDBMerger _merger;
 	
 	/**
 	 * Open the CrawlDB, and load entries into the fetch queue if we
@@ -16,8 +17,9 @@ public abstract class BaseCrawlDB implements Serializable {
 	 * 
 	 * @param fetchQueue Queue used externally as source of URLs to be fetched
 	 */
-	public void open(FetchQueue fetchQueue) throws Exception {
+	public void open(FetchQueue fetchQueue, BaseCrawlDBMerger merger) throws Exception {
 		_fetchQueue = fetchQueue;
+		_merger = merger;
 	}
 	
 	public abstract void close() throws Exception;

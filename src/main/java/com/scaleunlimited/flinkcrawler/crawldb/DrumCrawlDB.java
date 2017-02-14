@@ -1,5 +1,7 @@
 package com.scaleunlimited.flinkcrawler.crawldb;
 
+import java.io.File;
+
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
 import com.scaleunlimited.flinkcrawler.utils.HashUtils;
@@ -13,22 +15,24 @@ import com.scaleunlimited.flinkcrawler.utils.HashUtils;
 public class DrumCrawlDB extends BaseCrawlDB {
 
 	private int _maxRamEntries;
+	private String _dataDirname;
 	
 	private transient DrumMap _drumMap;
+	private transient byte[] _urlValue;
 	
-	public DrumCrawlDB(int maxRamEntries) {
+	public DrumCrawlDB(int maxRamEntries, String dataDirname) {
 		_maxRamEntries = maxRamEntries;
+		_dataDirname = dataDirname;
 	}
 	
 	@Override
-	public void open(FetchQueue fetchQueue) throws Exception {
-		super.open(fetchQueue);
+	public void open(FetchQueue fetchQueue, BaseCrawlDBMerger merger) throws Exception {
+		super.open(fetchQueue, merger);
 
-		_drumMap = new DrumMap(_maxRamEntries);
+		File dataDir = new File(_dataDirname);
+		_drumMap = new DrumMap(_maxRamEntries, CrawlStateUrl.averageValueSize(), dataDir);
 		
-		// Call merge to force anything on disk to be processed, so we
-		// fill the fetch queue with whatever we've got.
-		merge();
+		_urlValue = new byte[CrawlStateUrl.maxValueSize()];
 	}
 	
 	@Override
@@ -44,12 +48,18 @@ public class DrumCrawlDB extends BaseCrawlDB {
 
 	@Override
 	public boolean add(CrawlStateUrl url) throws Exception {
-		return _drumMap.add(HashUtils.longHash(url.getUrl()), url.makeValue(), url);
+		synchronized (_drumMap) {
+			url.getValue(_urlValue);
+			return _drumMap.add(HashUtils.longHash(url.getUrl()), _urlValue, url);
+		}
 	}
 
 	@Override
 	public void merge() throws Exception {
-		// TODO Use as of yet 
+		synchronized (_drumMap) {
+			_drumMap.merge();
+		}
 	}
 
+	
 }

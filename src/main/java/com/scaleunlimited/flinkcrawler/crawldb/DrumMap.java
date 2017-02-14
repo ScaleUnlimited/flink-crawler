@@ -7,7 +7,6 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.Arrays;
 
 import org.apache.commons.io.FileUtils;
 
@@ -17,20 +16,27 @@ import com.scaleunlimited.flinkcrawler.utils.ByteUtils;
  * A DrumMap implements a form of DRUM storage system as described by the IRLBot paper
  * (see http://irl.cs.tamu.edu/people/hsin-tsang/papers/www2008.pdf)
  * 
- * There's an in-memory array of new key/value pairs, where the key is an 8-byte
- * (long) hash, the value is 16 bytes of additional data, and there's an
+ * There's an in-memory array of key/value pairs, where the key is an 8-byte
+ * (long) hash, the value is up to 255 bytes of additional data, and there's an
  * additional 8-byte offset into a separate "payload" file, where associated data
  * is kept. For our use case the hash is generated from the URL, the value is
- * the URL status, score(s), next fetch time, and the payload is the actual URL.
+ * the URL status, score(s), next fetch time, etc and the payload is the actual URL.
  * 
- * So each entry is 32 bytes of data. This of course requires that the value
- * (URL status info) fits in 16 bytes - if not, we'd have to expand this.
+ * The value must contain everything needed to merge two or more entries with the
+ * same URL (actually same hash).
  * 
  * We store this data in a single large byte[], and have a separate
- * int[] of offsets into the 32-byte "entries" stored in the byte array. This
+ * int[] of offsets into the "entries" stored in the byte array. This
  * array of int offsets is what we sort (by hash) before doing a merge (see below).
  * We don't bother doing any de-duplication while adding values; this happens
  * during the merge.
+ * 
+ * Note that this approach maximizes the number of records that fit into memory,
+ * and avoids lots of object allocation, at the expense of longer times to add
+ * (and sort) entries. For 1M entries, if we just used arrays for the keys,
+ * the values, and the payload offsets, then it's 200ms or so to add them,
+ * versus 900ms for the approach we're using. But the per-entry time is so
+ * small that this isn't really much of a factor.
  * 
  * A merge is triggered when our array is full, or more URLs are needed for
  * fetching, or we're shutting down and have to persist state. The merge
@@ -59,8 +65,11 @@ public class DrumMap implements Closeable {
 	
 	public static final int DEFAULT_MAX_ENTRIES = 10_000;
 
-	private static final int VALUE_SIZE = 15;
-	private static final int ENTRY_SIZE = 8 + 8 + 1 + VALUE_SIZE;
+	public static final int MAX_VALUE_SIZE = 255;
+	
+	// Long hash, long payload offset, value length byte.
+	private static final int NON_VALUE_SIZE = 8 + 8 + 1;
+	private static final int MAX_ENTRY_SIZE = NON_VALUE_SIZE + MAX_VALUE_SIZE;
 	
 	private static final String PAYLOAD_FILENAME = "payload.bin";
 	
@@ -85,12 +94,16 @@ public class DrumMap implements Closeable {
 	
 	private DrumDataOutput _payloadOut;
 	
-	public DrumMap(int maxEntries, File dataDir) throws FileNotFoundException, IOException {
+	private boolean _mergeNeeded = false;
+	
+	public DrumMap(int maxEntries, int averageValueSize, File dataDir) throws FileNotFoundException, IOException {
 		_maxEntries = maxEntries;
 		_numEntries = 0;
 		
 		_entries = new int[_maxEntries];
-		_entryData = new byte[ENTRY_SIZE * _maxEntries];
+		
+		final int averageEntrySize = NON_VALUE_SIZE + averageValueSize;
+		_entryData = new byte[averageEntrySize * _maxEntries];
 		_entryDataOffset = 0;
 		
 		_dataDir = dataDir;
@@ -111,13 +124,18 @@ public class DrumMap implements Closeable {
 	}
 	
 	public int size() {
-		// TODO add in size of entries that have merged/spilled to disk.
+		// TODO add in size of entries that have merged/spilled to disk?
 		return _numEntries;
 	}
 	
 	public boolean add(long key, byte[] value, IPayload payload) throws IOException {
-		if (value.length > VALUE_SIZE) {
-			throw new IllegalArgumentException("value length is too long, max is " + VALUE_SIZE);
+		if (_mergeNeeded) {
+			throw new IllegalStateException("Merge needed before add can be called");
+		}
+		
+		int valueLength = ((value == null) || (value.length == 0) ? 0 : value[0]);
+		if (valueLength > MAX_VALUE_SIZE) {
+			throw new IllegalArgumentException("value length is too long, max is " + MAX_VALUE_SIZE);
 		}
 		
 		_entries[_numEntries++] = _entryDataOffset;
@@ -126,18 +144,15 @@ public class DrumMap implements Closeable {
 		ByteUtils.longToBytes(writePayload(payload), _entryData, _entryDataOffset);
 		_entryDataOffset += 8;
 		
-		_entryData[_entryDataOffset++] = (byte)value.length;
-		if (value.length > 0) {
-			System.arraycopy(value, 0, _entryData, _entryDataOffset, value.length);
-			_entryDataOffset += value.length;
+		_entryData[_entryDataOffset++] = (byte)valueLength;
+		if (valueLength > 0) {
+			System.arraycopy(value, 1, _entryData, _entryDataOffset, valueLength);
+			_entryDataOffset += valueLength;
 		}
 		
-		if (_numEntries >= _maxEntries) {
-			merge();
-			return true;
-		} else {
-			return false;
-		}
+		// If we're within the max entry size of the end of _entryData, we need a merge.
+		_mergeNeeded = (_numEntries >= _maxEntries) || ((_entryDataOffset + MAX_ENTRY_SIZE) > _entryData.length);
+		return _mergeNeeded;
 	}
 
 	/**
@@ -165,13 +180,15 @@ public class DrumMap implements Closeable {
 	/**
 	 * Merge our in-memory array and related payload file with the persisted version
 	 * 
-	 * TODO - take everything here we need to do the merge, or provide that up above?
+	 * TODO - If we're merging, prevent add from being called. So get a lock on a synchronized
+	 * object.
 	 */
 	public void merge() {
 		sort();
 		
 		// TODO do the merge
 		
+		_mergeNeeded = false;
 	}
 
 	@Override
@@ -179,6 +196,8 @@ public class DrumMap implements Closeable {
 		if (_payloadOut == null) {
 			throw new IllegalStateException("Already closed!");
 		}
+		
+		// TODO need to force a merge with active URLs, write out results.
 		
 		_payloadOut.close();
 		_payloadOut = null;
@@ -197,10 +216,6 @@ public class DrumMap implements Closeable {
 	public boolean getInMemoryEntry(long key, byte[] value, IPayload payload) throws IOException {
 		if (_payloadOut != null) {
 			throw new IllegalStateException("Must be closed first!");
-		}
-
-		if (value.length > VALUE_SIZE) {
-			throw new IllegalArgumentException("value length is too long, max is " + VALUE_SIZE);
 		}
 
 		int index = findKey(key);
@@ -230,8 +245,16 @@ public class DrumMap implements Closeable {
 			
 			entryDataOffset += 8;
 			int valueLength = (int)_entryData[entryDataOffset++];
+			
+			if (valueLength + 1 > value.length) {
+				throw new IllegalArgumentException("value array isn't big enough, we need " + (valueLength + 1));
+			}
+
+			value[0] = (byte)valueLength;
+
 			if (valueLength > 0) {
-				System.arraycopy(_entryData, entryDataOffset, value, 0, valueLength);
+				// Copy over the rest of the value
+				System.arraycopy(_entryData, entryDataOffset, value, 1, valueLength);
 			}
 			
 			return true;
