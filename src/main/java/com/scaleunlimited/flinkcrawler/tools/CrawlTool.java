@@ -9,6 +9,7 @@ import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 
+import com.scaleunlimited.flinkcrawler.config.BaseHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.config.SimpleHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.crawldb.InMemoryCrawlDB;
 import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
@@ -19,6 +20,7 @@ import com.scaleunlimited.flinkcrawler.urls.SimpleUrlLengthener;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlValidator;
 
+import crawlercommons.fetcher.http.SimpleHttpFetcher;
 import crawlercommons.fetcher.http.UserAgent;
 import crawlercommons.robots.SimpleRobotRulesParser;
 import crawlercommons.url.PaidLevelDomain;
@@ -28,6 +30,8 @@ public class CrawlTool {
 	static class CrawlToolOptions {
 	    private String _urlsFilename;
 	    private String _singleDomain;
+        private long _defaultCrawlDelay = 10 * 1000L;
+        private int _maxContentSize = SimpleHttpFetcher.DEFAULT_MAX_CONTENT_SIZE;
 
 		@Option(name = "-seedurls", usage = "text file containing list of seed urls", required = true)
 	    public void setSeedUrlsFilename(String urlsFilename) {
@@ -37,6 +41,16 @@ public class CrawlTool {
 		@Option(name = "-singledomain", usage = "only fetch URLs within this domain (and its sub-domains)", required = false)
 	    public void setSingleDomain(String urlsFilename) {
 			_singleDomain = urlsFilename;
+	    }
+		
+		@Option(name = "-defaultcrawldelay", usage = "use this crawl delay when robots.txt doesn't provide it", required = false)
+	    public void setDefaultCrawlDelay(long defaultCrawlDelay) {
+			_defaultCrawlDelay = defaultCrawlDelay;
+	    }
+		
+		@Option(name = "-maxcontentsize", usage = "maximum content size", required = false)
+	    public void setMaxContentSize(int maxContentSize) {
+			_maxContentSize = maxContentSize;
 	    }
 		
 		
@@ -50,6 +64,14 @@ public class CrawlTool {
 		
 		public String getSingleDomain() {
 			return _singleDomain;
+		}
+		
+		public long getDefaultCrawlDelay() {
+			return _defaultCrawlDelay;
+		}
+
+		public int getMaxContentSize() {
+			return _maxContentSize;
 		}
 	}
 	
@@ -139,17 +161,21 @@ public class CrawlTool {
 					new SingleDomainUrlValidator(options.getSingleDomain())
 				:	new SimpleUrlValidator());
 			
+			BaseHttpFetcherBuilder pageFetcherBuilder = new SimpleHttpFetcherBuilder(userAgent)
+				.setDefaultMaxContentSize(options.getMaxContentSize());
 			CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
-				.setUrlSource(new SeedUrlSource(1.0f, options.getSeedUrlsFilename()))
+//				.setMaxWaitTime(100000)
+				.setUrlSource(new SeedUrlSource(options.getSeedUrlsFilename(), 1.0f))
 				.setCrawlDB(new InMemoryCrawlDB())
 				.setUrlLengthener(new SimpleUrlLengthener())
-				.setRobotsFetcherBuilder(new SimpleHttpFetcherBuilder(userAgent))
+				.setRobotsFetcherBuilder(pageFetcherBuilder)
 				.setRobotsParser(new SimpleRobotRulesParser())
 				.setPageParser(new SimplePageParser())
 				.setContentSink(new DiscardingSink<ParsedUrl>())
 				.setUrlNormalizer(new SimpleUrlNormalizer())
 				.setUrlFilter(urlValidator)
-				.setPageFetcherBuilder(new SimpleHttpFetcherBuilder(userAgent));
+				.setPageFetcherBuilder(pageFetcherBuilder)
+				.setDefaultCrawlDelay(options.getDefaultCrawlDelay());
 			
 			builder.build().execute();
 		} catch (Throwable t) {
