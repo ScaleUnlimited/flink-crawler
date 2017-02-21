@@ -7,10 +7,15 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.io.FileUtils;
 
+import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDBMerger.MergeResult;
+import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDBMerger.MergedStatus;
+import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.utils.ByteUtils;
+import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
 
 /**
  * A DrumMap implements a form of DRUM storage system as described by the IRLBot paper
@@ -65,13 +70,15 @@ public class DrumMap implements Closeable {
 	
 	public static final int DEFAULT_MAX_ENTRIES = 10_000;
 
-	public static final int MAX_VALUE_SIZE = 255;
+	public static final int MAX_VALUE_LENGTH = 255;
 	
 	// Long hash, long payload offset, value length byte.
 	private static final int NON_VALUE_SIZE = 8 + 8 + 1;
-	private static final int MAX_ENTRY_SIZE = NON_VALUE_SIZE + MAX_VALUE_SIZE;
+	private static final int MAX_ENTRY_SIZE = NON_VALUE_SIZE + MAX_VALUE_LENGTH;
 	
 	private static final String PAYLOAD_FILENAME = "payload.bin";
+	
+	private BaseCrawlDBMerger _merger;
 	
 	// Max number of entries in the in-memory array
 	private int _maxEntries;
@@ -94,19 +101,25 @@ public class DrumMap implements Closeable {
 	
 	private DrumDataOutput _payloadOut;
 	
-	private boolean _mergeNeeded = false;
+	private volatile boolean _mergeNeeded = false;
 	
-	public DrumMap(int maxEntries, int averageValueSize, File dataDir) throws FileNotFoundException, IOException {
+	private AtomicBoolean _lock;
+	
+	public DrumMap(int maxEntries, int averageValueLength, File dataDir, BaseCrawlDBMerger merger) throws FileNotFoundException, IOException {
 		_maxEntries = maxEntries;
 		_numEntries = 0;
 		
 		_entries = new int[_maxEntries];
 		
-		final int averageEntrySize = NON_VALUE_SIZE + averageValueSize;
+		final int averageEntrySize = NON_VALUE_SIZE + averageValueLength;
 		_entryData = new byte[averageEntrySize * _maxEntries];
 		_entryDataOffset = 0;
 		
 		_dataDir = dataDir;
+		
+		_merger = merger;
+		
+		_lock = new AtomicBoolean(false);
 	}
 	
 	public void open() throws IOException {
@@ -129,30 +142,33 @@ public class DrumMap implements Closeable {
 	}
 	
 	public boolean add(long key, byte[] value, IPayload payload) throws IOException {
-		if (_mergeNeeded) {
-			throw new IllegalStateException("Merge needed before add can be called");
+		synchronized (_lock) {
+			if (_mergeNeeded) {
+				throw new IllegalStateException("Merge needed before add can be called");
+			}
+
+			int valueLength = ((value == null) || (value.length == 0) ? 0 : value[0]);
+			if (valueLength > MAX_VALUE_LENGTH) {
+				throw new IllegalArgumentException("value length is too long, max is " + MAX_VALUE_LENGTH);
+			}
+
+			_entries[_numEntries++] = _entryDataOffset;
+			ByteUtils.longToBytes(key, _entryData, _entryDataOffset);
+			_entryDataOffset += 8;
+			ByteUtils.longToBytes(writePayload(payload), _entryData, _entryDataOffset);
+			_entryDataOffset += 8;
+
+			_entryData[_entryDataOffset++] = (byte)valueLength;
+			if (valueLength > 0) {
+				System.arraycopy(value, 1, _entryData, _entryDataOffset, valueLength);
+				_entryDataOffset += valueLength;
+			}
+
+			// If we're within the max entry size of the end of _entryData, we need a merge.
+			// Same if we're at the limit of entries in our offset array.
+			_mergeNeeded = (_numEntries >= _maxEntries) || ((_entryDataOffset + MAX_ENTRY_SIZE) > _entryData.length);
+			return _mergeNeeded;
 		}
-		
-		int valueLength = ((value == null) || (value.length == 0) ? 0 : value[0]);
-		if (valueLength > MAX_VALUE_SIZE) {
-			throw new IllegalArgumentException("value length is too long, max is " + MAX_VALUE_SIZE);
-		}
-		
-		_entries[_numEntries++] = _entryDataOffset;
-		ByteUtils.longToBytes(key, _entryData, _entryDataOffset);
-		_entryDataOffset += 8;
-		ByteUtils.longToBytes(writePayload(payload), _entryData, _entryDataOffset);
-		_entryDataOffset += 8;
-		
-		_entryData[_entryDataOffset++] = (byte)valueLength;
-		if (valueLength > 0) {
-			System.arraycopy(value, 1, _entryData, _entryDataOffset, valueLength);
-			_entryDataOffset += valueLength;
-		}
-		
-		// If we're within the max entry size of the end of _entryData, we need a merge.
-		_mergeNeeded = (_numEntries >= _maxEntries) || ((_entryDataOffset + MAX_ENTRY_SIZE) > _entryData.length);
-		return _mergeNeeded;
 	}
 
 	/**
@@ -183,12 +199,18 @@ public class DrumMap implements Closeable {
 	 * TODO - If we're merging, prevent add from being called. So get a lock on a synchronized
 	 * object.
 	 */
-	public void merge() {
-		sort();
-		
-		// TODO do the merge
-		
-		_mergeNeeded = false;
+	public void merge(FetchQueue queue) {
+		synchronized (_lock) {
+			sort();
+			
+			if (onDiskActiveExists()) {
+				doMergeWithDisk(queue);
+			} else {
+				doMergeMemoryOnly(queue);
+			}
+			
+			_mergeNeeded = false;
+		}
 	}
 
 	@Override
@@ -203,6 +225,94 @@ public class DrumMap implements Closeable {
 		_payloadOut = null;
 	}
 
+	private void doMergeWithDisk(FetchQueue queue) {
+		// TODO do the merge with the on-disk data
+		
+	}
+	
+	private void doMergeMemoryOnly(FetchQueue queue) {
+		if (_numEntries == 0) {
+			return;
+		}
+		
+		// TODO need to close payload file, open of input stream on it
+		// so we can do random access. And reset size of payload file 
+		// when we're done.
+		byte[] oldValue = new byte[CrawlStateUrl.maxValueSize()];
+		byte[] newValue = new byte[CrawlStateUrl.maxValueSize()];
+		byte[] mergedValue = new byte[CrawlStateUrl.maxValueSize()];
+		
+		// Do the merge using only in-memory data
+		long curHash = getHash(0);
+		
+		for (int i = 1; i < _numEntries; i++) {
+			long nextHash = getHash(i);
+			byte[] valueToUse = null;
+			if (nextHash != curHash) {
+				// TODO remove need to copy by having getMergedStatus(byte[], offset)
+				System.arraycopy(_entryData, getValueOffset(i), mergedValue, 0, getValueSize(i));
+				valueToUse = mergedValue;
+			} else {
+				// we have two entries with the same hash, so we have to merge them.
+				// TODO remove need to copy to oldValue, newValue by having byte[], offset params
+				System.arraycopy(_entryData, getValueOffset(i - 1), oldValue, 0, getValueSize(i - 1));
+				System.arraycopy(_entryData, getValueOffset(i), newValue, 0, getValueSize(i));
+				MergeResult result = _merger.doMerge(oldValue, newValue, mergedValue);
+				
+				if (result == MergeResult.USE_OLD) {
+					valueToUse = oldValue;
+				} else if (result == MergeResult.USE_NEW) {
+					valueToUse = newValue;
+				} else if (result == MergeResult.USE_MERGED) {
+					valueToUse = mergedValue;
+				} else {
+					throw new RuntimeException("Unknown merge result: " + result);
+				}
+			}
+			
+			// Now decide what to do with the merged result
+			MergedStatus status = _merger.getMergedStatus(valueToUse);
+			if (status == MergedStatus.ACTIVE_FETCH) {
+				// TODO put in queue - so reconstruct CrawlStateUrl from value, payload
+				// put in active disk
+			} else if (status == MergedStatus.ACTIVE) {
+				// TODO put in active disk
+			} else if (status == MergedStatus.ARCHIVE) {
+				// TODO put in archive
+			} else {
+				throw new RuntimeException("Unknown merge status: " + status);
+			}
+
+			curHash = nextHash;
+		}
+	}
+	
+	private int getValueOffset(int entryIndex) {
+		if ((entryIndex < 0) || (entryIndex >= _numEntries)) {
+			throw new IllegalArgumentException("Invalid index: " + entryIndex);
+		}
+		
+		int dataOffset = _entries[entryIndex];
+		return dataOffset + 8 + 8;
+	}
+	
+	private int getValueSize(int entryIndex) {
+		return 1 + _entryData[getValueOffset(entryIndex)] & 0x00FF;
+	}
+	
+	private long getHash(int entryIndex) {
+		if ((entryIndex < 0) || (entryIndex >= _numEntries)) {
+			throw new IllegalArgumentException("Invalid index: " + entryIndex);
+		}
+		
+		int dataOffset = _entries[entryIndex];
+		return ByteUtils.bytesToLong(_entryData, dataOffset);
+	}
+	
+	private boolean onDiskActiveExists() {
+		// TODO check for on disk files (data, payload)
+		return false;
+	}
 	
 	/**
 	 * Return the value from the in-memory array for <key>. If payload isn't null,

@@ -129,9 +129,9 @@ public class CrawlStateUrl extends ValidUrl implements IPayload {
 		return 1 + 16;
 	}
 	
-	public static int averageValueSize() {
+	public static int averageValueLength() {
 		// TODO - figure out empirical value for this.
-		return 1 + 10;
+		return 10;
 	}
 	
 	public static FetchStatus getFetchStatus(byte[] value) {

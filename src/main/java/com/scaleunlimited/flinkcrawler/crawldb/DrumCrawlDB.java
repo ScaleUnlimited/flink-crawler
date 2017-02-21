@@ -30,7 +30,7 @@ public class DrumCrawlDB extends BaseCrawlDB {
 		super.open(fetchQueue, merger);
 
 		File dataDir = new File(_dataDirname);
-		_drumMap = new DrumMap(_maxRamEntries, CrawlStateUrl.averageValueSize(), dataDir);
+		_drumMap = new DrumMap(_maxRamEntries, CrawlStateUrl.averageValueLength(), dataDir, merger);
 		
 		_urlValue = new byte[CrawlStateUrl.maxValueSize()];
 	}
@@ -57,7 +57,7 @@ public class DrumCrawlDB extends BaseCrawlDB {
 	@Override
 	public void merge() throws Exception {
 		synchronized (_drumMap) {
-			_drumMap.merge();
+			_drumMap.merge(_fetchQueue);
 		}
 	}
 

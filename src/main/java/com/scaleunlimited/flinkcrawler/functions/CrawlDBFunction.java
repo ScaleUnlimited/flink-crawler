@@ -34,7 +34,7 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 	private static final int MAX_ACTIVE_URLS = 10_000;
 	
 	// TODO pick good time for this
-	private static final long QUEUE_CHECK_DELAY = 10;
+	private static final long QUEUE_CHECK_DELAY = 100L;
 
 	private BaseCrawlDB _crawlDB;
 	private BaseCrawlDBMerger _merger;
@@ -83,8 +83,7 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 			}
 		}
 		
-		// Every time we get called, we'll set up a new timer that fires, which will call the onTimer() method to
-		// emit URLs.
+		// Every time we get called, we'll set up a new timer that fires, which will call the onTimer() method to emit URLs.
 		context.timerService().registerProcessingTimeTimer(context.timerService().currentProcessingTime() + QUEUE_CHECK_DELAY);
 	}
 	

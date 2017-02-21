@@ -86,11 +86,11 @@ public class InMemoryCrawlDB extends BaseCrawlDB {
 				
 				if (status == MergedStatus.ACTIVE_FETCH) {
 					if (_fetchQueue.add(curState)) {
+						curState.setStatus(FetchStatus.FETCHING);
 						LOGGER.debug(String.format("Added URL from crawlDB to fetchable queue: %s", curState));
 					} else {
 						LOGGER.debug(String.format("Failed to add URL from crawlDB to fetchable queue: %s", curState));
 					}
-					curState.setStatus(FetchStatus.FETCHING);
 				} else if (status == MergedStatus.ACTIVE) {
 					// Do nothing, just stays in the crawl DB
 				} else if (status == MergedStatus.ARCHIVE) {

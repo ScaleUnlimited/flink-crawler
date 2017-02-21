@@ -22,7 +22,7 @@ public class DrumMapTest {
 	@Test
 	public void testPayload() throws Exception {
 		File dataDir = new File("target/test/testPayload/data");
-		DrumMap dm = new DrumMap(1000, CrawlStateUrl.averageValueSize(), dataDir);
+		DrumMap dm = new DrumMap(1000, CrawlStateUrl.averageValueLength(), dataDir, new DefaultCrawlDBMerger());
 		dm.open();
 		
 		byte[] value = new byte[2];
@@ -52,7 +52,7 @@ public class DrumMapTest {
 		File dataDir = new File("target/test/testTiming/data");
 		final int numEntries = 1_000_000;
 		for (int test = 0; test < 5; test++) {
-			DrumMap dm = new DrumMap(numEntries, CrawlStateUrl.averageValueSize(), dataDir);
+			DrumMap dm = new DrumMap(numEntries, CrawlStateUrl.averageValueLength(), dataDir, new DefaultCrawlDBMerger());
 			dm.open();
 			Random rand = new Random(System.currentTimeMillis());
 
