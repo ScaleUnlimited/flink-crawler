@@ -21,6 +21,7 @@ import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 
 import com.scaleunlimited.flinkcrawler.config.BaseHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDB;
+import com.scaleunlimited.flinkcrawler.crawldb.DefaultCrawlDBMerger;
 import com.scaleunlimited.flinkcrawler.functions.CheckUrlWithRobotsFunction;
 import com.scaleunlimited.flinkcrawler.functions.CrawlDBFunction;
 import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
@@ -221,7 +222,7 @@ public class CrawlTopology {
             IterativeStream<CrawlStateUrl> crawlDbIteration = cleanedUrls.iterate(_maxWaitTime);
             DataStream<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> postRobotsUrls = crawlDbIteration
             		.keyBy(new PldKeySelector<CrawlStateUrl>())
-            		.process(new CrawlDBFunction(_crawlDB))
+            		.process(new CrawlDBFunction(_crawlDB, new DefaultCrawlDBMerger()))
             		.name("CrawlDBFunction")
             		.keyBy(new PldKeySelector<FetchUrl>())
                     .process(new CheckUrlWithRobotsFunction(_robotsFetcherBuilder, _robotsParser, _defaultCrawlDelay))

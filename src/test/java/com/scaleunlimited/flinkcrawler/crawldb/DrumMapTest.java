@@ -2,10 +2,11 @@ package com.scaleunlimited.flinkcrawler.crawldb;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import java.io.DataInput;
 import java.io.DataOutput;
+import java.io.File;
 import java.io.IOException;
 import java.util.Random;
 
@@ -13,15 +14,22 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
+
 public class DrumMapTest {
 	static final Logger LOGGER = LoggerFactory.getLogger(DrumMapTest.class);
-			
+	
 	@Test
 	public void testPayload() throws Exception {
-		DrumMap dm = new DrumMap(1000);
+		File dataDir = new File("target/test/testPayload/data");
+		DrumMap dm = new DrumMap(1000, CrawlStateUrl.averageValueLength(), dataDir, new DefaultCrawlDBMerger());
+		dm.open();
 		
+		byte[] value = new byte[2];
+		value[0] = 1;
 		for (int i = 500; i > 0; i--) {
-			dm.add(i, null, new LongPayload(i));
+			value[1] = (byte)(i % 97);
+			dm.add(i, value, new LongPayload(i));
 		}
 		
 		dm.close();
@@ -29,8 +37,9 @@ public class DrumMapTest {
 		
 		LongPayload payload = new LongPayload();
 		for (int i = 1; i <= 500; i++) {
-			Integer value = (Integer)dm.getInMemoryEntry(i, payload);
-			assertNull("Shouldn't find value for key " + i, value);
+			assertTrue(dm.getInMemoryEntry(i, value, payload));
+			assertEquals(1, value[0]);
+			assertEquals((byte)(i % 97), value[1]);
 			
 			Long payloadValue = payload.getPayload();
 			assertNotNull("Should get payload for key " + i, payloadValue);
@@ -40,9 +49,11 @@ public class DrumMapTest {
 
 	@Test
 	public void testTiming() throws Exception {
+		File dataDir = new File("target/test/testTiming/data");
 		final int numEntries = 1_000_000;
-		for (int test = 0; test < 10; test++) {
-			DrumMap dm = new DrumMap(numEntries);
+		for (int test = 0; test < 5; test++) {
+			DrumMap dm = new DrumMap(numEntries, CrawlStateUrl.averageValueLength(), dataDir, new DefaultCrawlDBMerger());
+			dm.open();
 			Random rand = new Random(System.currentTimeMillis());
 
 			long startTime = System.currentTimeMillis();

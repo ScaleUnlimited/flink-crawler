@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDB;
+import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDBMerger;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
@@ -33,9 +34,10 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 	private static final int MAX_ACTIVE_URLS = 10_000;
 	
 	// TODO pick good time for this
-	private static final long QUEUE_CHECK_DELAY = 10;
+	private static final long QUEUE_CHECK_DELAY = 100L;
 
 	private BaseCrawlDB _crawlDB;
+	private BaseCrawlDBMerger _merger;
 	
 	// List of URLs that are available to be fetched.
 	private transient FetchQueue _fetchQueue;
@@ -43,8 +45,9 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 	private transient int _parallelism;
 	private transient int _index;
 	
-	public CrawlDBFunction(BaseCrawlDB crawlDB) {
+	public CrawlDBFunction(BaseCrawlDB crawlDB, BaseCrawlDBMerger merger) {
 		_crawlDB = crawlDB;
+		_merger = merger;
 	}
 
 	@Override
@@ -57,7 +60,7 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 
 		_fetchQueue = new FetchQueue(MAX_ACTIVE_URLS);
 		
-		_crawlDB.open(_fetchQueue);
+		_crawlDB.open(_fetchQueue, _merger);
 	}
 	
 	@Override
@@ -70,10 +73,17 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 	public void processElement(CrawlStateUrl url, Context context, Collector<FetchUrl> collector) throws Exception {
 		UrlLogger.record(this.getClass(), url, FetchStatus.class.getSimpleName(), url.getStatus().toString());
 		
-		// Add to our in-memory queue. If this is full, it might trigger a merge
-		_crawlDB.add(url);
+		// Add to our in-memory queue. If this is full, it might trigger a merge.
+		// TODO Start the merge in a thread, and use an in-memory array to hold URLs until the merge is done. If this array gets
+		// too big, then we need to block until we're done with the merge.
+		synchronized (_crawlDB) {
+			// TODO trigger a merge when the _fetchQueue hits a low water mark, but only if we have something to merge, of course.
+			if (_crawlDB.add(url)) {
+				_crawlDB.merge();
+			}
+		}
 		
-		// Every time we get called, we'll set up a new timer that fires
+		// Every time we get called, we'll set up a new timer that fires, which will call the onTimer() method to emit URLs.
 		context.timerService().registerProcessingTimeTimer(context.timerService().currentProcessingTime() + QUEUE_CHECK_DELAY);
 	}
 	
@@ -87,8 +97,15 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 			collector.collect(url);
 		} else {
 			// We don't have any active URLs to fetch.
-			// Call the CrawlDB to trigger a merge (if appropriate)
-			_crawlDB.merge();
+			// Call the CrawlDB to trigger a merge.
+			// TODO if we're merging already, don't merge.
+			synchronized (_crawlDB) {
+				// We might have done a merge while waiting to get the lock on the _crawlDB, so only
+				// do the merge if the fetch queue is still empty.
+				if (_fetchQueue.isEmpty()) {
+					_crawlDB.merge();
+				}
+			}
 		}
 
 		context.timerService().registerProcessingTimeTimer(context.timerService().currentProcessingTime() + QUEUE_CHECK_DELAY);

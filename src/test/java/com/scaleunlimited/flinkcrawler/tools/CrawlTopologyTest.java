@@ -68,9 +68,9 @@ public class CrawlTopologyTest {
 			.setContentSink(new DiscardingSink<ParsedUrl>())
 			.setUrlNormalizer(normalizer)
 			.setUrlFilter(new SimpleUrlValidator())
-			// You can increase this value from 5000 to say 100000 if you need time inside of a threaded
+			// You can increase this value from 10000 to say 100000 if you need time inside of a threaded
 			// executor before the cluster terminates.
-			.setMaxWaitTime(5000)
+			.setMaxWaitTime(10000)
 			.setDefaultCrawlDelay(0)
 			.setPageFetcherBuilder(new WebGraphFetcher.WebGraphFetcherBuilder(new WebGraphFetcher(graph)));
 

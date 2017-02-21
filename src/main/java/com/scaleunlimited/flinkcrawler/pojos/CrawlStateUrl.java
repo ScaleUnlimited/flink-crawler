@@ -5,6 +5,7 @@ import java.io.DataOutput;
 import java.io.IOException;
 
 import com.scaleunlimited.flinkcrawler.crawldb.IPayload;
+import com.scaleunlimited.flinkcrawler.utils.ByteUtils;
 import com.scaleunlimited.flinkcrawler.utils.HashUtils;
 
 
@@ -77,6 +78,26 @@ public class CrawlStateUrl extends ValidUrl implements IPayload {
 		_nextFetchTime = nextFetchTime;
 	}
 
+	/**
+	 * We have an array of bytes (with first byte = length) that
+	 * is coming from the result of merging entries in the CrawlDB.
+	 * We need to update the fields that are saved in this value.
+	 * 
+	 * @param value
+	 */
+	public void setFromValue(byte[] value) {
+		int valueSize = (int)value[0] & 0x00FF;
+		
+		if (valueSize == 0) {
+			_status = FetchStatus.UNFETCHED;
+		} else if (valueSize < 2) {
+			throw new IllegalArgumentException("Length of value must be 0 or >= 2, got " + valueSize);
+		} else {
+			// TODO handle additional status values.
+			_status = FetchStatus.values()[ByteUtils.bytesToShort(value, 1)];
+		}
+	}
+	
 	@Override
 	public String toString() {
 		// TODO add more fields to the response.
@@ -86,13 +107,45 @@ public class CrawlStateUrl extends ValidUrl implements IPayload {
 	/**
 	 * Return in a new object all the fields that we need for merging one CrawlStateUrl
 	 * with another one in the CrawlDB DrumMap.
+	 * 
+	 * TODO change to getValue(preallocated byte[]). We can use maxValueSize to
+	 * allocate this. When we do that, if status is UNFETCHED then set the size to
+	 * zero.
 	 *  
 	 * @return the new object.
 	 */
-	public Object makeValue() {
-		return _status;
+	public void getValue(byte[] value) {
+		if (_status == FetchStatus.UNFETCHED) {
+			value[0] = 0;
+		} else {
+			// TODO set up other values as needed.
+			value[0] = 2;
+			ByteUtils.shortToBytes((short)_status.ordinal(), value, 1);
+		}
 	}
 
+	public static int maxValueSize() {
+		// TODO - set this to the right value
+		return 1 + 16;
+	}
+	
+	public static int averageValueLength() {
+		// TODO - figure out empirical value for this.
+		return 10;
+	}
+	
+	public static FetchStatus getFetchStatus(byte[] value) {
+		int valueSize = (int)value[0] & 0x00FF;
+		
+		if (valueSize == 0) {
+			return FetchStatus.UNFETCHED;
+		} else if (valueSize < 2) {
+			throw new IllegalArgumentException("Length of value must be 0 or >= 2, got " + valueSize);
+		} else {
+			return FetchStatus.values()[ByteUtils.bytesToShort(value, 1)];
+		}
+	}
+	
 	// write the payload fields out
 	@Override
 	public void write(DataOutput out) throws IOException {

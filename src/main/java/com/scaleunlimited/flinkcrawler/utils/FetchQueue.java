@@ -17,6 +17,10 @@ public class FetchQueue {
 		_fetchQueue = new ConcurrentLinkedQueue<>();
 	}
 	
+	public boolean isEmpty() {
+		return _fetchQueue.isEmpty();
+	}
+	
 	public boolean add(CrawlStateUrl url) {
 		FetchStatus status = url.getStatus();
 		
