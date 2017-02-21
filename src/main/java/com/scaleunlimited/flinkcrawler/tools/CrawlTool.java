@@ -23,6 +23,7 @@ import com.scaleunlimited.flinkcrawler.urls.SimpleUrlValidator;
 import crawlercommons.fetcher.http.SimpleHttpFetcher;
 import crawlercommons.fetcher.http.UserAgent;
 import crawlercommons.robots.SimpleRobotRulesParser;
+import crawlercommons.sitemaps.SiteMapParser;
 import crawlercommons.url.PaidLevelDomain;
 
 public class CrawlTool {
@@ -174,6 +175,7 @@ public class CrawlTool {
 				.setContentSink(new DiscardingSink<ParsedUrl>())
 				.setUrlNormalizer(new SimpleUrlNormalizer())
 				.setUrlFilter(urlValidator)
+				.setSiteMapParser(new SiteMapParser())
 				.setPageFetcherBuilder(pageFetcherBuilder)
 				.setDefaultCrawlDelay(options.getDefaultCrawlDelay());
 			
