@@ -163,7 +163,8 @@ public class CrawlTool {
 					new SingleDomainUrlValidator(options.getSingleDomain())
 				:	new SimpleUrlValidator());
 			
-			BaseHttpFetcherBuilder siteMapFetcherBuilder = new SimpleHttpFetcherBuilder(userAgent);
+			BaseHttpFetcherBuilder siteMapFetcherBuilder = new SimpleHttpFetcherBuilder(userAgent)
+				.setDefaultMaxContentSize(SiteMapParser.MAX_BYTES_ALLOWED);
 			BaseHttpFetcherBuilder pageFetcherBuilder = new SimpleHttpFetcherBuilder(userAgent)
 				.setDefaultMaxContentSize(options.getMaxContentSize());
 			CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
