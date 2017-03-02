@@ -20,6 +20,7 @@ import com.scaleunlimited.flinkcrawler.functions.CrawlDBFunction;
 import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.ParseFunction;
 import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
+import com.scaleunlimited.flinkcrawler.parser.SimpleSiteMapParser;
 import com.scaleunlimited.flinkcrawler.pojos.BaseUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
@@ -68,6 +69,8 @@ public class CrawlTopologyTest {
 			.setContentSink(new DiscardingSink<ParsedUrl>())
 			.setUrlNormalizer(normalizer)
 			.setUrlFilter(new SimpleUrlValidator())
+			.setSiteMapFetcherBuilder(new WebGraphFetcher.WebGraphFetcherBuilder(new WebGraphFetcher(graph)))
+			.setSiteMapParser(new SimpleSiteMapParser())
 			// You can increase this value from 10000 to say 100000 if you need time inside of a threaded
 			// executor before the cluster terminates.
 			.setMaxWaitTime(10000)

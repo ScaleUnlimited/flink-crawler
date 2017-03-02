@@ -17,6 +17,7 @@ import org.apache.flink.streaming.api.datastream.IterativeStream;
 import org.apache.flink.streaming.api.datastream.KeyedStream;
 import org.apache.flink.streaming.api.datastream.SplitStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 
 import com.scaleunlimited.flinkcrawler.config.BaseHttpFetcherBuilder;
@@ -25,6 +26,7 @@ import com.scaleunlimited.flinkcrawler.crawldb.DefaultCrawlDBMerger;
 import com.scaleunlimited.flinkcrawler.functions.CheckUrlWithRobotsFunction;
 import com.scaleunlimited.flinkcrawler.functions.CrawlDBFunction;
 import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
+import com.scaleunlimited.flinkcrawler.functions.HandleFailedSiteMapFunction;
 import com.scaleunlimited.flinkcrawler.functions.LengthenUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.NormalizeUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.OutlinkToStateUrlFunction;
@@ -103,9 +105,10 @@ public class CrawlTopology {
         private BaseUrlNormalizer _urlNormalizer;
         private BaseUrlValidator _urlFilter;
         private BaseHttpFetcherBuilder _pageFetcherBuilder;
+        private BaseHttpFetcherBuilder _siteMapFetcherBuilder;
         private BasePageParser _pageParser;
+		private BasePageParser _siteMapParser;
 
-		private SiteMapParser _siteMapParser;
 
         public CrawlTopologyBuilder(StreamExecutionEnvironment env) {
             _env = env;
@@ -156,12 +159,17 @@ public class CrawlTopology {
             return this;
         }
 
+        public CrawlTopologyBuilder setSiteMapFetcherBuilder(BaseHttpFetcherBuilder siteMapFetcherBuilder) {
+            _siteMapFetcherBuilder = siteMapFetcherBuilder;
+            return this;
+        }
+
         public CrawlTopologyBuilder setPageParser(BasePageParser pageParser) {
             _pageParser = pageParser;
             return this;
         }
 
-        public CrawlTopologyBuilder setSiteMapParser(SiteMapParser siteMapParser) {
+        public CrawlTopologyBuilder setSiteMapParser(BasePageParser siteMapParser) {
             _siteMapParser = siteMapParser;
             return this;
         }
@@ -263,11 +271,17 @@ public class CrawlTopology {
 					})
 					.name("Select sitemap URLs")
             		.keyBy(new PldKeySelector<FetchUrl>())
-					.process(new FetchUrlsFunction(_pageFetcherBuilder))
-                    .name("FetchUrlsFunction");
+					.process(new FetchUrlsFunction(_siteMapFetcherBuilder))
+                    .name("FetchUrlsFunction for sitemap"); // FUTURE Have a separate FetchSiteMapUrlFunction that extends FetchUrlsFunction
            
+            // Run the failed urls into a custom function to log it and then to a DiscardingSink.
+            // FUTURE - flag as sitemap and emit as any other url from the robots code; but this would require us to payload the flag through
             SplitStream<Tuple2<CrawlStateUrl, FetchedUrl>> siteMapFetchAttemptedUrls = splitFetchedUrlsStream(sitemapUrls);
-            DataStream<CrawlStateUrl> siteMapFetchStatusUrls = selectFetchStatus(siteMapFetchAttemptedUrls);
+            selectFetchStatus(siteMapFetchAttemptedUrls)
+            		.filter(new HandleFailedSiteMapFunction())
+            		.name("HandleFailedSiteMapFunction")
+            		.addSink(new DiscardingSink<CrawlStateUrl>());
+            
             DataStream<Tuple2<ExtractedUrl, ParsedUrl>> parsedSiteMapUrls = selectFetchedUrls(siteMapFetchAttemptedUrls)
 					.flatMap(new ParseSiteMapFunction(_siteMapParser))
 					.name("ParseSiteMapFunction");
@@ -312,7 +326,7 @@ public class CrawlTopology {
 
             // We need to merge robotBlockedUrls with the "status" stream from fetchAttemptedUrls and status 
             // stream of the siteMapFetchAttemptedUrls
-            crawlDbIteration.closeWith(robotBlockedUrls.union(fetchStatusUrls).union(siteMapFetchStatusUrls));
+            crawlDbIteration.closeWith(robotBlockedUrls.union(fetchStatusUrls));
             
             DataStream<Tuple2<ExtractedUrl, ParsedUrl>> parsedUrls = selectFetchedUrls(fetchAttemptedUrls)
             														.flatMap(new ParseFunction(_pageParser))
