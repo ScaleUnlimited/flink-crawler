@@ -13,6 +13,6 @@ public interface IUrlLogger {
 	
 	public void record(Class<?> clazz, BaseUrl url, Map<String, String> metaData);
 
-	public List<Tuple3<Class<?>, BaseUrl, Map<String, String>>> getLog();
+	public List<Tuple3<Class<?>, String, Map<String, String>>> getLog();
 
 }

@@ -21,6 +21,10 @@ public class CrawlStateUrl extends ValidUrl implements IPayload {
 	private long _lastFetchedTime;
 	private long _nextFetchTime;
 
+	public CrawlStateUrl() {
+		// For creating from payload
+	}
+	
 	public CrawlStateUrl(FetchUrl url, FetchStatus status, long nextFetchTime) {
 		this(url, status, url.getActualScore(), url.getEstimatedScore(), 0, nextFetchTime);
 	}
@@ -62,7 +66,7 @@ public class CrawlStateUrl extends ValidUrl implements IPayload {
 		_estimatedScore = estimatedScore;
 	}
 
-	public float getLastFetchedTime() {
+	public long getLastFetchedTime() {
 		return _lastFetchedTime;
 	}
 
@@ -108,13 +112,9 @@ public class CrawlStateUrl extends ValidUrl implements IPayload {
 	 * Return in a new object all the fields that we need for merging one CrawlStateUrl
 	 * with another one in the CrawlDB DrumMap.
 	 * 
-	 * TODO change to getValue(preallocated byte[]). We can use maxValueSize to
-	 * allocate this. When we do that, if status is UNFETCHED then set the size to
-	 * zero.
-	 *  
-	 * @return the new object.
+	 * @return the buffer.
 	 */
-	public void getValue(byte[] value) {
+	public byte[] getValue(byte[] value) {
 		if (_status == FetchStatus.UNFETCHED) {
 			value[0] = 0;
 		} else {
@@ -122,6 +122,8 @@ public class CrawlStateUrl extends ValidUrl implements IPayload {
 			value[0] = 2;
 			ByteUtils.shortToBytes((short)_status.ordinal(), value, 1);
 		}
+		
+		return value;
 	}
 
 	public static int maxValueSize() {
@@ -150,6 +152,8 @@ public class CrawlStateUrl extends ValidUrl implements IPayload {
 	@Override
 	public void write(DataOutput out) throws IOException {
 		super.write(out);
+		
+		out.writeInt(_status.ordinal());
 		out.writeFloat(_actualScore);
 		out.writeFloat(_estimatedScore);
 		out.writeLong(_lastFetchedTime);
@@ -160,6 +164,8 @@ public class CrawlStateUrl extends ValidUrl implements IPayload {
 	@Override
 	public void readFields(DataInput in) throws IOException {
 		super.readFields(in);
+		
+		_status = FetchStatus.values()[in.readInt()];
 		_actualScore = in.readFloat();
 		_estimatedScore = in.readFloat();
 		_lastFetchedTime = in.readLong();
@@ -177,4 +183,43 @@ public class CrawlStateUrl extends ValidUrl implements IPayload {
 		_nextFetchTime = 0;
 	}
 
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = super.hashCode();
+		result = prime * result + Float.floatToIntBits(_actualScore);
+		result = prime * result + Float.floatToIntBits(_estimatedScore);
+		result = prime * result
+				+ (int) (_lastFetchedTime ^ (_lastFetchedTime >>> 32));
+		result = prime * result
+				+ (int) (_nextFetchTime ^ (_nextFetchTime >>> 32));
+		result = prime * result + ((_status == null) ? 0 : _status.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (!super.equals(obj))
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		CrawlStateUrl other = (CrawlStateUrl) obj;
+		if (Float.floatToIntBits(_actualScore) != Float
+				.floatToIntBits(other._actualScore))
+			return false;
+		if (Float.floatToIntBits(_estimatedScore) != Float
+				.floatToIntBits(other._estimatedScore))
+			return false;
+		if (_lastFetchedTime != other._lastFetchedTime)
+			return false;
+		if (_nextFetchTime != other._nextFetchTime)
+			return false;
+		if (_status != other._status)
+			return false;
+		return true;
+	}
+
+	
 }

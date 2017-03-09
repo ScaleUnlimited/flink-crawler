@@ -1,8 +1,5 @@
 package com.scaleunlimited.flinkcrawler.pojos;
 
-import java.io.DataInput;
-import java.io.DataOutput;
-import java.io.IOException;
 import java.io.Serializable;
 
 @SuppressWarnings("serial")
@@ -30,14 +27,6 @@ public abstract class BaseUrl implements Serializable {
 		return _url;
 	}
 
-	public void write(DataOutput out) throws IOException {
-		out.writeUTF(_url);
-	}
-
-	public void readFields(DataInput in) throws IOException {
-		_url = in.readUTF();
-	}
-	
 	public void clear() {
 		_url = null;
 	}
@@ -47,4 +36,30 @@ public abstract class BaseUrl implements Serializable {
 		return _url;
 	}
 
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + ((_url == null) ? 0 : _url.hashCode());
+		return result;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		BaseUrl other = (BaseUrl) obj;
+		if (_url == null) {
+			if (other._url != null)
+				return false;
+		} else if (!_url.equals(other._url))
+			return false;
+		return true;
+	}
+
+	
 }
