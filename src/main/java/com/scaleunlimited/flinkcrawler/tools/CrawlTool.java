@@ -32,7 +32,8 @@ public class CrawlTool {
 	    private String _singleDomain;
         private long _defaultCrawlDelay = 10 * 1000L;
         private int _maxContentSize = SimpleHttpFetcher.DEFAULT_MAX_CONTENT_SIZE;
-
+        private long _maxWaitTime = 5000;
+        
 		@Option(name = "-seedurls", usage = "text file containing list of seed urls", required = true)
 	    public void setSeedUrlsFilename(String urlsFilename) {
 	        _urlsFilename = urlsFilename;
@@ -43,7 +44,7 @@ public class CrawlTool {
 			_singleDomain = urlsFilename;
 	    }
 		
-		@Option(name = "-defaultcrawldelay", usage = "use this crawl delay when robots.txt doesn't provide it", required = false)
+		@Option(name = "-defaultcrawldelay", usage = "use this crawl delay (ms) when robots.txt doesn't provide it", required = false)
 	    public void setDefaultCrawlDelay(long defaultCrawlDelay) {
 			_defaultCrawlDelay = defaultCrawlDelay;
 	    }
@@ -51,6 +52,11 @@ public class CrawlTool {
 		@Option(name = "-maxcontentsize", usage = "maximum content size", required = false)
 	    public void setMaxContentSize(int maxContentSize) {
 			_maxContentSize = maxContentSize;
+	    }
+		
+		@Option(name = "-maxwaittime", usage = "maximum idle time (ms) before flink job terminates", required = false)
+	    public void setMaxWaitTime(long maxWaitTime) {
+			_maxWaitTime = maxWaitTime;
 	    }
 		
 		
@@ -72,6 +78,10 @@ public class CrawlTool {
 
 		public int getMaxContentSize() {
 			return _maxContentSize;
+		}
+		
+		public long getMaxWaitTime() {
+			return _maxWaitTime;
 		}
 	}
 	
@@ -175,7 +185,8 @@ public class CrawlTool {
 				.setUrlNormalizer(new SimpleUrlNormalizer())
 				.setUrlFilter(urlValidator)
 				.setPageFetcherBuilder(pageFetcherBuilder)
-				.setDefaultCrawlDelay(options.getDefaultCrawlDelay());
+				.setDefaultCrawlDelay(options.getDefaultCrawlDelay())
+				.setMaxWaitTime(options.getMaxWaitTime());
 			
 			builder.build().execute();
 		} catch (Throwable t) {
