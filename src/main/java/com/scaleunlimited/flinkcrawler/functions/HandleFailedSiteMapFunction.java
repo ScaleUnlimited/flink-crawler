@@ -5,6 +5,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
+import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 
 @SuppressWarnings({ "serial" })
 public class HandleFailedSiteMapFunction extends RichFilterFunction<CrawlStateUrl> {
@@ -15,7 +16,11 @@ public class HandleFailedSiteMapFunction extends RichFilterFunction<CrawlStateUr
 
 	@Override
 	public boolean filter(CrawlStateUrl crawlStateUrl) throws Exception {
-		LOGGER.info(String.format("Failed fetching sitemap url '%s' due to '%s'", crawlStateUrl.getUrl(), crawlStateUrl.getStatus()));
+		// only log if failed
+		FetchStatus status = crawlStateUrl.getStatus();
+		if (status != FetchStatus.FETCHED) {
+			LOGGER.info(String.format("Failed fetching sitemap url '%s' due to '%s'", crawlStateUrl.getUrl(), crawlStateUrl.getStatus()));
+		}
 		return true;
 	}
 }

@@ -142,9 +142,9 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 						}
 					} else {
 						// TODO use robotFetchRetryTime to set up when we want to purge our rules
-							_rules.put(makeRobotsKey(url), rules);
 							_output.add(processUrl(rules, url));
 					}
+					_rules.put(makeRobotsKey(url), rules);
 				} catch (MalformedURLException e) {
 					_output.add(invalidUrl(url));
 				}

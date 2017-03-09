@@ -14,11 +14,13 @@ import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.crawldb.InMemoryCrawlDB;
 import com.scaleunlimited.flinkcrawler.fetcher.MockRobotsFetcher;
+import com.scaleunlimited.flinkcrawler.fetcher.SiteMapGraphFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.WebGraphFetcher;
 import com.scaleunlimited.flinkcrawler.functions.CheckUrlWithRobotsFunction;
 import com.scaleunlimited.flinkcrawler.functions.CrawlDBFunction;
 import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.ParseFunction;
+import com.scaleunlimited.flinkcrawler.functions.ParseSiteMapFunction;
 import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
 import com.scaleunlimited.flinkcrawler.parser.SimpleSiteMapParser;
 import com.scaleunlimited.flinkcrawler.pojos.BaseUrl;
@@ -50,7 +52,11 @@ public class CrawlTopologyTest {
 			.add("domain1.com/page1")
 			.add("domain1.com/page2", "domain2.com", "domain1.com", "domain1.com/page1")
 			.add("domain2.com", "domain2.com/page1", "domain3.com")
-			.add("domain3.com", "domain3.com/page1");
+			.add("domain3.com", "domain3.com/page1", "domain4.com")
+			.add("domain4.com");
+
+		SimpleWebGraph sitemapGraph = new SimpleWebGraph(normalizer)
+		.add("domain4.com/sitemap.txt", "domain4.com/page1", "domain4.com/page2");
 
 		Map<String, String> robotPages = new HashMap<String, String>();
 		// Block one page, and set no crawl delay.
@@ -58,6 +64,9 @@ public class CrawlTopologyTest {
 		
 		// Set a long crawl delay.
 		robotPages.put("http://domain3.com:80/robots.txt", "User-agent: *" + CRLF + "Crawl-delay: 30" + CRLF);
+		
+		// And one with a sitemap
+		robotPages.put("http://domain4.com:80/robots.txt", "User-agent: *" + CRLF + "sitemap : http://domain4.com/sitemap.txt");
 
 		CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
 			.setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
@@ -69,7 +78,8 @@ public class CrawlTopologyTest {
 			.setContentSink(new DiscardingSink<ParsedUrl>())
 			.setUrlNormalizer(normalizer)
 			.setUrlFilter(new SimpleUrlValidator())
-			.setSiteMapFetcherBuilder(new WebGraphFetcher.WebGraphFetcherBuilder(new WebGraphFetcher(graph)))
+			// Create MockSitemapFetcher - that will return a valid sitemap
+			.setSiteMapFetcherBuilder(new SiteMapGraphFetcher.SiteMapGraphFetcherBuilder(new SiteMapGraphFetcher(sitemapGraph)))
 			.setSiteMapParser(new SimpleSiteMapParser())
 			// You can increase this value from 10000 to say 100000 if you need time inside of a threaded
 			// executor before the cluster terminates.
@@ -95,7 +105,10 @@ public class CrawlTopologyTest {
 		String domain2page1 = normalizer.normalize("domain2.com/page1");
 		String domain1blockedPage = normalizer.normalize("domain1.com/blocked");
 		String domain3deferredPage = normalizer.normalize("domain3.com/page1");
-		
+		String domain4SiteMap = normalizer.normalize("domain4.com/sitemap.txt");
+		String domain4page1 = normalizer.normalize("domain4.com/page1");
+		String domain4page2 = normalizer.normalize("domain4.com/page2");
+
 		UrlLoggerResults results = new UrlLoggerResults(UrlLogger.getLog());
 		
 		results
@@ -127,6 +140,14 @@ public class CrawlTopologyTest {
 			.assertUrlLoggedBy(CheckUrlWithRobotsFunction.class, domain1blockedPage)
 			.assertUrlNotLoggedBy(FetchUrlsFunction.class, domain1blockedPage)
 			.assertUrlNotLoggedBy(ParseFunction.class, domain1blockedPage)
-			.assertUrlLoggedBy(CrawlDBFunction.class, domain1blockedPage, 2);
+			.assertUrlLoggedBy(CrawlDBFunction.class, domain1blockedPage, 2)
+			
+			.assertUrlLoggedBy(ParseSiteMapFunction.class, domain4SiteMap)
+			.assertUrlLoggedBy(	CrawlDBFunction.class, domain4page1, 1,
+								FetchStatus.class.getSimpleName(), FetchStatus.HTTP_NOT_FOUND.toString())
+			.assertUrlLoggedBy(	CrawlDBFunction.class, domain4page2, 1,
+								FetchStatus.class.getSimpleName(), FetchStatus.HTTP_NOT_FOUND.toString())
+
+			;
 	}
 }
