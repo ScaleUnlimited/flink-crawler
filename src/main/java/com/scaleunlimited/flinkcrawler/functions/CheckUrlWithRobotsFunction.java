@@ -180,8 +180,12 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 	}
 
 	private String makeRobotsKey(FetchUrl url) throws MalformedURLException {
-		String robotsKey = String.format("%s://%s:%s", url.getProtocol(), url.getHostname(), url.getPort());
-		return robotsKey;
+		int port = url.getPort();
+		if (port == -1) {
+			return String.format("%s://%s", url.getProtocol(), url.getHostname());
+		} else {
+			return String.format("%s://%s:%d", url.getProtocol(), url.getHostname(), port);
+		}
 	}
 
 	@Override

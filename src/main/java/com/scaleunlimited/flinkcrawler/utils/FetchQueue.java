@@ -22,10 +22,8 @@ public class FetchQueue {
 	}
 	
 	public boolean add(CrawlStateUrl url) {
-		FetchStatus status = url.getStatus();
-		
 		// TODO make this more sophisticated.
-		if ((_fetchQueue.size() < _maxQueueSize) && (status == FetchStatus.UNFETCHED)) {
+		if (_fetchQueue.size() < _maxQueueSize) {
 			_fetchQueue.add(new FetchUrl(url, url.getEstimatedScore(), url.getActualScore()));
 			return true;
 		} else {

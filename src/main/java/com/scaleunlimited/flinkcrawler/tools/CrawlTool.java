@@ -176,7 +176,7 @@ public class CrawlTool {
 			CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
 //				.setMaxWaitTime(100000)
 				.setUrlSource(new SeedUrlSource(options.getSeedUrlsFilename(), 1.0f))
-				.setCrawlDB(new InMemoryCrawlDB())
+				.setCrawlDBBuilder(new InMemoryCrawlDB.InMemoryCrawlDBBuilder())
 				.setUrlLengthener(new SimpleUrlLengthener())
 				.setRobotsFetcherBuilder(pageFetcherBuilder)
 				.setRobotsParser(new SimpleRobotRulesParser())

@@ -24,8 +24,8 @@ public class InMemoryCrawlDB extends BaseCrawlDB {
 	private transient byte[] _mergedValue;
 	
 	@Override
-	public void open(FetchQueue fetchQueue, BaseCrawlDBMerger merger) throws Exception {
-		super.open(fetchQueue, merger);
+	public void open(int index, FetchQueue fetchQueue, BaseCrawlDBMerger merger) throws Exception {
+		super.open(index, fetchQueue, merger);
 		
 		_crawlState = new HashMap<>();
 		_archiveDB = new HashMap<>();
@@ -104,5 +104,15 @@ public class InMemoryCrawlDB extends BaseCrawlDB {
 		}
 	}
 
+	public static class InMemoryCrawlDBBuilder extends BaseCrawlDBBuilder<InMemoryCrawlDB> {
+		
+		public InMemoryCrawlDBBuilder() {
+			super();
+		}
+		
+		public InMemoryCrawlDB build() {
+			return new InMemoryCrawlDB();
+		}
+	}
 	
 }

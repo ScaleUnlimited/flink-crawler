@@ -17,7 +17,7 @@ public abstract class BaseCrawlDB implements Serializable {
 	 * 
 	 * @param fetchQueue Queue used externally as source of URLs to be fetched
 	 */
-	public void open(FetchQueue fetchQueue, BaseCrawlDBMerger merger) throws Exception {
+	public void open(int index, FetchQueue fetchQueue, BaseCrawlDBMerger merger) throws Exception {
 		_fetchQueue = fetchQueue;
 		_merger = merger;
 	}
