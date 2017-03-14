@@ -11,13 +11,12 @@ import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
 import com.scaleunlimited.flinkcrawler.config.ParserPolicy;
-import com.scaleunlimited.flinkcrawler.crawldb.InMemoryCrawlDB;
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
 
 
 @SuppressWarnings("serial")
 public abstract class BaseLinkExtractor extends DefaultHandler implements Serializable {
-    static final Logger LOGGER = LoggerFactory.getLogger(InMemoryCrawlDB.class);
+    static final Logger LOGGER = LoggerFactory.getLogger(BaseLinkExtractor.class);
 
     public static final Set<String> DEFAULT_LINK_TAGS =
         new HashSet<String>() {{
