@@ -12,7 +12,6 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.scaleunlimited.flinkcrawler.crawldb.DrumCrawlDB;
 import com.scaleunlimited.flinkcrawler.crawldb.InMemoryCrawlDB;
 import com.scaleunlimited.flinkcrawler.fetcher.MockRobotsFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.SiteMapGraphFetcher;
@@ -23,11 +22,7 @@ import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.ParseFunction;
 import com.scaleunlimited.flinkcrawler.functions.ParseSiteMapFunction;
 import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
-<<<<<<< HEAD
 import com.scaleunlimited.flinkcrawler.parser.SimpleSiteMapParser;
-import com.scaleunlimited.flinkcrawler.pojos.BaseUrl;
-=======
->>>>>>> master
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
@@ -68,15 +63,13 @@ public class CrawlTopologyTest {
 					  	"User-agent: *" + CRLF + "Disallow: /blocked" + CRLF + "Crawl-delay: 0" + CRLF);
 		
 		// Set a long crawl delay.
-<<<<<<< HEAD
 		robotPages.put("http://domain3.com:80/robots.txt", "User-agent: *" + CRLF + "Crawl-delay: 30" + CRLF);
+		robotPages.put(	normalizer.normalize("http://domain3.com/robots.txt"),
+				"User-agent: *" + CRLF + "Crawl-delay: 30" + CRLF);
 		
 		// And one with a sitemap
-		robotPages.put("http://domain4.com:80/robots.txt", "User-agent: *" + CRLF + "sitemap : http://domain4.com/sitemap.txt");
-=======
-		robotPages.put(	normalizer.normalize("http://domain3.com/robots.txt"),
-						"User-agent: *" + CRLF + "Crawl-delay: 30" + CRLF);
->>>>>>> master
+		robotPages.put(normalizer.normalize("http://domain4.com:80/robots.txt"), 
+				"User-agent: *" + CRLF + "sitemap : http://domain4.com/sitemap.txt");
 
 		CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
 			.setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
