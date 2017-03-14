@@ -12,6 +12,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.scaleunlimited.flinkcrawler.crawldb.DrumCrawlDB;
 import com.scaleunlimited.flinkcrawler.crawldb.InMemoryCrawlDB;
 import com.scaleunlimited.flinkcrawler.fetcher.MockRobotsFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.SiteMapGraphFetcher;
@@ -22,8 +23,11 @@ import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.ParseFunction;
 import com.scaleunlimited.flinkcrawler.functions.ParseSiteMapFunction;
 import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
+<<<<<<< HEAD
 import com.scaleunlimited.flinkcrawler.parser.SimpleSiteMapParser;
 import com.scaleunlimited.flinkcrawler.pojos.BaseUrl;
+=======
+>>>>>>> master
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
@@ -60,18 +64,25 @@ public class CrawlTopologyTest {
 
 		Map<String, String> robotPages = new HashMap<String, String>();
 		// Block one page, and set no crawl delay.
-		robotPages.put("http://domain1.com:80/robots.txt", "User-agent: *" + CRLF + "Disallow: /blocked" + CRLF + "Crawl-delay: 0" + CRLF);
+		robotPages.put(	normalizer.normalize("http://domain1.com/robots.txt"),
+					  	"User-agent: *" + CRLF + "Disallow: /blocked" + CRLF + "Crawl-delay: 0" + CRLF);
 		
 		// Set a long crawl delay.
+<<<<<<< HEAD
 		robotPages.put("http://domain3.com:80/robots.txt", "User-agent: *" + CRLF + "Crawl-delay: 30" + CRLF);
 		
 		// And one with a sitemap
 		robotPages.put("http://domain4.com:80/robots.txt", "User-agent: *" + CRLF + "sitemap : http://domain4.com/sitemap.txt");
+=======
+		robotPages.put(	normalizer.normalize("http://domain3.com/robots.txt"),
+						"User-agent: *" + CRLF + "Crawl-delay: 30" + CRLF);
+>>>>>>> master
 
 		CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
 			.setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
 			.setUrlLengthener(new SimpleUrlLengthener())
-			.setCrawlDB(new InMemoryCrawlDB())
+			.setCrawlDBBuilder(new InMemoryCrawlDB.InMemoryCrawlDBBuilder())
+			// .setCrawlDBBuilder(new DrumCrawlDB.DrumCrawlDBBuilder().setMaxRamEntries(10_000).setDataDirname("./target/drum/"))
 			.setRobotsFetcherBuilder(new MockRobotsFetcher.MockRobotsFetcherBuilder(new MockRobotsFetcher(robotPages)))
 			.setRobotsParser(new SimpleRobotRulesParser())
 			.setPageParser(new SimplePageParser())
@@ -83,6 +94,7 @@ public class CrawlTopologyTest {
 			.setSiteMapParser(new SimpleSiteMapParser())
 			// You can increase this value from 10000 to say 100000 if you need time inside of a threaded
 			// executor before the cluster terminates.
+			// TODO 5000 was long enough, but with new async crawlDB the iteration terminates too quickly.
 			.setMaxWaitTime(10000)
 			.setDefaultCrawlDelay(0)
 			.setPageFetcherBuilder(new WebGraphFetcher.WebGraphFetcherBuilder(new WebGraphFetcher(graph)));
@@ -96,7 +108,7 @@ public class CrawlTopologyTest {
 		
 		ct.execute();
 		
-		for (Tuple3<Class<?>, BaseUrl, Map<String, String>> entry : UrlLogger.getLog()) {
+		for (Tuple3<Class<?>, String, Map<String, String>> entry : UrlLogger.getLog()) {
 			LOGGER.info(String.format("%s: %s", entry.f0, entry.f1));
 		}
 		

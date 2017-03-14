@@ -2,18 +2,27 @@ package com.scaleunlimited.flinkcrawler.crawldb;
 
 import java.io.Closeable;
 import java.io.DataInputStream;
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDBMerger.MergeResult;
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDBMerger.MergedStatus;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
+import com.scaleunlimited.flinkcrawler.pojos.ValidUrl;
 import com.scaleunlimited.flinkcrawler.utils.ByteUtils;
 import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
 
@@ -66,7 +75,7 @@ import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
  * 
  */
 public class DrumMap implements Closeable {
-	private static final int NO_PAYLOAD_OFFSET = -1;
+	private static Logger LOGGER = LoggerFactory.getLogger(DrumMap.class);
 	
 	public static final int DEFAULT_MAX_ENTRIES = 10_000;
 
@@ -75,8 +84,6 @@ public class DrumMap implements Closeable {
 	// Long hash, long payload offset, value length byte.
 	private static final int NON_VALUE_SIZE = 8 + 8 + 1;
 	private static final int MAX_ENTRY_SIZE = NON_VALUE_SIZE + MAX_VALUE_LENGTH;
-	
-	private static final String PAYLOAD_FILENAME = "payload.bin";
 	
 	private BaseCrawlDBMerger _merger;
 	
@@ -107,13 +114,10 @@ public class DrumMap implements Closeable {
 	
 	public DrumMap(int maxEntries, int averageValueLength, File dataDir, BaseCrawlDBMerger merger) throws FileNotFoundException, IOException {
 		_maxEntries = maxEntries;
-		_numEntries = 0;
-		
 		_entries = new int[_maxEntries];
 		
 		final int averageEntrySize = NON_VALUE_SIZE + averageValueLength;
 		_entryData = new byte[averageEntrySize * _maxEntries];
-		_entryDataOffset = 0;
 		
 		_dataDir = dataDir;
 		
@@ -125,17 +129,32 @@ public class DrumMap implements Closeable {
 	public void open() throws IOException {
 		FileUtils.forceMkdir(_dataDir);
 		
-		// FUTURE gzip the output stream, as it's going to have a lot of compression. But
-		// can we keep track of offsets then? Do these need to be bit offsets? Or maybe
-		// since we only should be walking through the entries linearly, we could just
-		// use an entry id (0...n) vs. an offset, so we don't need locations.
-		_payloadFile = new File(_dataDir, PAYLOAD_FILENAME);
+		reset();
+	}
+	
+	/**
+	 * Create and open the payload file, and resets current positions
+	 * 
+	 * @throws IOException
+	 */
+	private void reset() throws IOException {
+		_numEntries = 0;
+		_entryDataOffset = 0;
+
+		_payloadFile = new File(_dataDir, makePayloadFilename());
 		_payloadFile.delete();
 		_payloadFile.createNewFile();
 		
 		_payloadOut = new DrumDataOutput(new FileOutputStream(_payloadFile));
 	}
-	
+
+	private String makePayloadFilename() {
+		
+		SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMdd'T'HHmmss.SSS");
+		dateFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+		return String.format("payload-%s.bin", dateFormat.format(new Date()));
+	}
+
 	public int size() {
 		// TODO add in size of entries that have merged/spilled to disk?
 		return _numEntries;
@@ -172,21 +191,18 @@ public class DrumMap implements Closeable {
 	}
 
 	/**
-	 * If we have a payload, write it out to our payload file and return
+	 * Write the payload out to our payload file and return
 	 * the offset.
 	 * 
 	 * @param payload
-	 * @return offset of data written, or NO_PAYLOAD_OFFSET
+	 * @return offset of data written
 	 */
 	private long writePayload(IPayload payload) throws IOException {
-		if (payload == null) {
-			return NO_PAYLOAD_OFFSET;
-		} else {
-			// Write the payload to our file, and return the offset of the data
-			long result = _payloadOut.getBytesWritten();
-			payload.write(_payloadOut);
-			return result;
-		}
+		// Write the payload to our file, and return the offset of the data
+		long result = _payloadOut.getBytesWritten();
+		payload.write(_payloadOut);
+		LOGGER.info(String.format("Wrote payload at offset %d", result));
+		return result;
 	}
 
 	public void sort() {
@@ -196,20 +212,23 @@ public class DrumMap implements Closeable {
 	/**
 	 * Merge our in-memory array and related payload file with the persisted version
 	 * 
-	 * TODO - If we're merging, prevent add from being called. So get a lock on a synchronized
-	 * object.
 	 */
 	public void merge(FetchQueue queue) {
+		// Get a lock so that no new entries are added while we're merging.
 		synchronized (_lock) {
-			sort();
-			
-			if (onDiskActiveExists()) {
-				doMergeWithDisk(queue);
-			} else {
-				doMergeMemoryOnly(queue);
+			try {
+				sort();
+
+				if (onDiskActiveExists()) {
+					doMergeWithDisk(queue);
+				} else {
+					doMergeMemoryOnly(queue);
+				}
+
+				_mergeNeeded = false;
+			} catch (IOException e) {
+				throw new RuntimeException("Exception while merging: " + e.getMessage(), e);
 			}
-			
-			_mergeNeeded = false;
 		}
 	}
 
@@ -230,61 +249,104 @@ public class DrumMap implements Closeable {
 		
 	}
 	
-	private void doMergeMemoryOnly(FetchQueue queue) {
+	/**
+	 * There's no active disk data, so we're just doing a self-merge with
+	 * what's in the memory list.
+	 * 
+	 * @param queue
+	 * @throws IOException 
+	 */
+	private void doMergeMemoryOnly(FetchQueue queue) throws IOException {
 		if (_numEntries == 0) {
 			return;
 		}
 		
-		// TODO need to close payload file, open of input stream on it
-		// so we can do random access. And reset size of payload file 
-		// when we're done.
-		byte[] oldValue = new byte[CrawlStateUrl.maxValueSize()];
-		byte[] newValue = new byte[CrawlStateUrl.maxValueSize()];
-		byte[] mergedValue = new byte[CrawlStateUrl.maxValueSize()];
-		
-		// Do the merge using only in-memory data
-		long curHash = getHash(0);
-		
-		for (int i = 1; i < _numEntries; i++) {
-			long nextHash = getHash(i);
-			byte[] valueToUse = null;
-			if (nextHash != curHash) {
-				// TODO remove need to copy by having getMergedStatus(byte[], offset)
-				System.arraycopy(_entryData, getValueOffset(i), mergedValue, 0, getValueSize(i));
-				valueToUse = mergedValue;
-			} else {
-				// we have two entries with the same hash, so we have to merge them.
-				// TODO remove need to copy to oldValue, newValue by having byte[], offset params
-				System.arraycopy(_entryData, getValueOffset(i - 1), oldValue, 0, getValueSize(i - 1));
-				System.arraycopy(_entryData, getValueOffset(i), newValue, 0, getValueSize(i));
-				MergeResult result = _merger.doMerge(oldValue, newValue, mergedValue);
-				
-				if (result == MergeResult.USE_OLD) {
-					valueToUse = oldValue;
-				} else if (result == MergeResult.USE_NEW) {
-					valueToUse = newValue;
-				} else if (result == MergeResult.USE_MERGED) {
-					valueToUse = mergedValue;
+		_payloadOut.close();
+		_payloadOut = null;
+		RandomAccessFile dis = new RandomAccessFile(_payloadFile, "r");
+
+		try {
+			byte[] oldValue = new byte[CrawlStateUrl.maxValueSize()];
+			byte[] newValue = new byte[CrawlStateUrl.maxValueSize()];
+			byte[] mergedValue = new byte[CrawlStateUrl.maxValueSize()];
+
+			byte[] curValue = null;
+			long nextHash = 0;
+
+			for (int i = 0; i < _numEntries; i++) {
+				// Use next hash if we've got it.
+				long curHash;
+
+				if (i == 0) {
+					curHash = getHash(0);
+					System.arraycopy(_entryData, getValueOffset(0), oldValue, 0, getValueSize(0));
+					curValue = oldValue;
 				} else {
-					throw new RuntimeException("Unknown merge result: " + result);
+					curHash = nextHash;
+					// curValue has been set up in previous loop.
+				}
+
+				// If we're at the end, fake a hash that will never match, to trigger
+				// processing of the last entry.
+				boolean lastEntry = i == _numEntries - 1;
+				nextHash = lastEntry ? curHash + 1 : getHash(i + 1);
+
+				if (nextHash != curHash) {
+					// Current entry can be processed, since next entry is different.
+					// Decide what to do with the merged result
+					MergedStatus status = _merger.getMergedStatus(curValue);
+					if (status == MergedStatus.ACTIVE_FETCH) {
+						long position = getPayloadPosition(i);
+						LOGGER.info(String.format("%s: Seeking to position %d for entry #%d", Thread.currentThread().getName(), position, i));
+						dis.seek(position);
+						CrawlStateUrl url = new CrawlStateUrl();
+						url.readFields(dis);
+						queue.add(url);
+						
+						// TODO - Also put in active disk
+					} else if (status == MergedStatus.ACTIVE) {
+						// TODO just put in active disk
+					} else if (status == MergedStatus.ARCHIVE) {
+						// TODO put in archive
+					} else {
+						throw new RuntimeException("Unknown merge status: " + status);
+					}
+
+					if (!lastEntry) {
+						// FUTURE remove need to copy by having getMergedStatus(byte[], offset)
+						System.arraycopy(_entryData, getValueOffset(i + 1), oldValue, 0, getValueSize(i + 1));
+						curValue = oldValue;
+						curHash = nextHash;
+					}
+				} else {
+					// we have two entries with the same hash, so we have to merge them.
+					// FUTURE remove need to copy to oldValue, newValue by having byte[], offset params
+					System.arraycopy(_entryData, getValueOffset(i + 1), newValue, 0, getValueSize(i + 1));
+					MergeResult result = _merger.doMerge(curValue, newValue, mergedValue);
+
+					if (result == MergeResult.USE_OLD) {
+						curValue = oldValue;
+					} else if (result == MergeResult.USE_NEW) {
+						curValue = newValue;
+					} else if (result == MergeResult.USE_MERGED) {
+						curValue = mergedValue;
+					} else {
+						throw new RuntimeException("Unknown merge result: " + result);
+					}
 				}
 			}
+		} catch (EOFException e) {
+			LOGGER.error(Thread.currentThread().getName() + ": EOFException reading from file " + _payloadFile);
+		} finally {
 			
-			// Now decide what to do with the merged result
-			MergedStatus status = _merger.getMergedStatus(valueToUse);
-			if (status == MergedStatus.ACTIVE_FETCH) {
-				// TODO put in queue - so reconstruct CrawlStateUrl from value, payload
-				// put in active disk
-			} else if (status == MergedStatus.ACTIVE) {
-				// TODO put in active disk
-			} else if (status == MergedStatus.ARCHIVE) {
-				// TODO put in archive
-			} else {
-				throw new RuntimeException("Unknown merge status: " + status);
-			}
-
-			curHash = nextHash;
+			// Create a new payload file, reset 
+			reset();
+			
+			IOUtils.closeQuietly(dis);
+			
+			// TODO delete old payload file if no error?
 		}
+		
 	}
 	
 	private int getValueOffset(int entryIndex) {
@@ -307,6 +369,15 @@ public class DrumMap implements Closeable {
 		
 		int dataOffset = _entries[entryIndex];
 		return ByteUtils.bytesToLong(_entryData, dataOffset);
+	}
+	
+	private long getPayloadPosition(int entryIndex) {
+		if ((entryIndex < 0) || (entryIndex >= _numEntries)) {
+			throw new IllegalArgumentException("Invalid index: " + entryIndex);
+		}
+		
+		int dataOffset = _entries[entryIndex];
+		return ByteUtils.bytesToLong(_entryData, dataOffset + 8);
 	}
 	
 	private boolean onDiskActiveExists() {

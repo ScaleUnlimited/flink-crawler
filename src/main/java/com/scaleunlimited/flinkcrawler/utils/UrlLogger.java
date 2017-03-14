@@ -31,7 +31,7 @@ public class UrlLogger {
 		}
 	}
 
-	public static List<Tuple3<Class<?>, BaseUrl, Map<String, String>>> getLog() {
+	public static List<Tuple3<Class<?>, String, Map<String, String>>> getLog() {
 		if (URL_LOGGER != null) {
 			return URL_LOGGER.getLog();
 		} else {

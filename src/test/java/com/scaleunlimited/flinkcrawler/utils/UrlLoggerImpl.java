@@ -18,11 +18,10 @@ public class UrlLoggerImpl implements IUrlLogger {
 	
 	private static final Map<String, String> EMPTY_METADATA_MAP = new HashMap<>();
 	
-	private Map<Class<?>, List<BaseUrl>> _byClass;
-	private List<Tuple3<Class<?>, BaseUrl, Map<String, String>>> _log;
+	private Map<Class<?>, List<String>> _byClass;
+	private List<Tuple3<Class<?>, String, Map<String, String>>> _log;
 	
 	public UrlLoggerImpl() {
-		// TODO check system property for whether we're logging, skip otherwise.
 		_byClass = new HashMap<>();
 		_log = new ArrayList<>();
 	}
@@ -34,18 +33,19 @@ public class UrlLoggerImpl implements IUrlLogger {
 	public void record(Class<?> clazz, BaseUrl url, Map<String, String> metaData) {
 		LOGGER.debug(String.format("%s: %s", clazz.getSimpleName(), url));
 		
-		List<BaseUrl> urls = _byClass.get(clazz);
+		List<String> urls = _byClass.get(clazz);
 		if (urls == null) {
-			urls = new ArrayList<BaseUrl>();
+			urls = new ArrayList<>();
 			_byClass.put(clazz, urls);
 		}
 		
-		urls.add(url);
+		String urlAsString = url.getUrl();
+		urls.add(urlAsString);
 		
-		_log.add(new Tuple3<Class<?>, BaseUrl, Map<String, String>>(clazz, url, metaData));
+		_log.add(new Tuple3<Class<?>, String, Map<String, String>>(clazz, urlAsString, metaData));
 	}
 	
-	public List<Tuple3<Class<?>, BaseUrl, Map<String, String>>> getLog() {
+	public List<Tuple3<Class<?>, String, Map<String, String>>> getLog() {
 		return _log;
 	}
 	
@@ -69,9 +69,9 @@ public class UrlLoggerImpl implements IUrlLogger {
 
 	public static class UrlLoggerResults {
 
-		private List<Tuple3<Class<?>, BaseUrl, Map<String, String>>> _log;
+		private List<Tuple3<Class<?>, String, Map<String, String>>> _log;
 		
-		public UrlLoggerResults(List<Tuple3<Class<?>, BaseUrl, Map<String, String>>> log) {
+		public UrlLoggerResults(List<Tuple3<Class<?>, String, Map<String, String>>> log) {
 			_log = log;
 		}
 		
@@ -106,7 +106,7 @@ public class UrlLoggerImpl implements IUrlLogger {
 		 */
 		public UrlLoggerResults assertLoggedBy(Class<?> clazz, int minCalls, int maxCalls) {
 			int foundCalls = 0;
-			for (Tuple3<Class<?>, BaseUrl, Map<String, String>> entry : _log) {
+			for (Tuple3<Class<?>, String, Map<String, String>> entry : _log) {
 				if (entry.f0.equals(clazz)) {
 					foundCalls += 1;
 				}
@@ -137,8 +137,11 @@ public class UrlLoggerImpl implements IUrlLogger {
 			Map<String, String> targetMetaDataMap = makeMetaDataMap(targetMetaData);
 
 			int foundCalls = 0;
-			for (Tuple3<Class<?>, BaseUrl, Map<String, String>> entry : _log) {
-				if (entry.f0.equals(clazz) && entry.f1.getUrl().equals(url)) {
+			int foundCallsRightMeta = 0;
+			for (Tuple3<Class<?>, String, Map<String, String>> entry : _log) {
+				if (entry.f0.equals(clazz) && entry.f1.equals(url)) {
+					foundCalls += 1;
+					
 					// For every entry that we care about in the target metadata, make sure it exists
 					// and has the same value.
 					boolean metaDataMatches = true;
@@ -153,18 +156,22 @@ public class UrlLoggerImpl implements IUrlLogger {
  					}
 					
 					if (metaDataMatches) {
-						foundCalls += 1;
+						foundCallsRightMeta += 1;
 					}
 				}
 			}
 			
-			if ((foundCalls < minCalls) || (foundCalls > maxCalls)) {
-				if (foundCalls == 0) {
-					fail(String.format("URL '%s' not logged by %s", url, clazz));
+			if ((foundCallsRightMeta < minCalls) || (foundCallsRightMeta > maxCalls)) {
+				if (foundCallsRightMeta == 0) {
+					if (foundCalls > 0) {
+						fail(String.format("URL '%s' not logged by %s with target metadata", url, clazz));
+					} else {
+						fail(String.format("URL '%s' not logged by %s", url, clazz));
+					}
 				} else if (minCalls == maxCalls) {
 					fail(String.format("URL '%s' was logged %d times by %s, expected %d", url, foundCalls, clazz, minCalls));
 				} else {
-					fail(String.format("URL '%s' was logged %d times by %s, expected between %d and %d", foundCalls, clazz, minCalls, maxCalls));
+					fail(String.format("URL '%s' was logged %d times by %s, expected between %d and %d", foundCallsRightMeta, clazz, minCalls, maxCalls));
 				}
 			}
 			
@@ -178,7 +185,7 @@ public class UrlLoggerImpl implements IUrlLogger {
 		 * @return
 		 */
 		public UrlLoggerResults assertNotCalledBy(Class<?> clazz) {
-			for (Tuple3<Class<?>, BaseUrl, Map<String, String>> entry : _log) {
+			for (Tuple3<Class<?>, String, Map<String, String>> entry : _log) {
 				if (entry.f0.equals(clazz)) {
 					fail(String.format("Found URL '%s' logged by %s", entry.f1, clazz));
 				}
@@ -189,8 +196,8 @@ public class UrlLoggerImpl implements IUrlLogger {
 		
 
 		public UrlLoggerResults assertUrlLogged(String url) {
-			for (Tuple3<Class<?>, BaseUrl, Map<String, String>> entry : _log) {
-				if (entry.f1.getUrl().equals(url)) {
+			for (Tuple3<Class<?>, String, Map<String, String>> entry : _log) {
+				if (entry.f1.equals(url)) {
 					return this;
 				}
 			}
@@ -202,8 +209,8 @@ public class UrlLoggerImpl implements IUrlLogger {
 		}
 		
 		public UrlLoggerResults assertUrlNotLoggedBy(Class<?> clazz, String url) {
-			for (Tuple3<Class<?>, BaseUrl, Map<String, String>> entry : _log) {
-				if (entry.f0.equals(clazz) && entry.f1.getUrl().equals(url)) {
+			for (Tuple3<Class<?>, String, Map<String, String>> entry : _log) {
+				if (entry.f0.equals(clazz) && entry.f1.equals(url)) {
 					fail(String.format("Found URL '%s' logged by %s", url, clazz));
 				}
 			}
