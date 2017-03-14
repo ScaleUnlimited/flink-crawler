@@ -201,7 +201,7 @@ public class DrumMap implements Closeable {
 		// Write the payload to our file, and return the offset of the data
 		long result = _payloadOut.getBytesWritten();
 		payload.write(_payloadOut);
-		LOGGER.info(String.format("Wrote payload at offset %d", result));
+		LOGGER.trace(String.format("Wrote payload at offset %d", result));
 		return result;
 	}
 
@@ -297,7 +297,7 @@ public class DrumMap implements Closeable {
 					MergedStatus status = _merger.getMergedStatus(curValue);
 					if (status == MergedStatus.ACTIVE_FETCH) {
 						long position = getPayloadPosition(i);
-						LOGGER.info(String.format("%s: Seeking to position %d for entry #%d", Thread.currentThread().getName(), position, i));
+						LOGGER.trace(String.format("%s: Seeking to position %d for entry #%d", Thread.currentThread().getName(), position, i));
 						dis.seek(position);
 						CrawlStateUrl url = new CrawlStateUrl();
 						url.readFields(dis);

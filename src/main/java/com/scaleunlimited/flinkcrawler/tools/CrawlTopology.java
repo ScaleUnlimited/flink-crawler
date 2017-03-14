@@ -9,6 +9,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.flink.api.common.JobExecutionResult;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.streaming.api.collector.selector.OutputSelector;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
@@ -16,6 +17,7 @@ import org.apache.flink.streaming.api.datastream.IterativeStream;
 import org.apache.flink.streaming.api.datastream.KeyedStream;
 import org.apache.flink.streaming.api.datastream.SplitStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 
 import com.scaleunlimited.flinkcrawler.config.BaseHttpFetcherBuilder;
@@ -25,10 +27,12 @@ import com.scaleunlimited.flinkcrawler.crawldb.DefaultCrawlDBMerger;
 import com.scaleunlimited.flinkcrawler.functions.CheckUrlWithRobotsFunction;
 import com.scaleunlimited.flinkcrawler.functions.CrawlDBFunction;
 import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
+import com.scaleunlimited.flinkcrawler.functions.HandleFailedSiteMapFunction;
 import com.scaleunlimited.flinkcrawler.functions.LengthenUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.NormalizeUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.OutlinkToStateUrlFunction;
 import com.scaleunlimited.flinkcrawler.functions.ParseFunction;
+import com.scaleunlimited.flinkcrawler.functions.ParseSiteMapFunction;
 import com.scaleunlimited.flinkcrawler.functions.PldKeySelector;
 import com.scaleunlimited.flinkcrawler.functions.UrlKeySelector;
 import com.scaleunlimited.flinkcrawler.functions.ValidUrlsFilter;
@@ -46,6 +50,7 @@ import com.scaleunlimited.flinkcrawler.urls.BaseUrlValidator;
 import com.scaleunlimited.flinkcrawler.utils.FlinkUtils;
 
 import crawlercommons.robots.SimpleRobotRulesParser;
+import crawlercommons.sitemaps.SiteMapParser;
 
 /**
  * A Flink streaming workflow that can be executed.
@@ -101,7 +106,10 @@ public class CrawlTopology {
         private BaseUrlNormalizer _urlNormalizer;
         private BaseUrlValidator _urlFilter;
         private BaseHttpFetcherBuilder _pageFetcherBuilder;
+        private BaseHttpFetcherBuilder _siteMapFetcherBuilder;
         private BasePageParser _pageParser;
+		private BasePageParser _siteMapParser;
+
 
         public CrawlTopologyBuilder(StreamExecutionEnvironment env) {
             _env = env;
@@ -152,8 +160,18 @@ public class CrawlTopology {
             return this;
         }
 
+        public CrawlTopologyBuilder setSiteMapFetcherBuilder(BaseHttpFetcherBuilder siteMapFetcherBuilder) {
+            _siteMapFetcherBuilder = siteMapFetcherBuilder;
+            return this;
+        }
+
         public CrawlTopologyBuilder setPageParser(BasePageParser pageParser) {
             _pageParser = pageParser;
+            return this;
+        }
+
+        public CrawlTopologyBuilder setSiteMapParser(BasePageParser siteMapParser) {
+            _siteMapParser = siteMapParser;
             return this;
         }
 
@@ -211,7 +229,7 @@ public class CrawlTopology {
             
             // Update the Crawl DB, then run URLs it emits through robots filtering.
             IterativeStream<CrawlStateUrl> crawlDbIteration = cleanedUrls.iterate(_maxWaitTime);
-            DataStream<Tuple2<CrawlStateUrl, FetchUrl>> postRobotsUrls = crawlDbIteration
+            DataStream<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> postRobotsUrls = crawlDbIteration
             		.keyBy(new PldKeySelector<CrawlStateUrl>())
             		.process(new CrawlDBFunction(_crawlDBBuilder, new DefaultCrawlDBMerger()))
             		.name("CrawlDBFunction")
@@ -219,32 +237,68 @@ public class CrawlTopology {
                     .process(new CheckUrlWithRobotsFunction(_robotsFetcherBuilder, _robotsParser, _defaultCrawlDelay))
                     .name("CheckUrlWithRobotsFunction");
             
-            // Split this stream into passed and blocked.
-            SplitStream<Tuple2<CrawlStateUrl, FetchUrl>> blockedOrPassedUrls = postRobotsUrls
-            		.split(new OutputSelector<Tuple2<CrawlStateUrl, FetchUrl>>() {
+            // Split this stream into passed, blocked or sitemap.
+            SplitStream<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> blockedOrPassedOrSitemapUrls = postRobotsUrls
+            		.split(new OutputSelector<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>>() {
                         
             			private final List<String> BLOCKED_STREAM = Arrays.asList("blocked");
                         private final List<String> PASSED_STREAM = Arrays.asList("passed");
+                        private final List<String> SITEMAP_STREAM = Arrays.asList("sitemap");
 
                         @Override
-                        public Iterable<String> select(Tuple2<CrawlStateUrl, FetchUrl> blockedOrPassedUrl) {
-                            if (blockedOrPassedUrl.f0 != null) {
+                        public Iterable<String> select(Tuple3<CrawlStateUrl, FetchUrl, FetchUrl> blockedOrPassedOrSitemapUrl) {
+                            if (blockedOrPassedOrSitemapUrl.f0 != null) {
                                 return BLOCKED_STREAM;
-                            } else if (blockedOrPassedUrl.f1 != null) {
+                            } else if (blockedOrPassedOrSitemapUrl.f1 != null) {
                                 return PASSED_STREAM;
+                            } else if (blockedOrPassedOrSitemapUrl.f2 != null) {
+                                return SITEMAP_STREAM;
                             } else {
-                                throw new RuntimeException("Invalid case of neither blocked nor passed");
+                                throw new RuntimeException("Invalid case of neither blocked nor passed nor sitemap");
                             }
                         }
             		});
             
-            // Split off rejected URLs. These will get unioned (merged) with the status of URLs that we
-            // attempt to fetch, and then fed back into the crawl DB via the inner iteration.
-            DataStream<CrawlStateUrl> robotBlockedUrls = blockedOrPassedUrls.select("blocked")
-            		.map(new MapFunction<Tuple2<CrawlStateUrl,FetchUrl>, CrawlStateUrl>() {
+            // Split off the sitemap urls and fetch and later parse them using the sitemap fetcher
+            // and parser to generate outlinks
+            DataStream<Tuple2<CrawlStateUrl, FetchedUrl>> sitemapUrls = blockedOrPassedOrSitemapUrls.select("sitemap")
+            		.map(new MapFunction<Tuple3<CrawlStateUrl,FetchUrl, FetchUrl>, FetchUrl>() {
 
 						@Override
-						public CrawlStateUrl map(Tuple2<CrawlStateUrl, FetchUrl> blockedUrl)
+						public FetchUrl map(Tuple3<CrawlStateUrl, FetchUrl, FetchUrl> sitemapUrl)
+								throws Exception {
+							return sitemapUrl.f2;
+						}
+					})
+					.name("Select sitemap URLs")
+            		.keyBy(new PldKeySelector<FetchUrl>())
+					.process(new FetchUrlsFunction(_siteMapFetcherBuilder))
+                    .name("FetchUrlsFunction for sitemap"); // FUTURE Have a separate FetchSiteMapUrlFunction that extends FetchUrlsFunction
+           
+            // Run the failed urls into a custom function to log it and then to a DiscardingSink.
+            // FUTURE - flag as sitemap and emit as any other url from the robots code; but this would require us to payload the flag through
+            SplitStream<Tuple2<CrawlStateUrl, FetchedUrl>> siteMapFetchAttemptedUrls = splitFetchedUrlsStream(sitemapUrls);
+            selectFetchStatus(siteMapFetchAttemptedUrls)
+            		.filter(new HandleFailedSiteMapFunction())
+            		.name("HandleFailedSiteMapFunction")
+            		.addSink(new DiscardingSink<CrawlStateUrl>());
+            
+            DataStream<Tuple2<ExtractedUrl, ParsedUrl>> parsedSiteMapUrls = selectFetchedUrls(siteMapFetchAttemptedUrls)
+					.flatMap(new ParseSiteMapFunction(_siteMapParser))
+					.name("ParseSiteMapFunction");
+            SplitStream<Tuple2<ExtractedUrl, ParsedUrl>> sitemapOutlinksContent = splitOutlinkContent(parsedSiteMapUrls);
+            DataStream<RawUrl> newSiteMapExtractedUrls = sitemapOutlinksContent.select("outlink")
+            		.map(new OutlinkToStateUrlFunction())
+            		.name("OutlinkToStateUrlFunction");
+
+            
+            // Split off rejected URLs. These will get unioned (merged) with the status of URLs that we
+            // attempt to fetch, and then fed back into the crawl DB via the inner iteration.
+            DataStream<CrawlStateUrl> robotBlockedUrls = blockedOrPassedOrSitemapUrls.select("blocked")
+            		.map(new MapFunction<Tuple3<CrawlStateUrl,FetchUrl, FetchUrl>, CrawlStateUrl>() {
+
+						@Override
+						public CrawlStateUrl map(Tuple3<CrawlStateUrl, FetchUrl, FetchUrl> blockedUrl)
 								throws Exception {
 							return blockedUrl.f0;
 						}
@@ -252,11 +306,11 @@ public class CrawlTopology {
 					.name("Select blocked URLs");
             
             // Fetch the URLs that passed our robots filter
-            DataStream<Tuple2<CrawlStateUrl, FetchedUrl>> fetchedUrls = blockedOrPassedUrls.select("passed")
-            		.map(new MapFunction<Tuple2<CrawlStateUrl,FetchUrl>, FetchUrl>() {
+            DataStream<Tuple2<CrawlStateUrl, FetchedUrl>> fetchedUrls = blockedOrPassedOrSitemapUrls.select("passed")
+            		.map(new MapFunction<Tuple3<CrawlStateUrl,FetchUrl, FetchUrl>, FetchUrl>() {
 
 						@Override
-						public FetchUrl map(Tuple2<CrawlStateUrl, FetchUrl> justHasFetchUrl)
+						public FetchUrl map(Tuple3<CrawlStateUrl, FetchUrl, FetchUrl> justHasFetchUrl)
 								throws Exception {
 							return justHasFetchUrl.f1;
 						}
@@ -266,74 +320,27 @@ public class CrawlTopology {
                     .process(new FetchUrlsFunction(_pageFetcherBuilder))
                     .name("FetchUrlsFunction");
             
-            // Split the fetchedUrls so that we can parse the ones we have actually fetched versus
-            // the ones that have failed.
-            SplitStream<Tuple2<CrawlStateUrl, FetchedUrl>> fetchAttemptedUrls = fetchedUrls.split(new OutputSelector<Tuple2<CrawlStateUrl, FetchedUrl>>() {
-    			private final List<String> FETCH_STATUS_STREAM = Arrays.asList("fetch_status");
-                private final List<String> FETCHED_URL_STREAMS = Arrays.asList("fetch_status", "fetched_url");
+            SplitStream<Tuple2<CrawlStateUrl, FetchedUrl>> fetchAttemptedUrls = splitFetchedUrlsStream(fetchedUrls);
+			// Get the status of all URLs we've attempted to fetch, so that we can  union them with URLs blocked by robots, 
+            // and iterate those back into the crawl DB.
+            DataStream<CrawlStateUrl> fetchStatusUrls = selectFetchStatus(fetchAttemptedUrls);
 
-				@Override
-				public Iterable<String> select(Tuple2<CrawlStateUrl, FetchedUrl> url) {
-                    if (url.f1 != null) {
-                        return FETCHED_URL_STREAMS;
-                    } else {
-                    	return FETCH_STATUS_STREAM;
-                    }
-                }
-            });
-            
-            // Get the status of all URLs we've attempted to fetch, union them with URLs blocked by robots, and iterate those back into the crawl DB.
-            DataStream<CrawlStateUrl> fetchStatusUrls = fetchAttemptedUrls.select("fetch_status")
-            		.map(new MapFunction<Tuple2<CrawlStateUrl, FetchedUrl>, CrawlStateUrl>() {
-
-						@Override
-						public CrawlStateUrl map(Tuple2<CrawlStateUrl, FetchedUrl> url) throws Exception {
-							return url.f0;
-						}
-					})
-					.name("Select fetch status");
-
-            // We need to merge robotBlockedUrls with the "status" stream from fetchAttemptedUrls
+            // We need to merge robotBlockedUrls with the "status" stream from fetchAttemptedUrls and status 
+            // stream of the siteMapFetchAttemptedUrls
             crawlDbIteration.closeWith(robotBlockedUrls.union(fetchStatusUrls));
             
-            DataStream<Tuple2<ExtractedUrl, ParsedUrl>> parsedUrls = fetchAttemptedUrls.select("fetched_url")
-            		.map(new MapFunction<Tuple2<CrawlStateUrl, FetchedUrl>, FetchedUrl>() {
-
-						@Override
-						public FetchedUrl map( Tuple2<CrawlStateUrl, FetchedUrl> hasFetchedUrl)
-								throws Exception {
-							return hasFetchedUrl.f1;
-						}
-            			
-            		})
-            		.name("Select fetched URLs")
-            		.flatMap(new ParseFunction(_pageParser))
-            		.name("ParseFunction");
+            DataStream<Tuple2<ExtractedUrl, ParsedUrl>> parsedUrls = selectFetchedUrls(fetchAttemptedUrls)
+            														.flatMap(new ParseFunction(_pageParser))
+            														.name("ParseFunction");
             
 
-            SplitStream<Tuple2<ExtractedUrl, ParsedUrl>> outlinksOrContent = parsedUrls
-                    .split(new OutputSelector<Tuple2<ExtractedUrl, ParsedUrl>>() {
-
-                        private final List<String> OUTLINK_STREAM = Arrays.asList("outlink");
-                        private final List<String> CONTENT_STREAM = Arrays.asList("content");
-
-                        @Override
-                        public Iterable<String> select(Tuple2<ExtractedUrl, ParsedUrl> outlinksOrContent) {
-                            if (outlinksOrContent.f0 != null) {
-                                return OUTLINK_STREAM;
-                            } else if (outlinksOrContent.f1 != null) {
-                                return CONTENT_STREAM;
-                            } else {
-                                throw new RuntimeException("Invalid case of neither outlink nor content");
-                            }
-                        }
-                    });
+            SplitStream<Tuple2<ExtractedUrl, ParsedUrl>> outlinksOrContent = splitOutlinkContent(parsedUrls);
 
             DataStream<RawUrl> newUrls = outlinksOrContent.select("outlink")
             		.map(new OutlinkToStateUrlFunction())
             		.name("OutlinkToStateUrlFunction");
 
-            newUrlsIteration.closeWith(newUrls);
+            newUrlsIteration.closeWith(newUrls.union(newSiteMapExtractedUrls));
 
             // Save off parsed page content. So just extract the parsed content piece of the Tuple2, and
             // then pass it on to the provided content sink function.
@@ -351,6 +358,78 @@ public class CrawlTopology {
 
             return new CrawlTopology(_env, _jobName);
         }
+
+
+		@SuppressWarnings("serial")
+		private SplitStream<Tuple2<CrawlStateUrl, FetchedUrl>> splitFetchedUrlsStream(DataStream<Tuple2<CrawlStateUrl, FetchedUrl>> fetchedUrls) {
+			// Split the fetchedUrls so that we can parse the ones we have actually fetched versus
+            // the ones that have failed.
+            SplitStream<Tuple2<CrawlStateUrl, FetchedUrl>> fetchAttemptedUrls = fetchedUrls.split(new OutputSelector<Tuple2<CrawlStateUrl, FetchedUrl>>() {
+    			private final List<String> FETCH_STATUS_STREAM = Arrays.asList("fetch_status");
+                private final List<String> FETCHED_URL_STREAMS = Arrays.asList("fetch_status", "fetched_url");
+
+				@Override
+				public Iterable<String> select(Tuple2<CrawlStateUrl, FetchedUrl> url) {
+                    if (url.f1 != null) {
+                        return FETCHED_URL_STREAMS;
+                    } else {
+                    	return FETCH_STATUS_STREAM;
+                    }
+                }
+            });
+			return fetchAttemptedUrls;
+		}
+		
+		@SuppressWarnings("serial")
+		private DataStream<CrawlStateUrl> selectFetchStatus(SplitStream<Tuple2<CrawlStateUrl, FetchedUrl>> fetchAttemptedUrls) {
+            DataStream<CrawlStateUrl> fetchStatusUrls = fetchAttemptedUrls.select("fetch_status")
+            		.map(new MapFunction<Tuple2<CrawlStateUrl, FetchedUrl>, CrawlStateUrl>() {
+
+						@Override
+						public CrawlStateUrl map(Tuple2<CrawlStateUrl, FetchedUrl> url) throws Exception {
+							return url.f0;
+						}
+					})
+					.name("Select fetch status");
+			return fetchStatusUrls;
+		}
+
+		@SuppressWarnings("serial")
+		private DataStream<FetchedUrl> selectFetchedUrls(SplitStream<Tuple2<CrawlStateUrl, FetchedUrl>> fetchAttemptedUrls) {
+            DataStream<FetchedUrl> fetchedUrls = fetchAttemptedUrls.select("fetched_url")
+            		.map(new MapFunction<Tuple2<CrawlStateUrl, FetchedUrl>, FetchedUrl>() {
+
+						@Override
+						public FetchedUrl map( Tuple2<CrawlStateUrl, FetchedUrl> hasFetchedUrl)
+								throws Exception {
+							return hasFetchedUrl.f1;
+						}
+					})
+					.name("Select fetched URLs");
+			return fetchedUrls;
+		}
+
+		@SuppressWarnings("serial")
+		private SplitStream<Tuple2<ExtractedUrl, ParsedUrl>> splitOutlinkContent(DataStream<Tuple2<ExtractedUrl, ParsedUrl>> parsedUrls) {
+			SplitStream<Tuple2<ExtractedUrl, ParsedUrl>> outlinksOrContent = parsedUrls
+                    .split(new OutputSelector<Tuple2<ExtractedUrl, ParsedUrl>>() {
+
+                        private final List<String> OUTLINK_STREAM = Arrays.asList("outlink");
+                        private final List<String> CONTENT_STREAM = Arrays.asList("content");
+
+                        @Override
+                        public Iterable<String> select(Tuple2<ExtractedUrl, ParsedUrl> outlinksOrContent) {
+                            if (outlinksOrContent.f0 != null) {
+                                return OUTLINK_STREAM;
+                            } else if (outlinksOrContent.f1 != null) {
+                                return CONTENT_STREAM;
+                            } else {
+                                throw new RuntimeException("Invalid case of neither outlink nor content");
+                            }
+                        }
+                    });
+			return outlinksOrContent;
+		}
 
     }
 }
