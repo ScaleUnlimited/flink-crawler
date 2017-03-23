@@ -103,6 +103,7 @@ public class CrawlTopology {
 
         private BaseUrlLengthener _urlLengthener;
         private SinkFunction<ParsedUrl> _contentSink;
+        private SinkFunction<String> _contentTextSink;
         private BaseUrlNormalizer _urlNormalizer;
         private BaseUrlValidator _urlFilter;
         private BaseHttpFetcherBuilder _pageFetcherBuilder;
@@ -177,6 +178,11 @@ public class CrawlTopology {
 
         public CrawlTopologyBuilder setContentSink(SinkFunction<ParsedUrl> contentSink) {
             _contentSink = contentSink;
+            return this;
+        }
+
+        public CrawlTopologyBuilder setContentTextSink(SinkFunction<String> contentTextSink) {
+            _contentTextSink = contentTextSink;
             return this;
         }
 
@@ -283,10 +289,10 @@ public class CrawlTopology {
             		.name("HandleFailedSiteMapFunction")
             		.addSink(new DiscardingSink<CrawlStateUrl>());
             
-            DataStream<Tuple2<ExtractedUrl, ParsedUrl>> parsedSiteMapUrls = selectFetchedUrls(siteMapFetchAttemptedUrls)
+            DataStream<Tuple3<ExtractedUrl, ParsedUrl, String>> parsedSiteMapUrls = selectFetchedUrls(siteMapFetchAttemptedUrls)
 					.flatMap(new ParseSiteMapFunction(_siteMapParser))
 					.name("ParseSiteMapFunction");
-            SplitStream<Tuple2<ExtractedUrl, ParsedUrl>> sitemapOutlinksContent = splitOutlinkContent(parsedSiteMapUrls);
+            SplitStream<Tuple3<ExtractedUrl, ParsedUrl, String>> sitemapOutlinksContent = splitOutlinkContent(parsedSiteMapUrls);
             DataStream<RawUrl> newSiteMapExtractedUrls = sitemapOutlinksContent.select("outlink")
             		.map(new OutlinkToStateUrlFunction())
             		.name("OutlinkToStateUrlFunction");
@@ -329,12 +335,12 @@ public class CrawlTopology {
             // stream of the siteMapFetchAttemptedUrls
             crawlDbIteration.closeWith(robotBlockedUrls.union(fetchStatusUrls));
             
-            DataStream<Tuple2<ExtractedUrl, ParsedUrl>> parsedUrls = selectFetchedUrls(fetchAttemptedUrls)
+            DataStream<Tuple3<ExtractedUrl, ParsedUrl, String>> parsedUrls = selectFetchedUrls(fetchAttemptedUrls)
             														.flatMap(new ParseFunction(_pageParser))
             														.name("ParseFunction");
             
 
-            SplitStream<Tuple2<ExtractedUrl, ParsedUrl>> outlinksOrContent = splitOutlinkContent(parsedUrls);
+            SplitStream<Tuple3<ExtractedUrl, ParsedUrl, String>> outlinksOrContent = splitOutlinkContent(parsedUrls);
 
             DataStream<RawUrl> newUrls = outlinksOrContent.select("outlink")
             		.map(new OutlinkToStateUrlFunction())
@@ -342,19 +348,37 @@ public class CrawlTopology {
 
             newUrlsIteration.closeWith(newUrls.union(newSiteMapExtractedUrls));
 
-            // Save off parsed page content. So just extract the parsed content piece of the Tuple2, and
+            // Save off parsed page content. So just extract the parsed content piece of the Tuple3, and
             // then pass it on to the provided content sink function.
             outlinksOrContent.select("content")
-            	.map(new MapFunction<Tuple2<ExtractedUrl, ParsedUrl>, ParsedUrl>() {
+            	.map(new MapFunction<Tuple3<ExtractedUrl, ParsedUrl, String>, ParsedUrl>() {
 
 	                @Override
-	                public ParsedUrl map(Tuple2<ExtractedUrl, ParsedUrl> in) throws Exception {
+	                public ParsedUrl map(Tuple3<ExtractedUrl, ParsedUrl, String> in) throws Exception {
 	                    return in.f1;
 	                }
 	            })
 	            .name("Select fetched content")
             	.addSink(_contentSink)
             	.name("ContentSink");
+
+            // Save off parsed page content text. So just extract the parsed content text piece of the Tuple3, and
+            // then pass it on to the provided content sink function (or just send it to the console).
+            DataStream<String> contentText = outlinksOrContent.select("content_text")
+            	.map(new MapFunction<Tuple3<ExtractedUrl, ParsedUrl, String>, String>() {
+
+	                @Override
+	                public String map(Tuple3<ExtractedUrl, ParsedUrl, String> in) throws Exception {
+	                    return in.f2;
+	                }
+	            })
+	            .name("Select fetched content text")
+            	.name("ContentTextSink");
+            if (_contentTextSink == null) {
+            	contentText.print();
+            } else {
+            	contentText.addSink(_contentTextSink);
+            }
 
             return new CrawlTopology(_env, _jobName);
         }
@@ -410,21 +434,24 @@ public class CrawlTopology {
 		}
 
 		@SuppressWarnings("serial")
-		private SplitStream<Tuple2<ExtractedUrl, ParsedUrl>> splitOutlinkContent(DataStream<Tuple2<ExtractedUrl, ParsedUrl>> parsedUrls) {
-			SplitStream<Tuple2<ExtractedUrl, ParsedUrl>> outlinksOrContent = parsedUrls
-                    .split(new OutputSelector<Tuple2<ExtractedUrl, ParsedUrl>>() {
+		private SplitStream<Tuple3<ExtractedUrl, ParsedUrl, String>> splitOutlinkContent(DataStream<Tuple3<ExtractedUrl, ParsedUrl, String>> parsedUrls) {
+			SplitStream<Tuple3<ExtractedUrl, ParsedUrl, String>> outlinksOrContent = parsedUrls
+                    .split(new OutputSelector<Tuple3<ExtractedUrl, ParsedUrl, String>>() {
 
                         private final List<String> OUTLINK_STREAM = Arrays.asList("outlink");
                         private final List<String> CONTENT_STREAM = Arrays.asList("content");
+                        private final List<String> CONTENT_TEXT_STREAM = Arrays.asList("content_text");
 
                         @Override
-                        public Iterable<String> select(Tuple2<ExtractedUrl, ParsedUrl> outlinksOrContent) {
+                        public Iterable<String> select(Tuple3<ExtractedUrl, ParsedUrl, String> outlinksOrContent) {
                             if (outlinksOrContent.f0 != null) {
                                 return OUTLINK_STREAM;
                             } else if (outlinksOrContent.f1 != null) {
                                 return CONTENT_STREAM;
+                            } else if (outlinksOrContent.f2 != null) {
+                                return CONTENT_TEXT_STREAM;
                             } else {
-                                throw new RuntimeException("Invalid case of neither outlink nor content");
+                                throw new RuntimeException("Invalid case of neither outlink, content, nor content_text");
                             }
                         }
                     });
