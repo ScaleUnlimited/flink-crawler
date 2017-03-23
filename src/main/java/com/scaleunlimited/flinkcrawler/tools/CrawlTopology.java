@@ -104,6 +104,7 @@ public class CrawlTopology {
         private BaseUrlLengthener _urlLengthener;
         private SinkFunction<ParsedUrl> _contentSink;
         private SinkFunction<String> _contentTextSink;
+        private String _contentTextFilePathString;
         private BaseUrlNormalizer _urlNormalizer;
         private BaseUrlValidator _urlFilter;
         private BaseHttpFetcherBuilder _pageFetcherBuilder;
@@ -182,7 +183,18 @@ public class CrawlTopology {
         }
 
         public CrawlTopologyBuilder setContentTextSink(SinkFunction<String> contentTextSink) {
+        	if (_contentTextFilePathString != null) {
+        		throw new IllegalArgumentException("already have a content text file path");
+        	}
             _contentTextSink = contentTextSink;
+            return this;
+        }
+
+        public CrawlTopologyBuilder setContentTextFile(String filePathString) {
+        	if (_contentTextSink != null) {
+        		throw new IllegalArgumentException("already have a content text sink");
+        	}
+            _contentTextFilePathString = filePathString;
             return this;
         }
 
@@ -374,10 +386,12 @@ public class CrawlTopology {
 	            })
 	            .name("Select fetched content text")
             	.name("ContentTextSink");
-            if (_contentTextSink == null) {
-            	contentText.print();
-            } else {
+            if (_contentTextSink != null) {
             	contentText.addSink(_contentTextSink);
+            } else if (_contentTextFilePathString != null) {
+            	contentText.writeAsText(_contentTextFilePathString);
+            } else {
+            	contentText.print();
             }
 
             return new CrawlTopology(_env, _jobName);

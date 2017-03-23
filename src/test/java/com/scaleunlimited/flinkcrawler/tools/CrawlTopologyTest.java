@@ -71,6 +71,10 @@ public class CrawlTopologyTest {
 		robotPages.put(normalizer.normalize("http://domain4.com:80/robots.txt"), 
 				"User-agent: *" + CRLF + "sitemap : http://domain4.com/sitemap.txt");
 
+		File testDir = new File("target/CrawlTopologyTest/");
+		testDir.mkdirs();
+		File contentTextFile = new File(testDir, "content.txt");
+
 		CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
 			.setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
 			.setUrlLengthener(new SimpleUrlLengthener())
@@ -80,6 +84,7 @@ public class CrawlTopologyTest {
 			.setRobotsParser(new SimpleRobotRulesParser())
 			.setPageParser(new SimplePageParser())
 			.setContentSink(new DiscardingSink<ParsedUrl>())
+			.setContentTextFile(contentTextFile.getAbsolutePath())
 			.setUrlNormalizer(normalizer)
 			.setUrlFilter(new SimpleUrlValidator())
 			// Create MockSitemapFetcher - that will return a valid sitemap
@@ -94,8 +99,6 @@ public class CrawlTopologyTest {
 
 		CrawlTopology ct = builder.build();
 		
-		File testDir = new File("target/CrawlTopologyTest/");
-		testDir.mkdirs();
 		File dotFile = new File(testDir, "topology.dot");
 		ct.printDotFile(dotFile);
 		
