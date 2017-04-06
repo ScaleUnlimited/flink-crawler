@@ -8,6 +8,7 @@ import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
+import org.apache.flink.util.FileUtils;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,6 +75,9 @@ public class CrawlTopologyTest {
 		File testDir = new File("target/CrawlTopologyTest/");
 		testDir.mkdirs();
 		File contentTextFile = new File(testDir, "content.txt");
+		if (contentTextFile.exists()) {
+			FileUtils.deleteFileOrDirectory(contentTextFile);
+		}
 
 		CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
 			.setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
