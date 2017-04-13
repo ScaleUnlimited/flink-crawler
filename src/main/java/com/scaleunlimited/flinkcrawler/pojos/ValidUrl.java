@@ -6,10 +6,12 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 
+import com.scaleunlimited.flinkcrawler.crawldb.IPayload;
+
 import crawlercommons.url.PaidLevelDomain;
 
 @SuppressWarnings("serial")
-public class ValidUrl extends BaseUrl {
+public class ValidUrl extends BaseUrl implements IPayload {
 	
 	private String _protocol;
 	private String _hostname;
@@ -84,6 +86,7 @@ public class ValidUrl extends BaseUrl {
 		return _query;
 	}
 
+	@Override
 	public void write(DataOutput out) throws IOException {
 		out.writeUTF(_protocol);
 		out.writeUTF(_hostname);
@@ -98,6 +101,7 @@ public class ValidUrl extends BaseUrl {
 		}
 	}
 
+	@Override
 	public void readFields(DataInput in) throws IOException {
 		_protocol = in.readUTF();
 		_hostname = in.readUTF();

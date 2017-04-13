@@ -34,7 +34,7 @@ public class DrumCrawlDB extends BaseCrawlDB {
 		_drumMap = new DrumMap(_maxRamEntries, CrawlStateUrl.averageValueLength(), dataDir, merger);
 		_drumMap.open();
 		
-		_urlValue = new byte[CrawlStateUrl.maxValueSize()];
+		_urlValue = new byte[1 + CrawlStateUrl.maxValueLength()];
 	}
 	
 	@Override
@@ -63,27 +63,4 @@ public class DrumCrawlDB extends BaseCrawlDB {
 		}
 	}
 
-	public static class DrumCrawlDBBuilder extends BaseCrawlDBBuilder<DrumCrawlDB> {
-		
-		private int _maxRamEntries;
-		private String _dataDirname;
-
-		public DrumCrawlDBBuilder() {
-			super();
-		}
-		
-		public DrumCrawlDBBuilder setMaxRamEntries(int maxRamEntries) {
-			_maxRamEntries = maxRamEntries;
-			return this;
-		}
-		
-		public DrumCrawlDBBuilder setDataDirname(String dataDirname) {
-			_dataDirname = dataDirname;
-			return this;
-		}
-		
-		public DrumCrawlDB build() {
-			return new DrumCrawlDB(_maxRamEntries, _dataDirname);
-		}
-	}
 }

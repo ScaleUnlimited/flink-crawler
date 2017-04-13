@@ -1,13 +1,18 @@
 package com.scaleunlimited.flinkcrawler.utils;
 
 import java.io.BufferedReader;
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.RandomAccessFile;
 
+import org.apache.flink.util.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.scaleunlimited.flinkcrawler.crawldb.DrumKVIterator;
 
 
 public class IoUtils {
@@ -51,6 +56,38 @@ public class IoUtils {
 		InputStreamReader isr = new InputStreamReader(System.in);
 		BufferedReader br = new BufferedReader(isr);
 		return br.readLine();
+	}
+
+	/**
+	 * Close a set of items, and throw the first exception we get
+	 * (if any) from these actions. So everything will get closed,
+	 * though there might be some exceptions which are hidden.
+	 * 
+	 * @param items
+	 * @throws IOException
+	 */
+	public static void closeAll(Closeable... items) throws IOException {
+		IOException savedException = null;
+		
+		for (Closeable item : items) {
+			try {
+				item.close();
+			} catch (IOException e) {
+				if (savedException == null) {
+					savedException = e;
+				}
+			}
+		}
+		
+		if (savedException != null) {
+			throw savedException;
+		}
+	}
+
+	public static void closeAllQuietly(Closeable... items) {
+		for (Closeable item : items) {
+			IOUtils.closeQuietly(item);
+		}
 	}
 
 

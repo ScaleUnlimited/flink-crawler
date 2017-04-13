@@ -36,6 +36,10 @@ public class ByteUtils {
 		return result;
 	}
 
+	public static int bytesToUnsignedByte(byte[] src, int srcOffset) {
+		return src[srcOffset] & 0x00FF;
+	}
+	
 	public static short bytesToShort(byte[] src, int srcOffset) {
 		short result = 0;
 		for (int i = 0; i < 2; i++) {

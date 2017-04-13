@@ -12,7 +12,6 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.scaleunlimited.flinkcrawler.crawldb.DrumCrawlDB;
 import com.scaleunlimited.flinkcrawler.crawldb.InMemoryCrawlDB;
 import com.scaleunlimited.flinkcrawler.fetcher.MockRobotsFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.WebGraphFetcher;
@@ -63,7 +62,7 @@ public class CrawlTopologyTest {
 		CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
 			.setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
 			.setUrlLengthener(new SimpleUrlLengthener())
-			.setCrawlDBBuilder(new InMemoryCrawlDB.InMemoryCrawlDBBuilder())
+			.setCrawlDB(new InMemoryCrawlDB())
 			// .setCrawlDBBuilder(new DrumCrawlDB.DrumCrawlDBBuilder().setMaxRamEntries(10_000).setDataDirname("./target/drum/"))
 			.setRobotsFetcherBuilder(new MockRobotsFetcher.MockRobotsFetcherBuilder(new MockRobotsFetcher(robotPages)))
 			.setRobotsParser(new SimpleRobotRulesParser())
@@ -76,6 +75,8 @@ public class CrawlTopologyTest {
 			// TODO 5000 was long enough, but with new async crawlDB the iteration terminates too quickly.
 			.setMaxWaitTime(10000)
 			.setDefaultCrawlDelay(0)
+			// Explicitly set parallelism so that it doesn't vary based on # of cores
+			.setParallelism(2)
 			.setPageFetcherBuilder(new WebGraphFetcher.WebGraphFetcherBuilder(new WebGraphFetcher(graph)));
 
 		CrawlTopology ct = builder.build();

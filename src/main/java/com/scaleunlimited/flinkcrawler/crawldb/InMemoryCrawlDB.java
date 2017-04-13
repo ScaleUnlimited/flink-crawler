@@ -7,10 +7,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDBMerger.MergeResult;
-import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDBMerger.MergedStatus;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
-import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
+import com.scaleunlimited.flinkcrawler.utils.FetchQueue.MergeStatus;
 
 @SuppressWarnings("serial")
 public class InMemoryCrawlDB extends BaseCrawlDB {
@@ -23,6 +22,10 @@ public class InMemoryCrawlDB extends BaseCrawlDB {
 	private transient byte[] _newValue;
 	private transient byte[] _mergedValue;
 	
+	public InMemoryCrawlDB() {
+		super();
+	}
+	
 	@Override
 	public void open(int index, FetchQueue fetchQueue, BaseCrawlDBMerger merger) throws Exception {
 		super.open(index, fetchQueue, merger);
@@ -30,9 +33,9 @@ public class InMemoryCrawlDB extends BaseCrawlDB {
 		_crawlState = new HashMap<>();
 		_archiveDB = new HashMap<>();
 		
-		_curValue = new byte[CrawlStateUrl.maxValueSize()];
-		_newValue = new byte[CrawlStateUrl.maxValueSize()];
-		_mergedValue = new byte[CrawlStateUrl.maxValueSize()];
+		_curValue = new byte[1 + CrawlStateUrl.maxValueLength()];
+		_newValue = new byte[1  + CrawlStateUrl.maxValueLength()];
+		_mergedValue = new byte[1 + CrawlStateUrl.maxValueLength()];
 	}
 
 	@Override
@@ -82,37 +85,19 @@ public class InMemoryCrawlDB extends BaseCrawlDB {
 			for (String url : _crawlState.keySet()) {
 				CrawlStateUrl curState = _crawlState.get(url);
 				curState.getValue(_curValue);
-				MergedStatus status = _merger.getMergedStatus(_curValue);
+				MergeStatus status = _fetchQueue.add(curState);
 				
-				if (status == MergedStatus.ACTIVE_FETCH) {
-					if (_fetchQueue.add(curState)) {
-						curState.setStatus(FetchStatus.FETCHING);
-						LOGGER.debug(String.format("Added URL from crawlDB to fetchable queue: %s", curState));
-					} else {
-						LOGGER.debug(String.format("Failed to add URL from crawlDB to fetchable queue: %s", curState));
-					}
-				} else if (status == MergedStatus.ACTIVE) {
+				if (status == MergeStatus.ACTIVE) {
 					// Do nothing, just stays in the crawl DB
-				} else if (status == MergedStatus.ARCHIVE) {
+				} else if (status == MergeStatus.ARCHIVE) {
 					// Remove from the in-memory DB, stick in our archive DB
 					_crawlState.remove(url);
 					_archiveDB.put(url, curState);
 				} else {
-					throw new RuntimeException("Unknown merge status!");
+					throw new RuntimeException("Unknown merge status: " + status);
 				}
 			}
 		}
 	}
 
-	public static class InMemoryCrawlDBBuilder extends BaseCrawlDBBuilder<InMemoryCrawlDB> {
-		
-		public InMemoryCrawlDBBuilder() {
-			super();
-		}
-		
-		public InMemoryCrawlDB build() {
-			return new InMemoryCrawlDB();
-		}
-	}
-	
 }

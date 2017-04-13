@@ -20,7 +20,6 @@ import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 
 import com.scaleunlimited.flinkcrawler.config.BaseHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDB;
-import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDBBuilder;
 import com.scaleunlimited.flinkcrawler.crawldb.DefaultCrawlDBMerger;
 import com.scaleunlimited.flinkcrawler.functions.CheckUrlWithRobotsFunction;
 import com.scaleunlimited.flinkcrawler.functions.CrawlDBFunction;
@@ -91,7 +90,7 @@ public class CrawlTopology {
         
         private BaseUrlSource _urlSource;
 
-        private BaseCrawlDBBuilder<BaseCrawlDB> _crawlDBBuilder;
+        private BaseCrawlDB _crawlDB;
         
         private BaseHttpFetcherBuilder _robotsFetcherBuilder;
         private SimpleRobotRulesParser _robotsParser;
@@ -132,8 +131,8 @@ public class CrawlTopology {
             return this;
         }
 
-        public CrawlTopologyBuilder setCrawlDBBuilder(BaseCrawlDBBuilder crawlDBBuilder) {
-        	_crawlDBBuilder = crawlDBBuilder;
+        public CrawlTopologyBuilder setCrawlDB(BaseCrawlDB crawlDB) {
+        	_crawlDB = crawlDB;
             return this;
         }
 
@@ -179,12 +178,12 @@ public class CrawlTopology {
 
         @SuppressWarnings("serial")
         public CrawlTopology build() {
+            if (_parallelism != DEFAULT_PARALLELISM) {
+            	_env.setParallelism(_parallelism);
+            }
+            
             // FUTURE use single topology parallelism? But likely will want different levels for different parts.
             DataStreamSource<RawUrl> seedUrlsSource = _env.addSource(_urlSource);
-            
-            if (_parallelism != DEFAULT_PARALLELISM) {
-                seedUrlsSource = seedUrlsSource.setParallelism(_parallelism);
-            }
             
             // Key is the full URL, as (a) we don't know that it's a valid URL yet, and (b) after lengthening the
             // domain might change, and (c) we don't have to enforce any per-domain constraints here.
@@ -213,7 +212,7 @@ public class CrawlTopology {
             IterativeStream<CrawlStateUrl> crawlDbIteration = cleanedUrls.iterate(_maxWaitTime);
             DataStream<Tuple2<CrawlStateUrl, FetchUrl>> postRobotsUrls = crawlDbIteration
             		.keyBy(new PldKeySelector<CrawlStateUrl>())
-            		.process(new CrawlDBFunction(_crawlDBBuilder, new DefaultCrawlDBMerger()))
+            		.process(new CrawlDBFunction(_crawlDB, new DefaultCrawlDBMerger()))
             		.name("CrawlDBFunction")
             		.keyBy(new PldKeySelector<FetchUrl>())
                     .process(new CheckUrlWithRobotsFunction(_robotsFetcherBuilder, _robotsParser, _defaultCrawlDelay))

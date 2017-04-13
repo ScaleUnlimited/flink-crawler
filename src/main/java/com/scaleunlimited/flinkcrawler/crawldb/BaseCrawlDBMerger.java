@@ -11,12 +11,6 @@ public abstract class BaseCrawlDBMerger implements Serializable {
 		USE_MERGED
 	}
 	
-	public static enum MergedStatus {
-		ACTIVE,
-		ACTIVE_FETCH,
-		ARCHIVE
-	}
-	
 	/**
 	 * Merge <oldValue> with <newValue>, and put results into <mergedValue>
 	 * 
@@ -26,6 +20,4 @@ public abstract class BaseCrawlDBMerger implements Serializable {
 	 * @return Result of the merge.
 	 */
 	public abstract MergeResult doMerge(byte[] oldValue, byte[] newValue, byte[] mergedValue);
-	
-	public abstract MergedStatus getMergedStatus(byte[] mergedValue);
 }

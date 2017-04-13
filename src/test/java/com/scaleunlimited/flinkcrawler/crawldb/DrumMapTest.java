@@ -13,7 +13,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
+import org.apache.commons.io.FileUtils;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,6 +57,7 @@ public class DrumMapTest {
 		}
 	}
 
+	@Ignore
 	@Test
 	public void testTiming() throws Exception {
 		File dataDir = new File("target/test/testTiming/data");
@@ -144,8 +147,94 @@ public class DrumMapTest {
 		dm.close();
 	}
 	
+	@Test
+	public void testMemoryDiskMerging() throws Exception {
+		final String[] testCases = {
+				"",			// nothing in list
+				"0",		// single entry (unfetched)
+				"1",		// single entry (fetched)
+				"0,1",		// two different entries
+				"1,2",
+				"0,0",		// two entries that are the same
+				"1,1",		// two entries that are the same
+				"0,0,1",	// two dups, then new
+				"0,0,2",	// two dups, then new
+				"1,1,2",	// two dups, then new
+				"1,1,3",	// two dups, then new
+				"0,1,1",	// one different, then two dups.
+				"0,2,2",	// one different, then two dups.
+				"1,2,2",	// one different, then two dups.
+				"1,3,3",	// one different, then two dups.
+		};
+		
+		for (String memTestcase : testCases) {
+			for (String diskTestcase : testCases) {
+				File dataDir = new File("target/test/testMemoryDiskMerging/data");
+				FileUtils.deleteDirectory(dataDir);
+				createDiskFile(dataDir, diskTestcase);
+
+				final int maxEntries = 1000;
+				DrumMap dm = new DrumMap(maxEntries, CrawlStateUrl.averageValueLength(), dataDir, new DefaultCrawlDBMerger());
+				dm.open();
+
+				if (!memTestcase.isEmpty()) {
+					for (String pageID : memTestcase.split(",")) {
+						addUrl(dm, "http://domain.com/page" + pageID, getFetchStatusFromPageID(pageID), 10);
+					}
+				}
+				
+				FetchQueue queue = new FetchQueue(maxEntries);
+				dm.merge(queue);
+
+				// TODO make sure we wind up with what we expect
+			}
+			
+		}
+	}
+	
+	/**
+	 * Create the on-disk DRUM files, located in dataDir.
+	 * 
+	 * @param dataDir
+	 * @param testcase
+	 * @throws IOException 
+	 */
+	private void createDiskFile(File dataDir, String testcase) throws IOException {
+		File workingDir = new File(dataDir, DrumMap.WORKING_SUBDIR_NAME);
+		FileUtils.forceMkdir(workingDir);
+		
+		DrumMapFile active = new DrumMapFile(workingDir, DrumMap.ACTIVE_FILE_PREFIX, false);
+		DrumKeyValueFile dkvf = active.getKeyValueFile();
+		DrumPayloadFile dpf = active.getPayloadFile();
+		DrumDataOutput ddo = dpf.getDrumDataOutput();
+		byte[] valueBuffer = new byte[1 + CrawlStateUrl.maxValueLength()];
+		
+		if (!testcase.isEmpty()) {
+			DrumKeyValue dkv = new DrumKeyValue();
+			for (String pageID : testcase.split(",")) {
+				String urlAsString = "http://domain.com/page" + pageID;
+				CrawlStateUrl url = makeUrl(urlAsString, getFetchStatusFromPageID(pageID), 10);
+				
+				dkv.setPayloadOffset(ddo.getBytesWritten());
+				ddo.writeUTF(urlAsString);
+				
+				dkv.setKeyHash(url.makeKey());
+				dkv.setValue(url.getValue(valueBuffer));
+				
+				dkvf.write(dkv);
+			}
+		}
+		
+		active.close();
+	}
+
+	private FetchStatus getFetchStatusFromPageID(String pageID) {
+		boolean isEven = (Integer.parseInt(pageID) % 2) == 0;
+		return isEven ? FetchStatus.UNFETCHED : FetchStatus.FETCHED;
+	}
+
 	private void addUrl(DrumMap dm, String urlAsString, FetchStatus status, long nextFetchTime) throws IOException {
-		byte[] valueBuffer = new byte[CrawlStateUrl.maxValueSize()];
+		byte[] valueBuffer = new byte[1 + CrawlStateUrl.maxValueLength()];
 		CrawlStateUrl url = new CrawlStateUrl(new FetchUrl(new ValidUrl(urlAsString)), status, nextFetchTime);
 		Assert.assertFalse(dm.add(url.makeKey(), url.getValue(valueBuffer), url));
 	}

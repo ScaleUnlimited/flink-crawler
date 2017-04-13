@@ -8,7 +8,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDB;
-import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDBBuilder;
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDBMerger;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
@@ -37,18 +36,17 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 	// TODO pick good time for this
 	private static final long QUEUE_CHECK_DELAY = 100L;
 
-	private BaseCrawlDBBuilder<BaseCrawlDB> _crawlDBBuilder;
+	private BaseCrawlDB _crawlDB;
 	private BaseCrawlDBMerger _merger;
 	
 	// List of URLs that are available to be fetched.
 	private transient FetchQueue _fetchQueue;
-	private transient BaseCrawlDB _crawlDB;
 	
 	private transient int _parallelism;
 	private transient int _index;
 	
-	public CrawlDBFunction(BaseCrawlDBBuilder crawlDBBuilder, BaseCrawlDBMerger merger) {
-		_crawlDBBuilder = crawlDBBuilder;
+	public CrawlDBFunction(BaseCrawlDB crawlDB, BaseCrawlDBMerger merger) {
+		_crawlDB = crawlDB;
 		_merger = merger;
 	}
 
@@ -62,7 +60,6 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 
 		_fetchQueue = new FetchQueue(MAX_ACTIVE_URLS);
 		
-		_crawlDB = _crawlDBBuilder.build();
 		_crawlDB.open(_index, _fetchQueue, _merger);
 	}
 	

@@ -34,19 +34,4 @@ public class DefaultCrawlDBMerger extends BaseCrawlDBMerger {
 		}
 	}
 
-	@Override
-	public MergedStatus getMergedStatus(byte[] mergedValue) {
-		FetchStatus mergedStatus = CrawlStateUrl.getFetchStatus(mergedValue);
-
-		if (mergedStatus == FetchStatus.UNFETCHED) {
-			return MergedStatus.ACTIVE_FETCH;
-		} else if (mergedStatus == FetchStatus.FETCHING) {
-			// Don't put it back in the queue, but it's active.
-			return MergedStatus.ACTIVE;
-		} else {
-			// TODO use calculated score to decide what to do.
-			return MergedStatus.ACTIVE;
-		}
-	}
-
 }

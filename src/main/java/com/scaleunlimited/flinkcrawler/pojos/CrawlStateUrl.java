@@ -1,16 +1,15 @@
 package com.scaleunlimited.flinkcrawler.pojos;
 
-import java.io.DataInput;
-import java.io.DataOutput;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 
-import com.scaleunlimited.flinkcrawler.crawldb.IPayload;
+import com.scaleunlimited.flinkcrawler.crawldb.DrumKeyValue;
 import com.scaleunlimited.flinkcrawler.utils.ByteUtils;
 import com.scaleunlimited.flinkcrawler.utils.HashUtils;
 
 
 @SuppressWarnings("serial")
-public class CrawlStateUrl extends ValidUrl implements IPayload {
+public class CrawlStateUrl extends ValidUrl {
 
 	// Data needed in-memory for CrawlDB merging
 	private FetchStatus _status;		// TODO make this an enum ?
@@ -126,9 +125,10 @@ public class CrawlStateUrl extends ValidUrl implements IPayload {
 		return value;
 	}
 
-	public static int maxValueSize() {
+	// TODO have everyone use DrumMap.MAX_VALUE_SIZE vs. calling this + 1.
+	public static int maxValueLength() {
 		// TODO - set this to the right value
-		return 1 + 16;
+		return 16;
 	}
 	
 	public static int averageValueLength() {
@@ -148,30 +148,6 @@ public class CrawlStateUrl extends ValidUrl implements IPayload {
 		}
 	}
 	
-	// write the payload fields out
-	@Override
-	public void write(DataOutput out) throws IOException {
-		super.write(out);
-		
-		out.writeInt(_status.ordinal());
-		out.writeFloat(_actualScore);
-		out.writeFloat(_estimatedScore);
-		out.writeLong(_lastFetchedTime);
-		out.writeLong(_nextFetchTime);
-	}
-
-	// Read the payload fields in
-	@Override
-	public void readFields(DataInput in) throws IOException {
-		super.readFields(in);
-		
-		_status = FetchStatus.values()[in.readInt()];
-		_actualScore = in.readFloat();
-		_estimatedScore = in.readFloat();
-		_lastFetchedTime = in.readLong();
-		_nextFetchTime = in.readLong();
-	}
-
 	// Clear the payload fields
 	@Override
 	public void clear() {
@@ -219,6 +195,19 @@ public class CrawlStateUrl extends ValidUrl implements IPayload {
 		if (_status != other._status)
 			return false;
 		return true;
+	}
+
+	public static CrawlStateUrl fromKV(DrumKeyValue dkv, RandomAccessFile payloadFile) throws IOException {
+		CrawlStateUrl result = new CrawlStateUrl();
+		
+		// Get the URL
+		payloadFile.seek(dkv.getPayloadOffset());
+		result.readFields(payloadFile);
+		
+		// Get the other fields
+		result.setFromValue(dkv.getValue());
+		
+		return result;
 	}
 
 	
