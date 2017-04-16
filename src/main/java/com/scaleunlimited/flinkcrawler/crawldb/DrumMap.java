@@ -301,17 +301,23 @@ public class DrumMap implements Closeable {
 				activeIterator = new DiskDrumKVIterator(getActiveFile());
 				nextDir = doMerge(queue, memoryIterator, activeIterator);
 				
-				_mergeNeeded = false;
+				// We have to close the iterators (and thus the files they opened in the directory) before
+				// calling reset(), as that moves directories around, after which a close doesn't actually
+				// close the files.
+				IoUtils.closeAllQuietly(memoryIterator, activeIterator);
+				memoryIterator = null;
+				activeIterator = null;
 				
 				// Set up the new working directory to be nextDir. If reset() fails and throws an exception, we
 				// assume that it won't swap in the new directory, so we have to get rid of it.
 				reset(getWorkingDir(), nextDir);
+				
+				_mergeNeeded = false;
 			} catch (IOException e) {
+				IoUtils.closeAllQuietly(memoryIterator, activeIterator);
 				FileUtils.deleteQuietly(nextDir);
 				
 				throw new RuntimeException(Thread.currentThread().getName() + ": Exception while merging: " + e.getMessage(), e);
-			} finally {
-				IoUtils.closeAllQuietly(memoryIterator, activeIterator);
 			}
 		}
 	}

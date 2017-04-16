@@ -86,7 +86,9 @@ public class IoUtils {
 
 	public static void closeAllQuietly(Closeable... items) {
 		for (Closeable item : items) {
-			IOUtils.closeQuietly(item);
+			if (item != null) {
+				IOUtils.closeQuietly(item);
+			}
 		}
 	}
 
