@@ -24,8 +24,8 @@ public class MemoryDrumKVIterator extends DrumKVIterator {
 		_entries = entries;
 		_entryData = entryData;
 		
-		_mergedValue = new byte[1 + DrumMap.MAX_VALUE_LENGTH];
-		_nextValue = new byte[1 + DrumMap.MAX_VALUE_LENGTH];
+		_mergedValue = new byte[1 + DrumKeyValue.MAX_VALUE_LENGTH];
+		_nextValue = new byte[1 + DrumKeyValue.MAX_VALUE_LENGTH];
 	}
 
 	@Override
@@ -89,7 +89,7 @@ public class MemoryDrumKVIterator extends DrumKVIterator {
 	
 	private void getValue(byte[] value) {
 		int curOffset = _entries[_curEntry];
-		curOffset += 8;
+		curOffset += 16;
 		int valueLength = (byte)_entryData[curOffset++];
 		value[0] = (byte)valueLength;
 		System.arraycopy(_entryData, curOffset, value, 1, valueLength);

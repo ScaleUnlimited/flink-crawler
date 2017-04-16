@@ -20,18 +20,26 @@ public class DefaultCrawlDBMerger extends BaseCrawlDBMerger {
 		FetchStatus oldStatus = CrawlStateUrl.getFetchStatus(oldValue);
 		FetchStatus newStatus = CrawlStateUrl.getFetchStatus(newValue);
 		
-		if (newStatus == FetchStatus.UNFETCHED) {
-			// We're getting a new URL that we already know about, so always use old.
+		if (oldStatus == FetchStatus.UNFETCHED) {
+			if (newStatus != FetchStatus.UNFETCHED) {
+				return MergeResult.USE_NEW;
+			}
+		} else if (newStatus == FetchStatus.UNFETCHED) {
+			// Old is not unfetched, new is unfetched, so use old.
 			return MergeResult.USE_OLD;
-		} else if (oldStatus == FetchStatus.FETCHING) {
-			// new status must be an update from the fetch request.
+		}
+		
+		// Both old/new status are unfetched, or both old/new are NOT
+		// unfetched...in either case we want to use the more recent one.
+		long oldTime = CrawlStateUrl.getFetchStatusTime(oldValue);
+		long newTime = CrawlStateUrl.getFetchStatusTime(newValue);
+		
+		if (oldTime <= newTime) {
 			return MergeResult.USE_NEW;
 		} else {
-			// Old status must be coming off disk, and we've got something new
-			// from a fetch request. We want to merge the two results.
-			// TODO - make it so...for now, just use new.
-			return MergeResult.USE_NEW;
+			return MergeResult.USE_OLD;
 		}
+
 	}
 
 }

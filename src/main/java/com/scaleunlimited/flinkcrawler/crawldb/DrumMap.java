@@ -10,6 +10,7 @@ import java.io.RandomAccessFile;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.flink.util.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,13 +75,11 @@ public class DrumMap implements Closeable {
 	
 	public static final int DEFAULT_MAX_ENTRIES = 10_000;
 
-	public static final int MAX_VALUE_LENGTH = CrawlStateUrl.maxValueLength();
-	
 	// Long hash, long payload offset, value length byte.
 	private static final int NON_VALUE_SIZE = 8 + 8 + 1;
 	
 	// Max entry size is the above fixed size plus the max value length.
-	private static final int MAX_ENTRY_SIZE = NON_VALUE_SIZE + MAX_VALUE_LENGTH;
+	private static final int MAX_ENTRY_SIZE = NON_VALUE_SIZE + DrumKeyValue.MAX_VALUE_LENGTH;
 
 	protected static final String WORKING_SUBDIR_NAME = "working";
 	private static final String NEXT_SUBDIR_NAME = "next";
@@ -113,9 +112,9 @@ public class DrumMap implements Closeable {
 	// File for the memory payload data.
 	private DrumPayloadFile _memoryPayloadFile;
 	
-	// Files for the active & archived key-value & payload data
-	private DrumMapFile _activeFile;
-	private DrumMapFile _archivedFile;
+	// Optimization - keep this flag set up (in reset()) so that we can quickly
+	// abort merge when there's no data in the working active file.
+	private volatile boolean _activeIsEmpty = true;
 	
 	private volatile boolean _mergeNeeded = false;
 	
@@ -154,10 +153,8 @@ public class DrumMap implements Closeable {
 		// But pass in a FetchQueue that never "takes" any URLs, so
 		// status is never saved as "FETCHING".
 		
-		IoUtils.closeAll(_memoryPayloadFile, _activeFile, _archivedFile);
+		IoUtils.closeAll(_memoryPayloadFile /*, _activeFile, _archivedFile*/);
 		_memoryPayloadFile = null;
-		_activeFile = null;
-		_archivedFile = null;
 	}
 
 	/**
@@ -172,7 +169,10 @@ public class DrumMap implements Closeable {
 		
 		if (nextDir != null) {
 			File tempDir = new File(_dataDir, TEMP_SUBDIR_NAME);
-			FileUtils.forceDelete(tempDir);
+			if (tempDir.exists()) {
+				FileUtils.forceDelete(tempDir);
+			}
+			
 			FileUtils.moveDirectory(workingDir, tempDir);
 			
 			FileUtils.moveDirectory(nextDir, workingDir);
@@ -181,12 +181,13 @@ public class DrumMap implements Closeable {
 			// old working dir (now tempDir) into the new working dir. They'll get
 			// a timestamped name.
 			
+
 			// All done with the temp directory, delete it.
 			FileUtils.forceDelete(tempDir);
 		} else {
 			// Create active & archived keyvalue/payload files, but only if they don't exist.
-			_activeFile = new DrumMapFile(workingDir, ACTIVE_FILE_PREFIX, false);
-			_archivedFile = new DrumMapFile(workingDir, ARCHIVED_FILE_PREFIX, false);
+			// _activeFile = new DrumMapFile(workingDir, ACTIVE_FILE_PREFIX, false);
+			// _archivedFile = new DrumMapFile(workingDir, ARCHIVED_FILE_PREFIX, false);
 		}
 		
 		// Now that we have the active & archived files set up, reset the memory key-value 
@@ -200,6 +201,13 @@ public class DrumMap implements Closeable {
 		String payloadFilename = DrumMapFile.makeFilename(MEMORY_FILE_PREFIX, DrumMapFileType.PAYLOAD);
 		_memoryPayloadFile = new DrumPayloadFile(new File(workingDir,  payloadFilename));
 		_memoryPayloadFile.create();
+		
+		DrumMapFile activeFile = getActiveFile();
+		try {
+			_activeIsEmpty = activeFile.isEmpty();
+		} finally {
+			IOUtils.closeQuietly(activeFile);
+		}
 	}
 
 	/**
@@ -209,6 +217,14 @@ public class DrumMap implements Closeable {
 		return _numEntries;
 	}
 	
+	public DrumMapFile getActiveFile() throws IOException {
+		return new DrumMapFile(getWorkingDir(), ACTIVE_FILE_PREFIX, false);
+	}
+	
+	public DrumMapFile getArchivedFile() throws IOException {
+		return new DrumMapFile(getWorkingDir(), ARCHIVED_FILE_PREFIX, false);
+	}
+	
 	public boolean add(long key, byte[] value, IPayload payload) throws IOException {
 		synchronized (_lock) {
 			if (_mergeNeeded) {
@@ -216,8 +232,8 @@ public class DrumMap implements Closeable {
 			}
 
 			int valueLength = ((value == null) || (value.length == 0) ? 0 : value[0]);
-			if (valueLength > MAX_VALUE_LENGTH) {
-				throw new IllegalArgumentException("value length is too long, max is " + MAX_VALUE_LENGTH);
+			if (valueLength > DrumKeyValue.MAX_VALUE_LENGTH) {
+				throw new IllegalArgumentException("value length is too long, max is " + DrumKeyValue.MAX_VALUE_LENGTH);
 			}
 
 			_entries[_numEntries++] = _entryDataOffset;
@@ -273,8 +289,8 @@ public class DrumMap implements Closeable {
 			File nextDir = null;
 			
 			try {
-				// If we have no active data, and no in-memory data, then we're all done.
-				if ((size() == 0) && _activeFile.isEmpty()) {
+				// If we have no in-memory data and no active data then we're all done.
+				if ((size() == 0) && _activeIsEmpty) {
 					return;
 				}
 				
@@ -283,14 +299,14 @@ public class DrumMap implements Closeable {
 				// Create memory and disk KV iterators. The MemoryDrumKVIterator needs the merger to handle
 				// duplicate entries.
 				memoryIterator = new MemoryDrumKVIterator(_merger, _numEntries, _entries, _entryData, _memoryPayloadFile);
-				activeIterator = new DiskDrumKVIterator(_activeFile);
+				activeIterator = new DiskDrumKVIterator(getActiveFile());
 				nextDir = doMerge(queue, memoryIterator, activeIterator);
 				
 				_mergeNeeded = false;
 				
 				// Set up the new working directory to be nextDir. If reset() fails and throws an exception, we
 				// assume that it won't swap in the new directory, so we have to get rid of it.
-				reset(new File(_dataDir, WORKING_SUBDIR_NAME), nextDir);
+				reset(getWorkingDir(), nextDir);
 			} catch (IOException e) {
 				FileUtils.deleteQuietly(nextDir);
 				
@@ -299,6 +315,10 @@ public class DrumMap implements Closeable {
 				IoUtils.closeAllQuietly(memoryIterator, activeIterator);
 			}
 		}
+	}
+
+	private File getWorkingDir() {
+		return new File(_dataDir, WORKING_SUBDIR_NAME);
 	}
 
 	/**
@@ -321,18 +341,16 @@ public class DrumMap implements Closeable {
 		
 		boolean hasMem = false;
 		boolean hasDisk = false;
-		boolean firstLoop = true;
 		
 		DrumKeyValue memKV = null;
 		DrumKeyValue diskKV = null;
-		DrumKeyValue curKV = null;
 		DrumKeyValue nextKV = null;
 		
+		// What we use when we have to merge memory/disk entries.
 		DrumKeyValue mergedKV = new DrumKeyValue();
 		
 		RandomAccessFile memPayloadRAF = memKVIter.getPayloadRAF();
 		RandomAccessFile diskPayloadRAF = diskKVIter.getPayloadRAF();
-		RandomAccessFile curPayloadRAF = null;
 		RandomAccessFile nextPayloadRAF = null;
 		
 		while (true) {
@@ -358,11 +376,7 @@ public class DrumMap implements Closeable {
 			
 			if (!hasDisk) {
 				if (!hasMem) {
-					// Emit the current value if we have one.
-					if (curKV != null) {
-						addEntry(nextActiveFile, nextArchivedFile, queue, curKV, curPayloadRAF);
-					}
-					
+					// All done
 					break;
 				} else {
 					nextKV = memKV;
@@ -384,25 +398,28 @@ public class DrumMap implements Closeable {
 				nextPayloadRAF = diskPayloadRAF;
 				hasDisk = false;
 			} else {
-				// TODO merge the two values.
-				nextKV = null; // TODO Set to merged result. make sure nextKV has offset that's appropriate for memPayloadRAF.
-				nextPayloadRAF = memPayloadRAF;
-				hasMem = hasDisk = false;
+				MergeResult result = _merger.doMerge(diskKV.getValue(), memKV.getValue(), mergedKV.getValue());
+
+				if (result == MergeResult.USE_OLD) {
+					nextKV = diskKV;
+					nextPayloadRAF = diskPayloadRAF;
+				} else if (result == MergeResult.USE_NEW) {
+					nextKV = memKV;
+					nextPayloadRAF = memPayloadRAF;
+				} else if (result == MergeResult.USE_MERGED) {
+					nextKV = mergedKV;
+					// We could use either payload file, so just pick the memory one.
+					nextPayloadRAF = memPayloadRAF;
+					nextKV.setPayloadOffset(memKV.getPayloadOffset());
+				} else {
+					throw new RuntimeException("Unknown merge result: " + result);
+				}
+				
+				hasMem = false;
+				hasDisk = false;
 			}
 			
-			// TODO is this even needed? Based on above, we will be working our way through mem & disk entries,
-			// always picking the lower hash. If the hashes are the same, then we merge. The disk file doesn't have
-			// any dups, and the iterator for the in-memory has taken care of merging. 
-			// Compare the nextKV with current hash. If different, emit
-			// current value, otherwise merge.
-			if (curKV.getKeyHash() != nextKV.getKeyHash()) {
-				// We can emit curKV, and then set that to the nextKV.
-				// TODO make it so.
-			} else {
-				// TODO merge them. Will they always have different hashes?
-			}
-			
-			firstLoop = false;
+			addEntry(nextKV, nextPayloadRAF, queue, nextActiveFile, nextArchivedFile);
 		}
 		
 		return nextDir;
@@ -485,61 +502,45 @@ public class DrumMap implements Closeable {
 		
 	}
 	
-	private void addEntry(DrumMapFile activeFile, DrumMapFile archivedFile,
-			FetchQueue queue, DrumKeyValue dkv, RandomAccessFile payloadRAF) throws IOException {
+	/**
+	 * Create a URL from the KV and payload data, then try to add it to the queue. Based on the
+	 * result, put it into either the active or the archived data.
+	 * 
+	 * @param dkv
+	 * @param payloadRAF
+	 * @param queue
+	 * @param activeFile
+	 * @param archivedFile
+	 * @throws IOException
+	 */
+	private void addEntry(DrumKeyValue dkv, RandomAccessFile payloadRAF,
+			FetchQueue queue, DrumMapFile activeFile, DrumMapFile archivedFile) throws IOException {
 		CrawlStateUrl url = CrawlStateUrl.fromKV(dkv, payloadRAF);
 		MergeStatus status = queue.add(url);
+		
 		switch (status) {
 		case ACTIVE:
-			// TODO update dkv with offset in payload file
+			RandomAccessFile activePayloadRAF = activeFile.getPayloadFile().getRandomAccessFile();
+			dkv.setPayloadOffset(activePayloadRAF.getFilePointer());
 			dkv.write(activeFile.getKeyValueFile());
-			url.write(activeFile.getPayloadFile().getRandomAccessFile());
+			url.write(activePayloadRAF);
 			break;
-			
+
 		case ARCHIVE:
-			// TODO update dkv with offset in payload file
+			RandomAccessFile archivePayloadRAF = archivedFile.getPayloadFile().getRandomAccessFile();
+			dkv.setPayloadOffset(archivePayloadRAF.getFilePointer());
 			dkv.write(archivedFile.getKeyValueFile());
-			url.write(archivedFile.getPayloadFile().getRandomAccessFile());
+			url.write(archivePayloadRAF);
 			break;
 		}
 	}
 
-	private int getValueOffset(int entryIndex) {
-		if ((entryIndex < 0) || (entryIndex >= _numEntries)) {
-			throw new IllegalArgumentException("Invalid index: " + entryIndex);
-		}
-		
-		int dataOffset = _entries[entryIndex];
-		return dataOffset + 8 + 8;
-	}
-	
-	private int getValueSize(int entryIndex) {
-		return 1 + _entryData[getValueOffset(entryIndex)] & 0x00FF;
-	}
-	
-	private long getHash(int entryIndex) {
-		if ((entryIndex < 0) || (entryIndex >= _numEntries)) {
-			throw new IllegalArgumentException("Invalid index: " + entryIndex);
-		}
-		
-		int dataOffset = _entries[entryIndex];
-		return ByteUtils.bytesToLong(_entryData, dataOffset);
-	}
-	
-	private long getPayloadPosition(int entryIndex) {
-		if ((entryIndex < 0) || (entryIndex >= _numEntries)) {
-			throw new IllegalArgumentException("Invalid index: " + entryIndex);
-		}
-		
-		int dataOffset = _entries[entryIndex];
-		return ByteUtils.bytesToLong(_entryData, dataOffset + 8);
-	}
-	
 	/**
 	 * Return the value from the in-memory array for <key>. If payload isn't null,
 	 * fill it in with the payload for this entry.
 	 * 
 	 * WARNING!!! This is only used for testing!
+	 * TODO replace with use of iterator.
 	 * 
 	 * @param key
 	 * @param payload

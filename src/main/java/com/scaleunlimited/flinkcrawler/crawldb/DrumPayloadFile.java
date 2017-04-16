@@ -53,7 +53,7 @@ public class DrumPayloadFile implements Closeable {
 		}
 		
 		if (_randomAccess == null) {
-			_randomAccess = new RandomAccessFile(_payloadFile, "r");
+			_randomAccess = new RandomAccessFile(_payloadFile, isEmpty() ? "rw" : "r");
 		}
 		
 		return _randomAccess;

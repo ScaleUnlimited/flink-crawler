@@ -11,13 +11,16 @@ import com.scaleunlimited.flinkcrawler.utils.HashUtils;
 @SuppressWarnings("serial")
 public class CrawlStateUrl extends ValidUrl {
 
+	// Status = 2 bytes, status time = 8 bytes.
+	private static final int HAS_VALUE_LENGTH = 2 + 8;
+	
 	// Data needed in-memory for CrawlDB merging
 	private FetchStatus _status;		// TODO make this an enum ?
 	
 	// Data kept in the CrawlDB on-disk payload
 	private float _actualScore;			// TODO do we maintain separate page and link scores ?
 	private float _estimatedScore;
-	private long _lastFetchedTime;
+	private long _statusTime;
 	private long _nextFetchTime;
 
 	public CrawlStateUrl() {
@@ -25,16 +28,16 @@ public class CrawlStateUrl extends ValidUrl {
 	}
 	
 	public CrawlStateUrl(FetchUrl url, FetchStatus status, long nextFetchTime) {
-		this(url, status, url.getActualScore(), url.getEstimatedScore(), 0, nextFetchTime);
+		this(url, status, url.getActualScore(), url.getEstimatedScore(), System.currentTimeMillis(), nextFetchTime);
 	}
 	
-	public CrawlStateUrl(ValidUrl url, FetchStatus status, float actualScore, float estimatedScore, long lastFetchedTime, long nextFetchTime) {
+	public CrawlStateUrl(ValidUrl url, FetchStatus status, float actualScore, float estimatedScore, long statusTime, long nextFetchTime) {
 		super(url);
 
 		_status = status;
 		_actualScore = actualScore;
 		_estimatedScore = estimatedScore;
-		_lastFetchedTime = lastFetchedTime;
+		_statusTime = statusTime;
 		_nextFetchTime = nextFetchTime;
 	}
 
@@ -65,12 +68,12 @@ public class CrawlStateUrl extends ValidUrl {
 		_estimatedScore = estimatedScore;
 	}
 
-	public long getLastFetchedTime() {
-		return _lastFetchedTime;
+	public long getStatusTime() {
+		return _statusTime;
 	}
 
-	public void setLastFetchedTime(long lastFetchedTime) {
-		_lastFetchedTime = lastFetchedTime;
+	public void setStatusTime(long statusTime) {
+		_statusTime = statusTime;
 	}
 
 	public float getNextFetchTime() {
@@ -89,15 +92,17 @@ public class CrawlStateUrl extends ValidUrl {
 	 * @param value
 	 */
 	public void setFromValue(byte[] value) {
-		int valueSize = (int)value[0] & 0x00FF;
+		int valueLength = DrumKeyValue.getValueLength(value);
 		
-		if (valueSize == 0) {
+		if (valueLength == 0) {
 			_status = FetchStatus.UNFETCHED;
-		} else if (valueSize < 2) {
-			throw new IllegalArgumentException("Length of value must be 0 or >= 2, got " + valueSize);
+			_statusTime = 0;
+		} else if (valueLength < HAS_VALUE_LENGTH) {
+			throw new IllegalArgumentException(String.format("Length of value must be 0 or %d, got %d", HAS_VALUE_LENGTH, valueLength));
 		} else {
 			// TODO handle additional status values.
 			_status = FetchStatus.values()[ByteUtils.bytesToShort(value, 1)];
+			_statusTime = ByteUtils.bytesToLong(value, 3);
 		}
 	}
 	
@@ -118,8 +123,9 @@ public class CrawlStateUrl extends ValidUrl {
 			value[0] = 0;
 		} else {
 			// TODO set up other values as needed.
-			value[0] = 2;
+			value[0] = HAS_VALUE_LENGTH;
 			ByteUtils.shortToBytes((short)_status.ordinal(), value, 1);
+			ByteUtils.longToBytes(_statusTime, value, 3);
 		}
 		
 		return value;
@@ -127,24 +133,35 @@ public class CrawlStateUrl extends ValidUrl {
 
 	// TODO have everyone use DrumMap.MAX_VALUE_SIZE vs. calling this + 1.
 	public static int maxValueLength() {
-		// TODO - set this to the right value
-		return 16;
+		return HAS_VALUE_LENGTH;
 	}
 	
 	public static int averageValueLength() {
-		// TODO - figure out empirical value for this.
-		return 10;
+		// TODO - figure out empirical value for this. Somewhere between 0 (unfetched) and this value.
+		return HAS_VALUE_LENGTH;
 	}
 	
 	public static FetchStatus getFetchStatus(byte[] value) {
-		int valueSize = (int)value[0] & 0x00FF;
+		int valueLength = DrumKeyValue.getValueLength(value);
 		
-		if (valueSize == 0) {
+		if (valueLength == 0) {
 			return FetchStatus.UNFETCHED;
-		} else if (valueSize < 2) {
-			throw new IllegalArgumentException("Length of value must be 0 or >= 2, got " + valueSize);
+		} else if (valueLength < 2) {
+			throw new IllegalArgumentException("Length of value must be 0 or >= 2, got " + valueLength);
 		} else {
 			return FetchStatus.values()[ByteUtils.bytesToShort(value, 1)];
+		}
+	}
+	
+	public static long getFetchStatusTime(byte[] value) {
+		int valueLength = DrumKeyValue.getValueLength(value);
+		
+		if (valueLength == 0) {
+			return 0;
+		} else if (valueLength != HAS_VALUE_LENGTH) {
+			throw new IllegalArgumentException(String.format("Length of value must be 0 or %d, got %d", HAS_VALUE_LENGTH, valueLength));
+		} else {
+			return ByteUtils.bytesToLong(value, 3);
 		}
 	}
 	
@@ -155,7 +172,7 @@ public class CrawlStateUrl extends ValidUrl {
 		
 		_actualScore = 0.0f;
 		_estimatedScore = 0.0f;
-		_lastFetchedTime = 0;
+		_statusTime = 0;
 		_nextFetchTime = 0;
 	}
 
@@ -166,7 +183,7 @@ public class CrawlStateUrl extends ValidUrl {
 		result = prime * result + Float.floatToIntBits(_actualScore);
 		result = prime * result + Float.floatToIntBits(_estimatedScore);
 		result = prime * result
-				+ (int) (_lastFetchedTime ^ (_lastFetchedTime >>> 32));
+				+ (int) (_statusTime ^ (_statusTime >>> 32));
 		result = prime * result
 				+ (int) (_nextFetchTime ^ (_nextFetchTime >>> 32));
 		result = prime * result + ((_status == null) ? 0 : _status.hashCode());
@@ -188,7 +205,7 @@ public class CrawlStateUrl extends ValidUrl {
 		if (Float.floatToIntBits(_estimatedScore) != Float
 				.floatToIntBits(other._estimatedScore))
 			return false;
-		if (_lastFetchedTime != other._lastFetchedTime)
+		if (_statusTime != other._statusTime)
 			return false;
 		if (_nextFetchTime != other._nextFetchTime)
 			return false;

@@ -34,6 +34,9 @@ public class HashUtils {
     /**
      * Generate a 64-bit JOAAT hash from the given byte array
      * 
+     * FUTURE - optimize by doing long (8 bytes) at a time until we have
+     * less than 8 bytes left.
+     * 
      * @param b Bytes to hash
      * @param offset starting offset
      * @param length number of bytes to hash

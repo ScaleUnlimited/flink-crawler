@@ -1,6 +1,7 @@
 package com.scaleunlimited.flinkcrawler.crawldb;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -10,6 +11,9 @@ import java.io.File;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
@@ -149,49 +153,154 @@ public class DrumMapTest {
 	
 	@Test
 	public void testMemoryDiskMerging() throws Exception {
-		final String[] testCases = {
-				"",			// nothing in list
-				"0",		// single entry (unfetched)
-				"1",		// single entry (fetched)
-				"0,1",		// two different entries
-				"1,2",
-				"0,0",		// two entries that are the same
-				"1,1",		// two entries that are the same
-				"0,0,1",	// two dups, then new
-				"0,0,2",	// two dups, then new
-				"1,1,2",	// two dups, then new
-				"1,1,3",	// two dups, then new
-				"0,1,1",	// one different, then two dups.
-				"0,2,2",	// one different, then two dups.
-				"1,2,2",	// one different, then two dups.
-				"1,3,3",	// one different, then two dups.
+		final String[][] testCases = {
+		//	mem, disk, queue, active, archive
+				{"1u,2u,2f,3u",	"1f,3u,4f", "3u", "1f,2f,3u,4f",	""},		// mix of entries
+
+				{"",	"",		"", 	"", 	""},
+		
+			{"1u",	"",		"1u",	"1u",	""},		// single entry (unfetched)
+			{"1f",	"",		"",		"1f",	""},		// single entry (fetched)
+			{"",	"1u",	"1u",	"1u",	""},		// single entry (fetched)
+			{"",	"1f",	"",		"1f",	""},		// single entry (fetched)
+			
+			{"1u,1u",	"",	"1u",	"1u",	""},		// dup entries (unfetched)
+			{"1f,1f",	"",	"",		"1f",	""},		// dup entries (fetched)
+			{"1u,1f",	"",	"",		"1f",	""},		// dup entries (unfetched & fetched)
+			{"1f,1u",	"",	"",		"1f",	""},		// dup entries (fetched & unfetched)
+
+			// Entries in both memory and disk
+			{"1u",	"1u",	"1u",	"1u",	""},		// same entry (unfetched)
+			{"1f",	"1f",	"",		"1f",	""},		// same entry (fetched)
+			{"1u",	"1f",	"",		"1f",	""},		// same entry (unfetched & fetched)
+
+			{"1u,2u,2f,3u",	"1f,3u,4f", "3u", "1f,2f,3u,4f",	""},		// mix of entries
+			
+			// Nothing in memory, all on disk.
+			{"", "1f,2u", "2u", "1f,2u", ""},
 		};
 		
-		for (String memTestcase : testCases) {
-			for (String diskTestcase : testCases) {
-				File dataDir = new File("target/test/testMemoryDiskMerging/data");
-				FileUtils.deleteDirectory(dataDir);
-				createDiskFile(dataDir, diskTestcase);
+		for (String[] testCase : testCases) {
+			String memTestCase = testCase[0];
+			String diskTestCase = testCase[1];
 
-				final int maxEntries = 1000;
-				DrumMap dm = new DrumMap(maxEntries, CrawlStateUrl.averageValueLength(), dataDir, new DefaultCrawlDBMerger());
-				dm.open();
+			File dataDir = new File("target/test/testMemoryDiskMerging/data");
+			FileUtils.deleteDirectory(dataDir);
+			createDiskFile(dataDir, diskTestCase);
 
-				if (!memTestcase.isEmpty()) {
-					for (String pageID : memTestcase.split(",")) {
-						addUrl(dm, "http://domain.com/page" + pageID, getFetchStatusFromPageID(pageID), 10);
-					}
+			final int maxEntries = 1000;
+			DrumMap dm = new DrumMap(maxEntries, CrawlStateUrl.averageValueLength(), dataDir, new DefaultCrawlDBMerger());
+			dm.open();
+
+			if (!memTestCase.isEmpty()) {
+				for (String pageID : memTestCase.split(",")) {
+					addUrl(dm, getUrlFromPageID(pageID), getFetchStatusFromPageID(pageID), 10);
 				}
-				
-				FetchQueue queue = new FetchQueue(maxEntries);
-				dm.merge(queue);
+			}
 
-				// TODO make sure we wind up with what we expect
+			FetchQueue queue = new FetchQueue(maxEntries);
+			dm.merge(queue);
+
+			String queueResults = testCase[2];
+			if (queueResults.isEmpty()) {
+				assertTrue("Fetch queue should be empty for test " + testCaseToString(testCase), queue.isEmpty());
+			} else {
+				for (String pageID : queueResults.split(",")) {
+					assertFalse(queue.isEmpty());
+					FetchUrl urlFromQueue = queue.poll();
+					assertEquals(getUrlFromPageID(pageID), urlFromQueue.getUrl());
+				}
 			}
 			
+			Iterator<CrawlStateUrl> activeIter = dm.getActiveFile().iterator();
+//			while (activeIter.hasNext()) {
+//				System.out.println(activeIter.next());
+//			}
+			
+			String activeResults = testCase[3];
+			if (activeResults.isEmpty()) {
+				assertFalse(activeIter.hasNext());
+			} else {
+				for (CrawlStateUrl expectedUrl : makeSortedResults(activeResults)) {
+					assertTrue(activeIter.hasNext());
+					CrawlStateUrl actualUrl = activeIter.next();
+					assertEquals("Check URL for test " + testCaseToString(testCase), expectedUrl.getUrl(), actualUrl.getUrl());
+					assertEquals("Check fetch status for test " + testCaseToString(testCase), expectedUrl.getStatus(), actualUrl.getStatus());
+				}
+			}
+			
+			Iterator<CrawlStateUrl> archivedIter = dm.getArchivedFile().iterator();
+			String archiveResults = testCase[4];
+			if (archiveResults.isEmpty()) {
+				assertFalse(archivedIter.hasNext());
+			} else {
+				for (CrawlStateUrl expectedUrl : makeSortedResults(archiveResults)) {
+					assertTrue(archivedIter.hasNext());
+					CrawlStateUrl actualUrl = archivedIter.next();
+					assertEquals("Check URL for test " + testCaseToString(testCase), expectedUrl.getUrl(), actualUrl.getUrl());
+					assertEquals("Check fetch status for test " + testCaseToString(testCase), expectedUrl.getStatus(), actualUrl.getStatus());
+				}
+			}
 		}
 	}
 	
+	/**
+	 * Results from active & archived files are in key hash order, so we need to do the same for
+	 * our tests.
+	 * 
+	 * @param iterator
+	 * @return
+	 * @throws MalformedURLException 
+	 */
+	private List<CrawlStateUrl> makeSortedResults(String results) throws MalformedURLException {
+		List<CrawlStateUrl> result = new ArrayList<>();
+		for (String pageID : results.split(",")) {
+			CrawlStateUrl url = makeUrl(getUrlFromPageID(pageID), getFetchStatusFromPageID(pageID), 0);
+			result.add(url);
+		}
+		
+		Collections.sort(result, new Comparator<CrawlStateUrl>() {
+
+			@Override
+			public int compare(CrawlStateUrl o1, CrawlStateUrl o2) {
+				if (o1.makeKey() < o2.makeKey()) {
+					return -1;
+				} else if (o1.makeKey() > o2.makeKey()) {
+					return 1;
+				} else {
+					return 0;
+				}
+			}
+		});
+		
+		return result;
+	}
+
+	private String testCaseToString(String[] testCase) {
+		StringBuilder result = new StringBuilder();
+		result.append("mem: \"");
+		result.append(testCase[0]);
+		result.append("\", ");
+
+		result.append("disk: \"");
+		result.append(testCase[1]);
+		result.append("\", ");
+
+		result.append("queue: \"");
+		result.append(testCase[2]);
+		result.append("\", ");
+
+		result.append("active: \"");
+		result.append(testCase[3]);
+		result.append("\", ");
+
+		result.append("archive: \"");
+		result.append(testCase[4]);
+		result.append("\"");
+
+		return result.toString();
+	}
+
 	/**
 	 * Create the on-disk DRUM files, located in dataDir.
 	 * 
@@ -203,7 +312,7 @@ public class DrumMapTest {
 		File workingDir = new File(dataDir, DrumMap.WORKING_SUBDIR_NAME);
 		FileUtils.forceMkdir(workingDir);
 		
-		DrumMapFile active = new DrumMapFile(workingDir, DrumMap.ACTIVE_FILE_PREFIX, false);
+		DrumMapFile active = new DrumMapFile(workingDir, DrumMap.ACTIVE_FILE_PREFIX, true);
 		DrumKeyValueFile dkvf = active.getKeyValueFile();
 		DrumPayloadFile dpf = active.getPayloadFile();
 		DrumDataOutput ddo = dpf.getDrumDataOutput();
@@ -211,12 +320,10 @@ public class DrumMapTest {
 		
 		if (!testcase.isEmpty()) {
 			DrumKeyValue dkv = new DrumKeyValue();
-			for (String pageID : testcase.split(",")) {
-				String urlAsString = "http://domain.com/page" + pageID;
-				CrawlStateUrl url = makeUrl(urlAsString, getFetchStatusFromPageID(pageID), 10);
+			for (CrawlStateUrl url : makeSortedResults(testcase)) {
 				
 				dkv.setPayloadOffset(ddo.getBytesWritten());
-				ddo.writeUTF(urlAsString);
+				url.write(ddo);
 				
 				dkv.setKeyHash(url.makeKey());
 				dkv.setValue(url.getValue(valueBuffer));
@@ -228,9 +335,20 @@ public class DrumMapTest {
 		active.close();
 	}
 
+	private String getUrlFromPageID(String pageID) {
+		String pageNumber = pageID.substring(0, 1);
+		return "http://domain.com/page" + pageNumber;
+	}
+
 	private FetchStatus getFetchStatusFromPageID(String pageID) {
-		boolean isEven = (Integer.parseInt(pageID) % 2) == 0;
-		return isEven ? FetchStatus.UNFETCHED : FetchStatus.FETCHED;
+		String fetchStatus = pageID.substring(1, 2);
+		if (fetchStatus.equals("u")) {
+			return FetchStatus.UNFETCHED;
+		} else if (fetchStatus.equals("f")) {
+			return FetchStatus.FETCHED;
+		} else {
+			throw new RuntimeException("Unknown fetch status for test: " + fetchStatus);
+		}
 	}
 
 	private void addUrl(DrumMap dm, String urlAsString, FetchStatus status, long nextFetchTime) throws IOException {

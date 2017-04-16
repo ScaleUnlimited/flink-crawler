@@ -3,16 +3,17 @@ package com.scaleunlimited.flinkcrawler.crawldb;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 
 public class DrumKeyValue {
 
+	public static final int MAX_VALUE_LENGTH = 255; // We could use CrawlStateUrl.maxValueLength();
+	
 	private long _keyHash;
 	private long _payloadOffset;
 	private byte[] _value;
 	
 	public DrumKeyValue() {
-		_value = new byte[1 + DrumMap.MAX_VALUE_LENGTH];
+		_value = new byte[1 + MAX_VALUE_LENGTH];
 	}
 
 	public long getKeyHash() {
@@ -32,7 +33,7 @@ public class DrumKeyValue {
 	}
 
 	public int getValueLength() {
-		return _value[0] & 0x0FF;
+		return getValueLength(_value);
 	}
 
 	public byte[] getValue() {
@@ -40,7 +41,7 @@ public class DrumKeyValue {
 	}
 
 	public void setValue(byte[] value) {
-		int valueLength = _value[0] & 0x0FF;
+		int valueLength = getValueLength(value);
 		System.arraycopy(value, 0, _value, 0, valueLength + 1);
 	}
 
@@ -63,9 +64,14 @@ public class DrumKeyValue {
 	public void write(DataOutput out) throws IOException {
 		out.writeLong(_keyHash);
 		out.writeLong(_payloadOffset);
-		int valueLength = _value[0] & 0x0FF;
+		int valueLength = getValueLength(_value);
 		out.writeByte(valueLength);
 		out.write(_value, 1, valueLength);
 	}
+
+	public static int getValueLength(byte[] value) {
+		return (int)value[0] & 0x00FF;
+	}
+	
 
 }

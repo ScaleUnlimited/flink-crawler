@@ -53,8 +53,27 @@ public enum FetchStatus {
     ERROR_INVALID_URL,
     ERROR_IOEXCEPTION,
     
-    UNFETCHED,                  // Never processed.
-    FETCHING,					// Being fetched
-    FETCHED;    				// Successfully fetched
+    UNFETCHED(0),               	// Never processed.
+    FETCHING(10),					// Being fetched
+    FETCHED(25);    				// Successfully fetched
 
+    // Priority is used when merging two entries for the same URL. We'll use the
+    // timestamp to pick the more recent update, unless both times are the same,
+    // in which case we use priority to break the tie.
+    private static final int DEFAULT_PRIORITY = 50;
+    
+    private int _priority;
+    
+    private FetchStatus() {
+    	this(DEFAULT_PRIORITY);
+    }
+    
+    private FetchStatus(int priority) {
+    	_priority = priority;
+    }
+    
+    public int getPriority() {
+    	return _priority;
+    }
+    
 }
