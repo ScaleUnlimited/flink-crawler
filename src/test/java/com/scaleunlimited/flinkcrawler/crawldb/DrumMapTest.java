@@ -2,7 +2,6 @@ package com.scaleunlimited.flinkcrawler.crawldb;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.DataInput;
@@ -33,34 +32,6 @@ import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
 public class DrumMapTest {
 	static final Logger LOGGER = LoggerFactory.getLogger(DrumMapTest.class);
 	
-	@Test
-	public void testPayload() throws Exception {
-		File dataDir = new File("target/test/testPayload/data");
-		DrumMap dm = new DrumMap(1000, CrawlStateUrl.averageValueLength(), dataDir, new DefaultCrawlDBMerger());
-		dm.open();
-		
-		byte[] value = new byte[2];
-		value[0] = 1;
-		for (int i = 500; i > 0; i--) {
-			value[1] = (byte)(i % 97);
-			dm.add(i, value, new LongPayload(i));
-		}
-		
-		dm.close();
-		assertEquals(500, dm.size());
-		
-		LongPayload payload = new LongPayload();
-		for (int i = 1; i <= 500; i++) {
-			assertTrue(dm.getInMemoryEntry(i, value, payload));
-			assertEquals(1, value[0]);
-			assertEquals((byte)(i % 97), value[1]);
-			
-			Long payloadValue = payload.getPayload();
-			assertNotNull("Should get payload for key " + i, payloadValue);
-			assertEquals(i, (long)payloadValue);
-		}
-	}
-
 	@Ignore
 	@Test
 	public void testTiming() throws Exception {
@@ -96,6 +67,9 @@ public class DrumMapTest {
 	@Test
 	public void testMerging() throws Exception {
 		File dataDir = new File("target/test/testMerging/data");
+		if (dataDir.exists()) {
+			FileUtils.deleteDirectory(dataDir);
+		}
 		
 		final int maxEntries = 1000;
 		DrumMap dm = new DrumMap(maxEntries, CrawlStateUrl.averageValueLength(), dataDir, new DefaultCrawlDBMerger());
@@ -155,29 +129,29 @@ public class DrumMapTest {
 	public void testMemoryDiskMerging() throws Exception {
 		final String[][] testCases = {
 		//	mem, disk, queue, active, archive
-				{"1u,2u,2f,3u",	"1f,3u,4f", "3u", "1f,2f,3u,4f",	""},		// mix of entries
+				{"1u,2u,2f,3u",	"1f,3u,4f", "3g", "1f,2f,3g,4f",	""},		// mix of entries
 
 				{"",	"",		"", 	"", 	""},
 		
-			{"1u",	"",		"1u",	"1u",	""},		// single entry (unfetched)
+			{"1u",	"",		"1g",	"1g",	""},		// single entry (unfetched)
 			{"1f",	"",		"",		"1f",	""},		// single entry (fetched)
-			{"",	"1u",	"1u",	"1u",	""},		// single entry (fetched)
+			{"",	"1u",	"1g",	"1g",	""},		// single entry (fetched)
 			{"",	"1f",	"",		"1f",	""},		// single entry (fetched)
 			
-			{"1u,1u",	"",	"1u",	"1u",	""},		// dup entries (unfetched)
+			{"1u,1u",	"",	"1g",	"1g",	""},		// dup entries (unfetched)
 			{"1f,1f",	"",	"",		"1f",	""},		// dup entries (fetched)
 			{"1u,1f",	"",	"",		"1f",	""},		// dup entries (unfetched & fetched)
 			{"1f,1u",	"",	"",		"1f",	""},		// dup entries (fetched & unfetched)
 
 			// Entries in both memory and disk
-			{"1u",	"1u",	"1u",	"1u",	""},		// same entry (unfetched)
+			{"1u",	"1u",	"1g",	"1g",	""},		// same entry (unfetched)
 			{"1f",	"1f",	"",		"1f",	""},		// same entry (fetched)
 			{"1u",	"1f",	"",		"1f",	""},		// same entry (unfetched & fetched)
 
-			{"1u,2u,2f,3u",	"1f,3u,4f", "3u", "1f,2f,3u,4f",	""},		// mix of entries
+			{"1u,2u,2f,3u",	"1f,3u,4f", "3g", "1f,2f,3g,4f",	""},		// mix of entries
 			
 			// Nothing in memory, all on disk.
-			{"", "1f,2u", "2u", "1f,2u", ""},
+			{"", "1f,2u", "2g", "1f,2g", ""},
 		};
 		
 		for (String[] testCase : testCases) {
@@ -346,6 +320,8 @@ public class DrumMapTest {
 			return FetchStatus.UNFETCHED;
 		} else if (fetchStatus.equals("f")) {
 			return FetchStatus.FETCHED;
+		} else if (fetchStatus.equals("g")) {
+			return FetchStatus.FETCHING;
 		} else {
 			throw new RuntimeException("Unknown fetch status for test: " + fetchStatus);
 		}

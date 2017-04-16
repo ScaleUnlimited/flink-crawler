@@ -247,6 +247,13 @@ under the License.
 				</exclusion>
 			</exclusions>
 		</dependency>
+
+		<dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>2.7.19</version>
+            <scope>test</scope>
+        </dependency>
 		
 		<!--
 		TODO decide if we want to switch to Java 8, so we can use flinkspector.

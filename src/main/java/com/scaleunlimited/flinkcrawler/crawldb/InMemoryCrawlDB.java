@@ -8,8 +8,9 @@ import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDBMerger.MergeResult;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
+import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
-import com.scaleunlimited.flinkcrawler.utils.FetchQueue.MergeStatus;
+import com.scaleunlimited.flinkcrawler.utils.FetchQueue.UrlState;
 
 @SuppressWarnings("serial")
 public class InMemoryCrawlDB extends BaseCrawlDB {
@@ -85,16 +86,17 @@ public class InMemoryCrawlDB extends BaseCrawlDB {
 			for (String url : _crawlState.keySet()) {
 				CrawlStateUrl curState = _crawlState.get(url);
 				curState.getValue(_curValue);
-				MergeStatus status = _fetchQueue.add(curState);
+				UrlState urlState = _fetchQueue.add(curState);
 				
-				if (status == MergeStatus.ACTIVE) {
-					// Do nothing, just stays in the crawl DB
-				} else if (status == MergeStatus.ARCHIVE) {
+				if (urlState == UrlState.ACTIVE) {
+					// Do nothing, just stays in the crawl DB with current state
+					// (which might have been updated by the add() call).
+				} else if (urlState == UrlState.ARCHIVE) {
 					// Remove from the in-memory DB, stick in our archive DB
 					_crawlState.remove(url);
 					_archiveDB.put(url, curState);
 				} else {
-					throw new RuntimeException("Unknown merge status: " + status);
+					throw new RuntimeException("Unknown merge status: " + urlState);
 				}
 			}
 		}

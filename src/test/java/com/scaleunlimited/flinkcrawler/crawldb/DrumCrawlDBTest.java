@@ -2,8 +2,10 @@ package com.scaleunlimited.flinkcrawler.crawldb;
 
 import static org.junit.Assert.*;
 
+import java.io.File;
 import java.net.MalformedURLException;
 
+import org.apache.commons.io.FileUtils;
 import org.junit.Test;
 
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
@@ -16,6 +18,11 @@ public class DrumCrawlDBTest {
 
 	@Test
 	public void testMergingAndKeepingState() throws Exception {
+		File testDir = new File("target/test/DrumCrawlDBTest/testMergingAndKeepingState");
+		if (testDir.exists()) {
+			FileUtils.deleteDirectory(testDir);
+		}
+		
 		DrumCrawlDB cdb = new DrumCrawlDB(10, "target/test/DrumCrawlDBTest/testMergingAndKeepingState/");
 		FetchQueue fq = new FetchQueue(100);
 		cdb.open(0, fq, new DefaultCrawlDBMerger());

@@ -1,7 +1,7 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
 import org.apache.flink.api.common.functions.MapFunction;
-import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.api.java.tuple.Tuple3;
 
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
@@ -9,10 +9,10 @@ import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
 @SuppressWarnings("serial")
-public class OutlinkToStateUrlFunction implements MapFunction<Tuple2<ExtractedUrl, ParsedUrl>, RawUrl> {
+public class OutlinkToStateUrlFunction implements MapFunction<Tuple3<ExtractedUrl, ParsedUrl, String>, RawUrl> {
 
 	@Override
-	public RawUrl map(Tuple2<ExtractedUrl, ParsedUrl> outlink) throws Exception {
+	public RawUrl map(Tuple3<ExtractedUrl, ParsedUrl, String> outlink) throws Exception {
 		ExtractedUrl outlinkUrl = outlink.f0;
 		
 		UrlLogger.record(this.getClass(), outlinkUrl);

@@ -1,8 +1,6 @@
 package com.scaleunlimited.flinkcrawler.crawldb;
 
-import java.io.ByteArrayInputStream;
 import java.io.Closeable;
-import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -17,9 +15,10 @@ import org.slf4j.LoggerFactory;
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDBMerger.MergeResult;
 import com.scaleunlimited.flinkcrawler.crawldb.DrumMapFile.DrumMapFileType;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
+import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.utils.ByteUtils;
 import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
-import com.scaleunlimited.flinkcrawler.utils.FetchQueue.MergeStatus;
+import com.scaleunlimited.flinkcrawler.utils.FetchQueue.UrlState;
 import com.scaleunlimited.flinkcrawler.utils.IoUtils;
 
 /**
@@ -422,84 +421,7 @@ public class DrumMap implements Closeable {
 			addEntry(nextKV, nextPayloadRAF, queue, nextActiveFile, nextArchivedFile);
 		}
 		
-		return nextDir;
-		
-		/*
-		byte[] oldValueA = new byte[1 + MAX_VALUE_LENGTH];
-		byte[] newValueA = new byte[1 + MAX_VALUE_LENGTH];
-		byte[] mergedValueA = new byte[1 + MAX_VALUE_LENGTH];
-
-		byte[] curValueA = null;
-		long nextHashA = 0;
-
-		for (int i = 0; i < _numEntries; i++) {
-			// Use next hash if we've got it.
-			long curHash;
-
-			if (i == 0) {
-				curHash = getHash(0);
-				System.arraycopy(_entryData, getValueOffset(0), oldValueA, 0, getValueSize(0));
-				curValueA = oldValueA;
-			} else {
-				curHash = nextHashA;
-				// curValue has been set up in previous loop.
-			}
-
-			// If we're at the end, fake a hash that will never match, to trigger
-			// processing of the last entry.
-			boolean lastEntry = i == _numEntries - 1;
-			nextHashA = lastEntry ? curHash + 1 : getHash(i + 1);
-
-			if (nextHashA != curHash) {
-				// Current entry can be processed, since next entry is different.
-				// See if we need to skip over some number of entries from active.
-				// TODO make it so
-				// See if we need to merge with an entry from active
-				// TODO make it so.
-				// Decide what to do with the merged result
-				MergedStatus status = _merger.getMergedStatus(curValueA);
-				if (status == MergedStatus.ACTIVE_FETCH) {
-					long position = getPayloadPosition(i);
-					LOGGER.trace(String.format("%s: Seeking to position %d for entry #%d", Thread.currentThread().getName(), position, i));
-					memoryPayload.seek(position);
-					CrawlStateUrl url = new CrawlStateUrl();
-					url.readFields(memoryPayload);
-					queue.add(url);
-
-					// TODO - Also put in active disk
-				} else if (status == MergedStatus.ACTIVE) {
-					// TODO just put in active disk
-				} else if (status == MergedStatus.ARCHIVE) {
-					// TODO put in archive
-				} else {
-					throw new RuntimeException("Unknown merge status: " + status);
-				}
-
-				if (!lastEntry) {
-					// FUTURE remove need to copy by having getMergedStatus(byte[], offset)
-					System.arraycopy(_entryData, getValueOffset(i + 1), oldValueA, 0, getValueSize(i + 1));
-					curValueA = oldValueA;
-					curHash = nextHashA;
-				}
-			} else {
-				// we have two entries with the same hash, so we have to merge them.
-				// FUTURE remove need to copy to oldValue, newValue by having byte[], offset params
-				System.arraycopy(_entryData, getValueOffset(i + 1), newValueA, 0, getValueSize(i + 1));
-				MergeResult result = _merger.doMerge(curValueA, newValueA, mergedValueA);
-
-				if (result == MergeResult.USE_OLD) {
-					curValueA = oldValueA;
-				} else if (result == MergeResult.USE_NEW) {
-					curValueA = newValueA;
-				} else if (result == MergeResult.USE_MERGED) {
-					curValueA = mergedValueA;
-				} else {
-					throw new RuntimeException("Unknown merge result: " + result);
-				}
-			}
-		}
-		*/
-		
+		return nextDir;		
 	}
 	
 	/**
@@ -516,9 +438,12 @@ public class DrumMap implements Closeable {
 	private void addEntry(DrumKeyValue dkv, RandomAccessFile payloadRAF,
 			FetchQueue queue, DrumMapFile activeFile, DrumMapFile archivedFile) throws IOException {
 		CrawlStateUrl url = CrawlStateUrl.fromKV(dkv, payloadRAF);
-		MergeStatus status = queue.add(url);
+		UrlState urlState = queue.add(url);
 		
-		switch (status) {
+		// Call to add() can change status of URL, so reload the value.
+		url.getValue(dkv.getValue());
+
+		switch (urlState) {
 		case ACTIVE:
 			RandomAccessFile activePayloadRAF = activeFile.getPayloadFile().getRandomAccessFile();
 			dkv.setPayloadOffset(activePayloadRAF.getFilePointer());
@@ -535,75 +460,4 @@ public class DrumMap implements Closeable {
 		}
 	}
 
-	/**
-	 * Return the value from the in-memory array for <key>. If payload isn't null,
-	 * fill it in with the payload for this entry.
-	 * 
-	 * WARNING!!! This is only used for testing!
-	 * TODO replace with use of iterator.
-	 * 
-	 * @param key
-	 * @param payload
-	 * @return
-	 */
-	public boolean getInMemoryEntry(long key, byte[] value, IPayload payload) throws IOException {
-		
-		int index = findKey(key);
-		if (index < 0) {
-			if (payload != null) {
-				payload.clear();
-			}
-			
-			return false;
-		} else {
-			int entryDataOffset = _entries[index];
-			entryDataOffset += 8;
-			
-			if (payload != null) {
-				RandomAccessFile memoryPayloadFile = _memoryPayloadFile.getRandomAccessFile();
-				byte[] payloadData = new byte[(int)memoryPayloadFile.length()];
-				memoryPayloadFile.read(payloadData);
-
-				long payloadOffset = ByteUtils.bytesToLong(_entryData, entryDataOffset);
-				
-				ByteArrayInputStream bais = new ByteArrayInputStream(payloadData);
-				DataInputStream dis = new DataInputStream(bais);
-				dis.skip(payloadOffset);
-				payload.readFields(dis);
-				dis.close();
-			}
-			
-			entryDataOffset += 8;
-			int valueLength = (int)_entryData[entryDataOffset++];
-			
-			if (valueLength + 1 > value.length) {
-				throw new IllegalArgumentException("value array isn't big enough, we need " + (valueLength + 1));
-			}
-
-			value[0] = (byte)valueLength;
-
-			if (valueLength > 0) {
-				// Copy over the rest of the value
-				System.arraycopy(_entryData, entryDataOffset, value, 1, valueLength);
-			}
-			
-			return true;
-		}
-	}
-
-	private int findKey(long key) {
-		for (int i = 0; i < _numEntries; i++) {
-			if (ByteUtils.bytesToLong(_entryData, _entries[i]) == key) {
-				return i;
-			}
-		}
-		
-		return -1;
-	}
-
-	private static enum PayloadFileType {
-		MEMORY,
-		ACTIVE,
-		ARCHIVE
-	}
 }

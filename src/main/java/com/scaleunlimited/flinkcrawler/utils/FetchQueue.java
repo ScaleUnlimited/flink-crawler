@@ -9,11 +9,10 @@ import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 
 public class FetchQueue {
 	
-	public static enum MergeStatus {
+	public static enum UrlState {
 		ACTIVE,
 		ARCHIVE
 	}
-	
 
 	private Queue<FetchUrl> _fetchQueue;
 	private int _maxQueueSize;
@@ -27,18 +26,18 @@ public class FetchQueue {
 		return _fetchQueue.isEmpty();
 	}
 	
-	public MergeStatus add(CrawlStateUrl url) {
-		// TODO make this more sophisticated.
+	public UrlState add(CrawlStateUrl url) {
 		FetchStatus fetchStatus = url.getStatus();
 		if (fetchStatus == FetchStatus.UNFETCHED) {
 			if (_fetchQueue.size() < _maxQueueSize) {
+				url.setStatus(FetchStatus.FETCHING);
 				_fetchQueue.add(new FetchUrl(url, url.getEstimatedScore(), url.getActualScore()));
 			}
 			
-			return MergeStatus.ACTIVE;
+			return UrlState.ACTIVE;
 		} else {
 			// TODO decide based on (score? other factors) whether to keep around or not.
-			return MergeStatus.ACTIVE;
+			return UrlState.ACTIVE;
 		}
 	}
 

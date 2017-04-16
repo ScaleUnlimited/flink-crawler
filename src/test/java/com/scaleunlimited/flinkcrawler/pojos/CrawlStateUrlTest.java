@@ -27,7 +27,7 @@ public class CrawlStateUrlTest {
 		csu2.readFields(dis);
 		dis.close();
 		
-		assertEquals(csu, csu2);
+		assertEquals(csu.getUrl(), csu2.getUrl());
 	}
 
 }
