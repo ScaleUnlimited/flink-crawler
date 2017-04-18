@@ -92,53 +92,110 @@ under the License.
 					much cleaner jar files.
 	-->
 
+	<dependencyManagement>
+        <dependencies>
+			<dependency>
+				<groupId>org.apache.flink</groupId>
+				<artifactId>flink-java</artifactId>
+				<version>${flink.version}</version>
+			</dependency>
+			
+			<dependency>
+				<groupId>org.apache.flink</groupId>
+				<artifactId>flink-streaming-java_2.10</artifactId>
+				<version>${flink.version}</version>
+			</dependency>
+			
+			<dependency>
+				<groupId>org.apache.flink</groupId>
+				<artifactId>flink-clients_2.10</artifactId>
+				<version>${flink.version}</version>
+			</dependency>
+			
+			<dependency>
+				<groupId>org.slf4j</groupId>
+				<artifactId>slf4j-api</artifactId>
+				<version>${slf4j.version}</version>
+			</dependency>
+			
+			<dependency>
+				<groupId>com.github.crawler-commons</groupId>
+				<artifactId>crawler-commons</artifactId>
+				<version>${crawlercommons.version}</version>
+			</dependency>
+			
+			<dependency>
+				<groupId>com.github.crawler-commons</groupId>
+				<artifactId>http-fetcher</artifactId>
+				<version>${http-fetcher.version}</version>
+			</dependency>
+			
+	        <dependency>
+				<groupId>org.apache.httpcomponents</groupId>
+				<artifactId>httpclient</artifactId>
+				<version>4.5.2</version>
+			</dependency>
+			
+			<dependency>
+				<groupId>org.apache.httpcomponents</groupId>
+				<artifactId>httpcore</artifactId>
+				<version>4.4.4</version>
+			</dependency>
+	
+			<dependency>
+				<groupId>com.amazonaws</groupId>
+				<artifactId>aws-java-sdk-s3</artifactId>
+				<version>${aws-java-sdk.version}</version>
+			</dependency>
+			
+			<dependency>
+				<groupId>org.apache.tika</groupId>
+				<artifactId>tika-parsers</artifactId>
+				<version>${tika.version}</version>
+			</dependency>
+			
+        </dependencies>
+	</dependencyManagement>
+
 	<dependencies>
 		<dependency>
 			<groupId>org.apache.flink</groupId>
 			<artifactId>flink-java</artifactId>
-			<version>${flink.version}</version>
 		</dependency>
 		
 		<dependency>
 			<groupId>org.apache.flink</groupId>
 			<artifactId>flink-streaming-java_2.10</artifactId>
-			<version>${flink.version}</version>
 		</dependency>
 		
 		<dependency>
 			<groupId>org.apache.flink</groupId>
 			<artifactId>flink-clients_2.10</artifactId>
-			<version>${flink.version}</version>
 		</dependency>
 		
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
-			<version>${slf4j.version}</version>
 		</dependency>
 		
 		<dependency>
 			<groupId>com.github.crawler-commons</groupId>
 			<artifactId>crawler-commons</artifactId>
-			<version>${crawlercommons.version}</version>
 		</dependency>
 		
 		<dependency>
 			<groupId>com.github.crawler-commons</groupId>
 			<artifactId>http-fetcher</artifactId>
-			<version>${http-fetcher.version}</version>
 		</dependency>
 		
 		<dependency>
 			<groupId>com.amazonaws</groupId>
 			<artifactId>aws-java-sdk-s3</artifactId>
-			<version>${aws-java-sdk.version}</version>
 		</dependency>
 		
 		<dependency>
 			<groupId>org.apache.tika</groupId>
 			<artifactId>tika-parsers</artifactId>
-			<version>${tika.version}</version>
 			<exclusions>
 	            <exclusion>
 	                <groupId>org.apache.pdfbox</groupId>
