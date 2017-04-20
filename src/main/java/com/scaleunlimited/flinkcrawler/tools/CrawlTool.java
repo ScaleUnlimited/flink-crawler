@@ -152,7 +152,11 @@ public class CrawlTool {
 	
 	public static void main(String[] args) {
 		
-		CrawlToolOptions options = new CrawlToolOptions();
+        // Dump the classpath to stdout to debug artifact version conflicts
+		System.out.println(    "Java classpath: "
+                    		+   System.getProperty("java.class.path", "."));
+
+        CrawlToolOptions options = new CrawlToolOptions();
         CmdLineParser parser = new CmdLineParser(options);
 
         try {
