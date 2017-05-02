@@ -36,6 +36,8 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 	// TODO pick good time for this
 	private static final long QUEUE_CHECK_DELAY = 100L;
 
+	private static final int URLS_PER_TIMER = 1000;
+
 	private BaseCrawlDB _crawlDB;
 	private BaseCrawlDBMerger _merger;
 	
@@ -89,22 +91,22 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 	
 	@Override
 	public void onTimer(long time, OnTimerContext context, Collector<FetchUrl> collector) throws Exception {
-		// TODO do this in a loop?
-		FetchUrl url = _fetchQueue.poll();
+		for (int i = 0; i < URLS_PER_TIMER; i++) {
+			FetchUrl url = _fetchQueue.poll();
+
+			if (url != null) {
+				LOGGER.debug(String.format("CrawlDBFunction emitting URL %s to fetch (partition %d of %d)", url, _index, _parallelism));
+				collector.collect(url);
+			} else {
+				break;
+			}
+		}
 		
-		if (url != null) {
-			LOGGER.debug(String.format("CrawlDBFunction emitting URL %s to fetch (partition %d of %d)", url, _index, _parallelism));
-			collector.collect(url);
-		} else {
-			// We don't have any active URLs to fetch.
-			// Call the CrawlDB to trigger a merge.
-			// TODO if we're merging already, don't merge.
-			synchronized (_crawlDB) {
-				// We might have done a merge while waiting to get the lock on the _crawlDB, so only
-				// do the merge if the fetch queue is still empty.
-				if (_fetchQueue.isEmpty()) {
-					_crawlDB.merge();
-				}
+		synchronized (_crawlDB) {
+			if (_fetchQueue.isEmpty()) {
+				// We don't have any active URLs left.
+				// Call the CrawlDB to trigger a merge.
+				_crawlDB.merge();
 			}
 		}
 
