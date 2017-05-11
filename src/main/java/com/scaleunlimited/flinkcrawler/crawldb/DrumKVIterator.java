@@ -27,4 +27,9 @@ public abstract class DrumKVIterator implements Iterator<DrumKeyValue>, Closeabl
 		DataInput di = _payloadFile.getInputStream(kv.getPayloadOffset());
 		result.readFields(di);
 	}
+	
+	@Override
+	public void close() throws IOException {
+		_payloadFile.close();
+	}
 }
