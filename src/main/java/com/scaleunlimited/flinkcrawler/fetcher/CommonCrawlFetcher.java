@@ -27,6 +27,9 @@ import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.model.S3ObjectInputStream;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import crawlercommons.fetcher.AbortedFetchException;
 import crawlercommons.fetcher.AbortedFetchReason;
@@ -66,6 +69,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
     private final AmazonS3 _s3Client;
     private final String[] _secondaryIndexUrls;
     private final SecondaryIndex[] _secondaryIndex;
+    private final JsonParser _jsonParser;
     
 	public CommonCrawlFetcher() throws IOException {
 		this(1);
@@ -73,6 +77,8 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 
 	public CommonCrawlFetcher(int maxThreads) throws IOException {
 		super(maxThreads, new UserAgent("", "", ""));
+		
+		_jsonParser = new JsonParser();
 		
 		_s3Client = AmazonS3ClientBuilder
                 .standard()
@@ -232,7 +238,22 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 					// we found it
 					// TODO get info from JSON, fetch page from WARC file, create FetchResult.
 					String json = m.group(3);
+					JsonObject jsonObj = _jsonParser.parse(json).getAsJsonObject();
 					
+					int status = jsonObj.get("status").getAsInt();
+					String mimeType = jsonObj.get("mime").getAsString();
+					
+					if (status != 200) {
+						return makeNotOKFetchResult(url, mimeType, status, payload);
+					} else if (true) {
+						// TODO check mimetype
+						String warcFile = jsonObj.get("filename").getAsString();
+						long length = jsonObj.get("length").getAsLong();
+						long offset = jsonObj.get("offset").getAsLong();
+						
+						// We have the data required to fetch the WARC entry and return that as a result.
+						// TODO make it so.
+					}
 					return null;
 				} else if (sort < 0) {
 					// we're past where it could be.
@@ -247,22 +268,25 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 		}
 	}
 
-	private FetchedResult make404FetchResult(URL url, Payload payload) {
+	private FetchedResult makeNotOKFetchResult(URL url, String mimeType, int status, Payload payload) {
 		String urlAsString = url.toString();
-		// TODO Auto-generated method stub
 		return new FetchedResult(	urlAsString,
 									urlAsString, 
 									System.currentTimeMillis(), 
 									EMPTY_HEADERS, 
 									EMPTY_CONTENT, 
-									"text/plain", 
+									mimeType, 
 									0, 
 									payload, 
 									urlAsString, 
 									0, 
 									url.getHost(), 
-									HttpStatus.SC_GONE, 
+									status, 
 									"");
+	}
+
+	private FetchedResult make404FetchResult(URL url, Payload payload) {
+		return makeNotOKFetchResult(url, "text/plain", HttpStatus.SC_GONE, payload);
 	}
 
 	private static class SecondaryIndex {
