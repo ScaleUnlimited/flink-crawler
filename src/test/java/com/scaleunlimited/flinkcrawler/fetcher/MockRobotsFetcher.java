@@ -7,8 +7,6 @@ import java.util.Map;
 import org.apache.http.HttpStatus;
 import org.apache.tika.metadata.Metadata;
 
-import com.scaleunlimited.flinkcrawler.config.BaseHttpFetcherBuilder;
-
 import crawlercommons.fetcher.BaseFetchException;
 import crawlercommons.fetcher.FetchedResult;
 import crawlercommons.fetcher.Payload;

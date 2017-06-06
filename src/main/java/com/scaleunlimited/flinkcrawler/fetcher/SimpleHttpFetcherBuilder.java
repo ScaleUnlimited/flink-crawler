@@ -1,4 +1,4 @@
-package com.scaleunlimited.flinkcrawler.config;
+package com.scaleunlimited.flinkcrawler.fetcher;
 
 import crawlercommons.fetcher.http.BaseHttpFetcher;
 import crawlercommons.fetcher.http.SimpleHttpFetcher;

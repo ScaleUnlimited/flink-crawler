@@ -1,4 +1,4 @@
-package com.scaleunlimited.flinkcrawler.config;
+package com.scaleunlimited.flinkcrawler.fetcher;
 
 import java.io.Serializable;
 import java.util.HashMap;
@@ -88,6 +88,7 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
     /**
      * Helper method that {@link #build()} can use to configure a newly
      * constructed BaseHttpFetcher instance
+     * 
      * @param fetcher instance of BaseHttpFetcher that {@link #build()} has
      * just constructed
      * @return the same fetcher, after applying all of the configuration
