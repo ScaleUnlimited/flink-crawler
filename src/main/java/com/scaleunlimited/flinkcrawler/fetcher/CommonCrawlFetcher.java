@@ -1,13 +1,18 @@
 package com.scaleunlimited.flinkcrawler.fetcher;
 
-import java.io.BufferedInputStream;
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -27,7 +32,6 @@ import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.model.S3ObjectInputStream;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -111,8 +115,22 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 		// TODO get crawl ID from configuration, or passed in.
 		String s3Path = String.format(INDEX_FILES_PATH, "2017-17", SECONDARY_INDEX_FILENAME);
 		
-		try (S3Object object = _s3Client.getObject(new GetObjectRequest(COMMONCRAWL_BUCKET, s3Path))) {
-			List<String> lines = IOUtils.readLines(object.getObjectContent());
+		// See if we have the file saved already. If so, read it in.
+		File cachedFile = new File("./target/CommonCrawlFetcherData" + s3Path);
+		if (!cachedFile.exists()) {
+			cachedFile.getParentFile().mkdirs();
+			cachedFile.createNewFile();
+			FileOutputStream fos = new FileOutputStream(cachedFile);
+			try (S3Object object = _s3Client.getObject(new GetObjectRequest(COMMONCRAWL_BUCKET, s3Path))) {
+				IOUtils.copy(object.getObjectContent(), fos);
+			} finally {
+				IOUtils.closeQuietly(fos);
+			}
+		}
+		
+		
+		try (FileInputStream fis = new FileInputStream(cachedFile)) {
+			List<String> lines = IOUtils.readLines(fis);
 			int numEntries = lines.size();
 			_secondaryIndexUrls = new String[numEntries];
 			_secondaryIndex = new SecondaryIndex[numEntries];
