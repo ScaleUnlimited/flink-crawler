@@ -22,7 +22,6 @@ import java.util.zip.GZIPInputStream;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpStatus;
-import org.apache.tika.metadata.Metadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,6 +47,7 @@ import crawlercommons.fetcher.RedirectFetchException.RedirectExceptionReason;
 import crawlercommons.fetcher.UrlFetchException;
 import crawlercommons.fetcher.http.BaseHttpFetcher;
 import crawlercommons.fetcher.http.UserAgent;
+import crawlercommons.util.Headers;
 
 @SuppressWarnings("serial")
 public class CommonCrawlFetcher extends BaseHttpFetcher {
@@ -68,7 +68,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
     // 0,124,148,146)/index.php 20170429211342 {"url": "http://146.148.124.0/index.php", "mim....
     private static final Pattern CDX_LINE_PATTERN = Pattern.compile("(.+?)[ ]+(\\d+)[ ]+(\\{.+\\})");
     
-    private static final Metadata EMPTY_HEADERS = new Metadata();
+    private static final Headers EMPTY_HEADERS = new Headers();
     private static final byte[] EMPTY_CONTENT = new byte[0];
 
     private static final String DEFAULT_CRAWL_ID = "2017-17";
@@ -298,7 +298,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 				throw new AbortedFetchException(redirectUrl.toString(), "Truncated binary data", AbortedFetchReason.CONTENT_SIZE);
 			}
 
-			Metadata headers = new Metadata();
+			Headers headers = new Headers();
 			for (String httpHeader : pageRecord.getHttpHeaders()) {
 				String[] keyValue = httpHeader.split(":", 2);
 				if (keyValue.length == 2) {

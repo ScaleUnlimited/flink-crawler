@@ -2,18 +2,20 @@ package com.scaleunlimited.flinkcrawler.pojos;
 
 import org.apache.tika.metadata.Metadata;
 
+import crawlercommons.util.Headers;
+
 
 @SuppressWarnings("serial")
 public class FetchedUrl extends ValidUrl {
 
 	private String _fetchedUrl;
 	private long _fetchTime;
-	private Metadata _headers;
+	private Headers _headers;
 	private byte[] _content;
 	private String _contentType;
 	private int _responseRate;
 	
-	public FetchedUrl(ValidUrl url, String fetchedUrl, long fetchTime, Metadata headers,
+	public FetchedUrl(ValidUrl url, String fetchedUrl, long fetchTime, Headers headers,
 			byte[] content, String contentType, int responseRate) {
 		super(url);
 		
@@ -44,12 +46,12 @@ public class FetchedUrl extends ValidUrl {
 	}
 
 
-	public Metadata getHeaders() {
+	public Headers getHeaders() {
 		return _headers;
 	}
 
 
-	public void setHeaders(Metadata headers) {
+	public void setHeaders(Headers headers) {
 		_headers = headers;
 	}
 

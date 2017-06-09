@@ -2,7 +2,10 @@ package com.scaleunlimited.flinkcrawler.tools;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 
 import org.apache.commons.io.FileUtils;
@@ -50,6 +53,7 @@ import com.scaleunlimited.flinkcrawler.utils.FlinkUtils;
 
 import crawlercommons.robots.SimpleRobotRulesParser;
 import crawlercommons.sitemaps.SiteMapParser;
+import de.javakaffee.kryoserializers.UnmodifiableCollectionsSerializer;
 
 /**
  * A Flink streaming workflow that can be executed.
@@ -217,6 +221,10 @@ public class CrawlTopology {
             if (_parallelism != DEFAULT_PARALLELISM) {
             	_env.setParallelism(_parallelism);
             }
+            
+            // The Headers class in http-fetcher uses an unmodifiable list, which Kryo can't handle
+            // unless we register a special serializer provided by the "kryo-serializers" project.
+            _env.registerTypeWithKryoSerializer(Collections.unmodifiableList(new ArrayList<>()).getClass(), UnmodifiableCollectionsSerializer.class);
             
             // FUTURE use single topology parallelism? But likely will want different levels for different parts.
             DataStreamSource<RawUrl> seedUrlsSource = _env.addSource(_urlSource);

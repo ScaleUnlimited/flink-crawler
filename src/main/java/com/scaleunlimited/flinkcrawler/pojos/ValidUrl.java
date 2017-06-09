@@ -8,7 +8,7 @@ import java.net.URL;
 
 import com.scaleunlimited.flinkcrawler.crawldb.IPayload;
 
-import crawlercommons.url.PaidLevelDomain;
+import crawlercommons.domains.PaidLevelDomain;
 
 @SuppressWarnings("serial")
 public class ValidUrl extends BaseUrl implements IPayload {

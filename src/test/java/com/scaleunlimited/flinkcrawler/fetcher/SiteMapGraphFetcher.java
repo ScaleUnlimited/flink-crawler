@@ -12,10 +12,10 @@ import crawlercommons.fetcher.AbortedFetchException;
 import crawlercommons.fetcher.AbortedFetchReason;
 import crawlercommons.fetcher.BaseFetchException;
 import crawlercommons.fetcher.FetchedResult;
-import crawlercommons.fetcher.HttpFetchException;
 import crawlercommons.fetcher.Payload;
 import crawlercommons.fetcher.http.BaseHttpFetcher;
 import crawlercommons.fetcher.http.UserAgent;
+import crawlercommons.util.Headers;
 
 @SuppressWarnings("serial")
 public class SiteMapGraphFetcher extends BaseHttpFetcher {
@@ -55,7 +55,20 @@ public class SiteMapGraphFetcher extends BaseHttpFetcher {
 		Iterator<String> outlinksIter = _graph.getChildren(urlToFetch);
 		
 		if (outlinksIter == null) {
-            throw new HttpFetchException(urlToFetch, "Error fetching " + urlToFetch, HttpStatus.SC_NOT_FOUND, new Metadata());
+            return new FetchedResult(
+					urlToFetch, 
+					urlToFetch, 
+					System.currentTimeMillis(), 
+					new Headers(),
+					new byte[0],
+					"text/plain",
+					0,
+					null,
+					urlToFetch,
+					0,
+					"127.0.0.1",
+					HttpStatus.SC_NOT_FOUND,
+					"");
 		} else if (!isValidMimeType(TEXT_MIME_TYPE)) {
             throw new AbortedFetchException(urlToFetch, "Invalid mime-type: " + TEXT_MIME_TYPE, AbortedFetchReason.INVALID_MIMETYPE);
 		} else {
@@ -71,7 +84,20 @@ public class SiteMapGraphFetcher extends BaseHttpFetcher {
 			}
 			
 			String contentAsStr = content.toString();
-			return new FetchedResult(urlToFetch, urlToFetch, System.currentTimeMillis(), new Metadata(), contentAsStr.getBytes(UTF_8), TEXT_MIME_TYPE, DEFAULT_MIN_RESPONSE_RATE, null, contentAsStr, 0, contentAsStr, HttpStatus.SC_OK, contentAsStr);
+			return new FetchedResult(
+					urlToFetch, 
+					urlToFetch, 
+					System.currentTimeMillis(), 
+					new Headers(), 
+					contentAsStr.getBytes(UTF_8), 
+					TEXT_MIME_TYPE, 
+					DEFAULT_MIN_RESPONSE_RATE, 
+					null, 
+					urlToFetch, 
+					0, 
+					"127.0.0.1",
+					HttpStatus.SC_OK, 
+					"");
 		}
 	}
 
