@@ -49,13 +49,28 @@ import crawlercommons.fetcher.http.BaseHttpFetcher;
 import crawlercommons.fetcher.http.UserAgent;
 import crawlercommons.util.Headers;
 
+/**
+ * Implementation of BaseHttpFetcher that uses Common Crawl index files and WARC files
+ * to "fetch" documents that were previously fetched by the Common Crawl fetcher and
+ * stored in S3.
+ * 
+ * TODO:
+ * 	Multi-threaded fetching.
+ *  Aborting fetches.
+ *  
+ *  Validate domain reversal code against "standard" implementation.
+ *  Add unit test for cache
+ *
+ */
+
 @SuppressWarnings("serial")
 public class CommonCrawlFetcher extends BaseHttpFetcher {
     private static Logger LOGGER = LoggerFactory.getLogger(CommonCrawlFetcher.class);
 
     // Path to files in S3 looks like s3://commoncrawl/cc-index/collections/CC-MAIN-2017-17/indexes/cluster.idx
     // "2017-17" is a crawl ID
-    // "cluster.idx" is the name of an index file.
+    // "cluster.idx" is the name of an index file (the single secondary index file, in this case)
+    // If it's one of the many primary index files, the name is cdx-<ddddd>.gz, e.g. cdx-00000.gz
     
     private static final String COMMONCRAWL_BUCKET = "commoncrawl";
     private static final String INDEX_FILES_PATH = "cc-index/collections/CC-MAIN-%s/indexes/%s";    
@@ -71,9 +86,9 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
     private static final Headers EMPTY_HEADERS = new Headers();
     private static final byte[] EMPTY_CONTENT = new byte[0];
 
-    private static final String DEFAULT_CRAWL_ID = "2017-17";
-	private static final int DEFAULT_THREADS = 1;
-	private static final int DEFAULT_CACHE_SIZE = 8 * 1024 * 1024;
+    protected static final String DEFAULT_CRAWL_ID = "2017-17";
+    protected static final int DEFAULT_THREADS = 1;
+	protected static final int DEFAULT_CACHE_SIZE = 8 * 1024 * 1024;
     
     private final String _crawlId;
     private final AmazonS3 _s3Client;
@@ -87,6 +102,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 	}
 
 	public CommonCrawlFetcher(String crawlId, int maxThreads, int cacheSize) throws IOException {
+		// We don't care about the user agent, since we aren't doing real fetches.
 		super(maxThreads, new UserAgent("", "", ""));
 		
 		_crawlId = crawlId;
@@ -106,6 +122,8 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 					public AWSCredentials getCredentials() {
 						return new AWSCredentials() {
 							
+							// TODO revoke my secret key, since this will be in GitHub
+							// once we make the repo public.
 							@Override
 							public String getAWSSecretKey() {
 								return "WinQ+Z/9lQlaTtGjS/DkDKe3DEH9Uhqgbho/Hzuv";
@@ -126,6 +144,8 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 		String s3Path = String.format(INDEX_FILES_PATH, _crawlId, SECONDARY_INDEX_FILENAME);
 		
 		// See if we have the file saved already. If so, read it in.
+		// TODO let caller specify the location here, if not specified then use
+		// a temp directory location.
 		File cachedFile = new File("./target/CommonCrawlFetcherData" + s3Path);
 		if (!cachedFile.exists()) {
 			cachedFile.getParentFile().mkdirs();
@@ -138,7 +158,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 			}
 		}
 		
-		
+		// Iterate over the secondary index file and create entries. Typically there are about 1.1M of these.
 		try (FileInputStream fis = new FileInputStream(cachedFile)) {
 			List<String> lines = IOUtils.readLines(fis);
 			int numEntries = lines.size();
@@ -182,7 +202,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
             }
             
             // TODO put this into queue, support multi-threading
-            // Can we re-use S3Client here?
+            // Can we re-use S3Client here (thread safe?)
             return fetch(realUrl, realUrl, payload, 0);
         } catch (MalformedURLException e) {
             throw new UrlFetchException(url, e.getMessage());
@@ -205,43 +225,8 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 			throw new RedirectFetchException(originalUrl.toString(), redirectUrl.toString(), RedirectExceptionReason.TOO_MANY_REDIRECTS);
 		}
 
-		// TODO move into separate routine, add unit tests
-		// TODO Find domain normalization code used in other projects
-		
-		// First reverse the url
-		StringBuilder reversedUrl = new StringBuilder();
-
-		String domain = redirectUrl.getHost();
-		String[] domainParts = domain.split("\\.");
-		for (int i = domainParts.length - 1; i >= 0; i--) {
-			// Skip leading www
- 			if ((i > 0) || !domainParts[i].equals("www")) {
-				if (reversedUrl.length() > 0) {
-					reversedUrl.append(',');
-				}
-				
-				reversedUrl.append(domainParts[i]);
-			}
-		}
-
-		if (redirectUrl.getPort() != -1) {
-			reversedUrl.append(':');
-			reversedUrl.append(redirectUrl.getPort());
-		}
-
-		reversedUrl.append(")");
-
-		if (!redirectUrl.getPath().isEmpty()) {
-			reversedUrl.append(redirectUrl.getPath());
-		}
-
-		if (redirectUrl.getQuery() != null) {
-			reversedUrl.append('?');
-			reversedUrl.append(redirectUrl.getQuery());
-		}
-
-		// Now figure out which segment it's in.
-		String targetKey = reversedUrl.toString();
+		// Figure out which segment it's in.
+		String targetKey = reverseDomain(redirectUrl);
 		int index = Arrays.binarySearch(_secondaryIndexUrls, targetKey);
 		if (index < 0) {
 			index = -(index + 1);
@@ -459,7 +444,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 		}
 	
 		result = new byte[(int)indexEntry.getSegmentLength()];
-		String s3Path = String.format(INDEX_FILES_PATH, "2017-17", indexEntry.getIndexFilename());
+		String s3Path = String.format(INDEX_FILES_PATH, _crawlId, indexEntry.getIndexFilename());
 		GetObjectRequest objectRequest = new GetObjectRequest(COMMONCRAWL_BUCKET, s3Path);
 		objectRequest.setRange(indexEntry.getSegmentOffset(), indexEntry.getSegmentOffset() + indexEntry.getSegmentLength());
 		
@@ -531,6 +516,43 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
         return false;
     }
 
+	// TODO Add unit tests
+	// TODO Find domain normalization code used in other projects
+    protected static String reverseDomain(URL url) {
+		StringBuilder reversedUrl = new StringBuilder();
+
+		String domain = url.getHost();
+		String[] domainParts = domain.split("\\.");
+		for (int i = domainParts.length - 1; i >= 0; i--) {
+			// Skip leading www
+ 			if ((i > 0) || !domainParts[i].equals("www")) {
+				if (reversedUrl.length() > 0) {
+					reversedUrl.append(',');
+				}
+				
+				reversedUrl.append(domainParts[i]);
+			}
+		}
+
+		if (url.getPort() != -1) {
+			reversedUrl.append(':');
+			reversedUrl.append(url.getPort());
+		}
+
+		reversedUrl.append(")");
+
+		if (!url.getPath().isEmpty()) {
+			reversedUrl.append(url.getPath());
+		}
+
+		if (url.getQuery() != null) {
+			reversedUrl.append('?');
+			reversedUrl.append(url.getQuery());
+		}
+
+		return reversedUrl.toString();
+    }
+    
 	private static class SecondaryIndex {
 		private String _indexFilename;
 		
@@ -596,7 +618,16 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 		public byte[] get(int segmentId) {
 			return _cache.get(segmentId);
 		}
-		
-		
 	}
+
+	protected int getNumSegments() {
+		return _secondaryIndex.length;
+	}
+
+	public void loadSegment(int index) throws IOFetchException, MalformedURLException {
+		SecondaryIndex indexEntry = _secondaryIndex[index];
+		findUrlInSegment(new URL("http://domain.com/page.html"), "com.domain)/page.html", indexEntry);
+	}
+	
+	
 }
