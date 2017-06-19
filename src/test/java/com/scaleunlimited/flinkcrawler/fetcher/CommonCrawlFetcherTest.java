@@ -68,9 +68,10 @@ public class CommonCrawlFetcherTest {
 		}
 		
 		// TODO decide how to validate results. Make sure we have all results?
-		// TODO need to sleep to give up time?
 		boolean allDone = false;
 		while (!allDone) {
+			Thread.sleep(100L);
+			
 			allDone = true;
 			for (int i = 0; i < results.length; i++) {
 				if (results[i] == null) {
