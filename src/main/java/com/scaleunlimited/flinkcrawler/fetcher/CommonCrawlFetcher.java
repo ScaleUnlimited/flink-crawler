@@ -16,6 +16,11 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
@@ -25,8 +30,10 @@ import org.apache.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.amazonaws.AmazonClientException;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.AWSCredentialsProvider;
+import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.GetObjectRequest;
@@ -55,7 +62,6 @@ import crawlercommons.util.Headers;
  * stored in S3.
  * 
  * TODO:
- * 	Multi-threaded fetching.
  *  Aborting fetches.
  *  
  *  Validate domain reversal code against "standard" implementation.
@@ -96,9 +102,15 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
     private final SecondaryIndex[] _secondaryIndex;
     private final JsonParser _jsonParser;
     private final SegmentCache _cache;
+    private ExecutorService _executorService;
+    private volatile boolean _keepGoing;
     
 	public CommonCrawlFetcher() throws IOException {
 		this(DEFAULT_CRAWL_ID, DEFAULT_THREADS, DEFAULT_CACHE_SIZE);
+	}
+
+	public CommonCrawlFetcher(String crawlId) throws IOException {
+		this(crawlId, DEFAULT_THREADS, DEFAULT_CACHE_SIZE);
 	}
 
 	public CommonCrawlFetcher(String crawlId, int maxThreads, int cacheSize) throws IOException {
@@ -109,33 +121,12 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 		_jsonParser = new JsonParser();
 		_cache = new SegmentCache(cacheSize);
 		
+	    _executorService = Executors.newFixedThreadPool(maxThreads);
+	    _keepGoing = true;
+	    
 		_s3Client = AmazonS3ClientBuilder
                 .standard()
-                .withCredentials(new AWSCredentialsProvider() {
-					
-                	// TODO do we have to use real credentials? Why didn't anonymous
-                	// (null credentials) work?
-					@Override
-					public void refresh() { }
-					
-					@Override
-					public AWSCredentials getCredentials() {
-						return new AWSCredentials() {
-							
-							// TODO revoke my secret key, since this will be in GitHub
-							// once we make the repo public.
-							@Override
-							public String getAWSSecretKey() {
-								return "WinQ+Z/9lQlaTtGjS/DkDKe3DEH9Uhqgbho/Hzuv";
-							}
-							
-							@Override
-							public String getAWSAccessKeyId() {
-								return "AKIAISPKLQBUFS4XBDKQ";
-							}
-						};
-					}
-				})
+                .withCredentials(new MyS3CredentialsProviderChain())
                 // TODO control the region???
                 .withRegion("us-east-1")
                 .build();
@@ -148,6 +139,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 		// a temp directory location.
 		File cachedFile = new File("./target/CommonCrawlFetcherData" + s3Path);
 		if (!cachedFile.exists()) {
+			LOGGER.info("Loading secondary index file for " + _crawlId);
 			cachedFile.getParentFile().mkdirs();
 			cachedFile.createNewFile();
 			FileOutputStream fos = new FileOutputStream(cachedFile);
@@ -156,9 +148,12 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 			} finally {
 				IOUtils.closeQuietly(fos);
 			}
+		} else {
+			LOGGER.info("Loading secondary index file for cache at " + cachedFile);
 		}
 		
 		// Iterate over the secondary index file and create entries. Typically there are about 1.1M of these.
+		LOGGER.info("Parsing secondary index file to create segment map");
 		try (FileInputStream fis = new FileInputStream(cachedFile)) {
 			List<String> lines = IOUtils.readLines(fis);
 			int numEntries = lines.size();
@@ -189,7 +184,9 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 		// TODO abort all pending requests.
 		// If we have a threaded fetch queue, we can interrupt it, which should work
 		// because we can abort an S3 request. But might need to make it async, vs. sync client.
+		_keepGoing = false;
 		
+		// TODO do we need to wait until returning?
 	}
 
 	@Override
@@ -201,9 +198,38 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
                 throw new BadProtocolFetchException(url);
             }
             
-            // TODO put this into queue, support multi-threading
-            // Can we re-use S3Client here (thread safe?)
-            return fetch(realUrl, realUrl, payload, 0);
+            
+            Future<FetchedResult> result = _executorService.submit(new Callable<FetchedResult>() {
+
+				@Override
+				public FetchedResult call() throws Exception {
+		            // Can we re-use S3Client here (thread safe?)
+		            return fetch(realUrl, realUrl, payload, 0);
+				}
+			});
+
+            // FUTURE add timeout
+            while (!result.isDone()) {
+            	if (!_keepGoing) {
+            		result.cancel(true);
+            		throw new AbortedFetchException(url, AbortedFetchReason.INTERRUPTED);
+            	} else {
+            		try {
+						Thread.sleep(100);
+					} catch (InterruptedException e) {
+						_keepGoing = false;
+						Thread.currentThread().interrupt();
+					}
+            	}
+            }
+            
+            try {
+				return result.get();
+			} catch (InterruptedException e) {
+        		throw new AbortedFetchException(url, AbortedFetchReason.INTERRUPTED);
+			} catch (ExecutionException e) {
+				throw new UrlFetchException(url, e.getMessage());
+			}
         } catch (MalformedURLException e) {
             throw new UrlFetchException(url, e.getMessage());
         } catch (AbortedFetchException e) {
@@ -217,7 +243,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
         } catch (BaseFetchException e) {
             LOGGER.debug("Exception fetching {} {}", url, e.getMessage());
             throw e;
-        }
+		}
 	}
 
 	private FetchedResult fetch(URL originalUrl, URL redirectUrl, Payload payload, int numRedirects) throws BaseFetchException {
@@ -543,6 +569,8 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 
 		if (!url.getPath().isEmpty()) {
 			reversedUrl.append(url.getPath());
+		} else {
+			reversedUrl.append('/');
 		}
 
 		if (url.getQuery() != null) {
@@ -551,6 +579,19 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 		}
 
 		return reversedUrl.toString();
+    }
+    
+    /**
+     * We want to use the S3CredentialsProviderChain, which supports the --no-sign-request (CLI) option,
+     * but that's not visible. So always pretend like we have no credentials.
+     *
+     */
+    private static class MyS3CredentialsProviderChain extends DefaultAWSCredentialsProviderChain {
+    	
+    	@Override
+    	public AWSCredentials getCredentials() {
+    		return null;
+    	}
     }
     
 	private static class SecondaryIndex {
