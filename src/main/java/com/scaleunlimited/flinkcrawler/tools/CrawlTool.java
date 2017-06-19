@@ -5,14 +5,13 @@ import java.net.URL;
 
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
-import org.apache.flink.streaming.api.functions.sink.PrintSinkFunction;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 
-import com.scaleunlimited.flinkcrawler.config.BaseHttpFetcherBuilder;
-import com.scaleunlimited.flinkcrawler.config.SimpleHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.crawldb.InMemoryCrawlDB;
+import com.scaleunlimited.flinkcrawler.fetcher.BaseHttpFetcherBuilder;
+import com.scaleunlimited.flinkcrawler.fetcher.SimpleHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
 import com.scaleunlimited.flinkcrawler.parser.SimpleSiteMapParser;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
@@ -22,11 +21,11 @@ import com.scaleunlimited.flinkcrawler.urls.SimpleUrlLengthener;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlValidator;
 
+import crawlercommons.domains.PaidLevelDomain;
 import crawlercommons.fetcher.http.SimpleHttpFetcher;
 import crawlercommons.fetcher.http.UserAgent;
 import crawlercommons.robots.SimpleRobotRulesParser;
 import crawlercommons.sitemaps.SiteMapParser;
-import crawlercommons.url.PaidLevelDomain;
 
 public class CrawlTool {
 

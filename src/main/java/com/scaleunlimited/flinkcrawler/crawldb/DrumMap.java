@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.io.FileUtils;
@@ -20,6 +21,7 @@ import com.scaleunlimited.flinkcrawler.utils.ByteUtils;
 import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
 import com.scaleunlimited.flinkcrawler.utils.FetchQueue.UrlState;
 import com.scaleunlimited.flinkcrawler.utils.IoUtils;
+import com.scaleunlimited.flinkcrawler.utils.OpenFilesUtils;
 
 /**
  * A DrumMap implements a form of DRUM storage system as described by the IRLBot paper
@@ -118,6 +120,8 @@ public class DrumMap implements Closeable {
 	private volatile boolean _mergeNeeded = false;
 	
 	private AtomicBoolean _lock;
+	
+	private OpenFilesUtils _lsof = null; // new OpenFilesUtils();
 	
 	public DrumMap(int maxEntries, int averageValueLength, File dataDir, BaseCrawlDBMerger merger) throws FileNotFoundException, IOException {
 		_maxEntries = maxEntries;
@@ -293,6 +297,8 @@ public class DrumMap implements Closeable {
 					return;
 				}
 				
+				// displayOpenFiles("Start of merge");
+				
 				sort();
 				
 				// Create memory and disk KV iterators. The MemoryDrumKVIterator needs the merger to handle
@@ -312,13 +318,25 @@ public class DrumMap implements Closeable {
 				// assume that it won't swap in the new directory, so we have to get rid of it.
 				reset(getWorkingDir(), nextDir);
 				
+				// displayOpenFiles("End of merge");
+				
 				_mergeNeeded = false;
 			} catch (IOException e) {
+				// displayOpenFiles("Exception during merge");
+				
 				IoUtils.closeAllQuietly(memoryIterator, activeIterator);
 				FileUtils.deleteQuietly(nextDir);
 				
 				throw new RuntimeException(Thread.currentThread().getName() + ": Exception while merging: " + e.getMessage(), e);
 			}
+		}
+	}
+
+	private void displayOpenFiles(String header) {
+		List<String> openFiles = _lsof.logOpenFiles(_dataDir);
+		LOGGER.debug(header + ": open files");
+		for (String filepath : openFiles) {
+			LOGGER.debug(filepath);
 		}
 	}
 

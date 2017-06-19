@@ -100,8 +100,4 @@ public class MemoryDrumKVIterator extends DrumKVIterator {
 		return ByteUtils.bytesToLong(_entryData, curOffset);
 	}
 
-	@Override
-	public void close() throws IOException {
-	}
-
 }

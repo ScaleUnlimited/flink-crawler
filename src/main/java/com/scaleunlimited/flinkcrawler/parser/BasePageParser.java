@@ -3,6 +3,7 @@ package com.scaleunlimited.flinkcrawler.parser;
 import java.io.Serializable;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.List;
 
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.utils.CharsetUtils;
@@ -10,6 +11,8 @@ import org.apache.tika.utils.CharsetUtils;
 import com.scaleunlimited.flinkcrawler.config.ParserPolicy;
 import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.utils.HttpUtils;
+
+import crawlercommons.util.Headers;
 
 @SuppressWarnings("serial")
 public abstract class BasePageParser implements Serializable {
@@ -75,13 +78,13 @@ public abstract class BasePageParser implements Serializable {
         return baseUrl;
     }
 
-    private String getFirst(Metadata headers, String name) {
+    private String getFirst(Headers headers, String name) {
         String normalizedName = normalize(name);
-        String[] curValues = headers.getValues(normalizedName);
-        if ((curValues == null) || (curValues.length == 0)) {
+        List<String> curValues = headers.getValues(normalizedName);
+        if ((curValues == null) || curValues.isEmpty()) {
             return null;
         } else {
-            return curValues[0];
+            return curValues.get(0);
         }
     }
 

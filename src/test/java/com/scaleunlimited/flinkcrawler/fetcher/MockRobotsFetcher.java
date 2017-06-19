@@ -5,15 +5,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.http.HttpStatus;
-import org.apache.tika.metadata.Metadata;
-
-import com.scaleunlimited.flinkcrawler.config.BaseHttpFetcherBuilder;
 
 import crawlercommons.fetcher.BaseFetchException;
 import crawlercommons.fetcher.FetchedResult;
 import crawlercommons.fetcher.Payload;
 import crawlercommons.fetcher.http.BaseHttpFetcher;
 import crawlercommons.fetcher.http.UserAgent;
+import crawlercommons.util.Headers;
 
 @SuppressWarnings("serial")
 public class MockRobotsFetcher extends BaseHttpFetcher {
@@ -58,7 +56,7 @@ public class MockRobotsFetcher extends BaseHttpFetcher {
 			return new FetchedResult(	robotsUrl, 
 										robotsUrl, 
 										0, 
-										new Metadata(), 
+										new Headers(), 
 										new byte[0], 
 										"text/plain", 
 										responseRate, 
@@ -72,7 +70,7 @@ public class MockRobotsFetcher extends BaseHttpFetcher {
 			return new FetchedResult(	robotsUrl,
 										robotsUrl, 
 										System.currentTimeMillis(), 
-										new Metadata(), 
+										new Headers(), 
 										page.getBytes(StandardCharsets.UTF_8), 
 										"text/plain", 
 										responseRate, 

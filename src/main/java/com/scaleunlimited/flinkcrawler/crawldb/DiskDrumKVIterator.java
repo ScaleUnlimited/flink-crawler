@@ -21,6 +21,7 @@ public class DiskDrumKVIterator extends DrumKVIterator {
 	@Override
 	public void close() throws IOException {
 		_kvFile.close();
+		super.close();
 	}
 	
 	@Override

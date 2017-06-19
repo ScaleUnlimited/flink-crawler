@@ -4,19 +4,17 @@ import java.nio.charset.Charset;
 import java.util.Iterator;
 
 import org.apache.http.HttpStatus;
-import org.apache.tika.metadata.Metadata;
 
-import com.scaleunlimited.flinkcrawler.config.BaseHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.webgraph.BaseWebGraph;
 
 import crawlercommons.fetcher.AbortedFetchException;
 import crawlercommons.fetcher.AbortedFetchReason;
 import crawlercommons.fetcher.BaseFetchException;
 import crawlercommons.fetcher.FetchedResult;
-import crawlercommons.fetcher.HttpFetchException;
 import crawlercommons.fetcher.Payload;
 import crawlercommons.fetcher.http.BaseHttpFetcher;
 import crawlercommons.fetcher.http.UserAgent;
+import crawlercommons.util.Headers;
 
 @SuppressWarnings("serial")
 public class WebGraphFetcher extends BaseHttpFetcher {
@@ -62,7 +60,20 @@ public class WebGraphFetcher extends BaseHttpFetcher {
 		Iterator<String> outlinksIter = _graph.getChildren(urlToFetch);
 		
 		if (outlinksIter == null) {
-            throw new HttpFetchException(urlToFetch, "Error fetching " + urlToFetch, HttpStatus.SC_NOT_FOUND, new Metadata());
+            return new FetchedResult(
+					urlToFetch, 
+					urlToFetch, 
+					System.currentTimeMillis(), 
+					new Headers(),
+					new byte[0],
+					"text/plain",
+					0,
+					null,
+					urlToFetch,
+					0,
+					"127.0.0.1",
+					HttpStatus.SC_NOT_FOUND,
+					"");
 		} else if (!isValidMimeType(HTML_MIME_TYPE)) {
             throw new AbortedFetchException(urlToFetch, "Invalid mime-type: " + HTML_MIME_TYPE, AbortedFetchReason.INVALID_MIMETYPE);
 		} else {
@@ -78,7 +89,20 @@ public class WebGraphFetcher extends BaseHttpFetcher {
 			}
 			
 			String contentAsStr = String.format(TEMPLATE, linksList);
-			return new FetchedResult(urlToFetch, urlToFetch, System.currentTimeMillis(), new Metadata(), contentAsStr.getBytes(UTF_8), HTML_MIME_TYPE, DEFAULT_MIN_RESPONSE_RATE, null, contentAsStr, 0, contentAsStr, HttpStatus.SC_OK, contentAsStr);
+			return new FetchedResult(
+					urlToFetch, 
+					urlToFetch, 
+					System.currentTimeMillis(), 
+					new Headers(),
+					contentAsStr.getBytes(UTF_8), 
+					HTML_MIME_TYPE, 
+					DEFAULT_MIN_RESPONSE_RATE, 
+					null, 
+					urlToFetch, 
+					0, 
+					"127.0.0.1", 
+					HttpStatus.SC_OK, 
+					"");
 		}
 	}
 
