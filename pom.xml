@@ -680,7 +680,7 @@ under the License.
 				<version>2.19.1</version>
 
                 <configuration>
-                    <argLine>-Xms256m -Xmx512m -XX:PermSize=512m -XX:MaxPermSize=512m</argLine>
+                    <argLine>-Xms1g -Xmx1g -XX:PermSize=1g -XX:MaxPermSize=1g</argLine>
                     <systemProperties>
                         <property>
                             <name>log4j.configuration</name>
