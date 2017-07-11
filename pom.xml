@@ -160,6 +160,12 @@ under the License.
 				<version>${tika.version}</version>
 			</dependency>
 			
+		    <dependency>
+		      <groupId>org.jdom</groupId>
+		      <artifactId>jdom</artifactId>
+		      <version>2.0.2</version>
+		    </dependency>
+
 			<dependency>
 				<groupId>org.objenesis</groupId>
 				<artifactId>objenesis</artifactId>
@@ -363,16 +369,8 @@ under the License.
 	                <artifactId>poi-scratchpad</artifactId>
 	            </exclusion>
 	            <exclusion>
-	                <groupId>rome</groupId>
-	                <artifactId>rome</artifactId>
-	            </exclusion>
-	            <exclusion>
 	                <groupId>edu.ucar</groupId>
 	                <artifactId>netcdf</artifactId>
-	            </exclusion>
-	            <exclusion>
-	                <groupId>org.bouncycastle</groupId>
-	                <artifactId>bcprov-jdk15</artifactId>
 	            </exclusion>
 	            <exclusion>
 	            	<groupId>edu.ucar</groupId>
@@ -385,6 +383,10 @@ under the License.
 	            <exclusion>
 	            	<groupId>edu.ucar</groupId>
 	            	<artifactId>netcdf4</artifactId>
+	            </exclusion>
+	            <exclusion>
+	                <groupId>org.bouncycastle</groupId>
+	                <artifactId>bcprov-jdk15</artifactId>
 	            </exclusion>
 	            <exclusion>
 	            	<groupId>org.bouncycastle</groupId>
@@ -413,6 +415,13 @@ under the License.
 			</exclusions>
 		</dependency>
 		
+		<!-- Something is borked here, as Tika pulls in rome (for RSS parsing), but the required
+		     jdom jar isn't available. -->
+	    <dependency>
+	      <groupId>org.jdom</groupId>
+	      <artifactId>jdom</artifactId>
+	    </dependency>
+
 		<dependency>
 			<groupId>args4j</groupId>
 			<artifactId>args4j</artifactId>

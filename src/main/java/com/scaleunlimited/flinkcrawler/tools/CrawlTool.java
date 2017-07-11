@@ -1,5 +1,6 @@
 package com.scaleunlimited.flinkcrawler.tools;
 
+import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 
@@ -12,6 +13,7 @@ import org.kohsuke.args4j.Option;
 import com.scaleunlimited.flinkcrawler.crawldb.InMemoryCrawlDB;
 import com.scaleunlimited.flinkcrawler.fetcher.BaseHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.fetcher.SimpleHttpFetcherBuilder;
+import com.scaleunlimited.flinkcrawler.fetcher.commoncrawl.CommonCrawlFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
 import com.scaleunlimited.flinkcrawler.parser.SimpleSiteMapParser;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
@@ -35,6 +37,12 @@ public class CrawlTool {
         private long _defaultCrawlDelay = 10 * 1000L;
         private int _maxContentSize = SimpleHttpFetcher.DEFAULT_MAX_CONTENT_SIZE;
         private long _maxWaitTime = 5000;
+        private int _maxThreads = 1;
+        private int _parallelism = CrawlTopologyBuilder.DEFAULT_PARALLELISM;
+        private String _outputFile = null;
+        
+        private String _cacheDir;
+        private String _commonCrawlId;
         
 		@Option(name = "-seedurls", usage = "text file containing list of seed urls", required = true)
 	    public void setSeedUrlsFilename(String urlsFilename) {
@@ -61,6 +69,31 @@ public class CrawlTool {
 			_maxWaitTime = maxWaitTime;
 	    }
 		
+		@Option(name = "-commoncrawl", usage = "crawl id for CommonCrawl.org dataset", required = false)
+	    public void setCommonCrawlId(String commonCrawlId) {
+			_commonCrawlId = commonCrawlId;
+	    }
+		
+		@Option(name = "-cachedir", usage = "cache location for CommonCrawl.org secondary index", required = false)
+	    public void setCommonCrawlCacheDir(String cacheDir) {
+			_cacheDir = cacheDir;
+	    }
+		
+		@Option(name = "-maxthreads", usage = "max threads per fetcher", required = false)
+	    public void setMaxThreads(int maxThreads) {
+			_maxThreads = maxThreads;
+	    }
+		
+		@Option(name = "-parallelism", usage = "Flink paralellism", required = false)
+	    public void setParallelism(int parallelism) {
+			_parallelism = parallelism;
+	    }
+		
+		@Option(name = "-outputfile", usage = "Local file to store fetched content (testing only)", required = false)
+	    public void setOutputFile(String outputFile) {
+			_outputFile = outputFile;
+	    }
+		
 		
 		public String getSeedUrlsFilename() {
 			return _urlsFilename;
@@ -84,6 +117,30 @@ public class CrawlTool {
 		
 		public long getMaxWaitTime() {
 			return _maxWaitTime;
+		}
+		
+		public boolean isCommonCrawl() {
+			return _commonCrawlId != null;
+		}
+		
+		public String getCommonCrawlId() {
+			return _commonCrawlId;
+		}
+		
+		public String getCommonCrawlCacheDir() {
+			return _cacheDir;
+		}
+		
+		public int getMaxThreads() {
+			return _maxThreads;
+		}
+		
+		public int getParallelism() {
+			return _parallelism;
+		}
+		
+		public String getOutputFile() {
+			return _outputFile;
 		}
 	}
 	
@@ -177,9 +234,9 @@ public class CrawlTool {
 					new SingleDomainUrlValidator(options.getSingleDomain())
 				:	new SimpleUrlValidator());
 			
-			BaseHttpFetcherBuilder siteMapFetcherBuilder = new SimpleHttpFetcherBuilder(userAgent)
+			BaseHttpFetcherBuilder siteMapFetcherBuilder = getFetcherBuilder(options, userAgent)
 				.setDefaultMaxContentSize(SiteMapParser.MAX_BYTES_ALLOWED);
-			BaseHttpFetcherBuilder pageFetcherBuilder = new SimpleHttpFetcherBuilder(userAgent)
+			BaseHttpFetcherBuilder pageFetcherBuilder = getFetcherBuilder(options, userAgent)
 				.setDefaultMaxContentSize(options.getMaxContentSize());
 			CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
 //				.setMaxWaitTime(100000)
@@ -196,13 +253,29 @@ public class CrawlTool {
 				.setSiteMapParser(new SimpleSiteMapParser())
 				.setPageFetcherBuilder(pageFetcherBuilder)
 				.setDefaultCrawlDelay(options.getDefaultCrawlDelay())
-				.setMaxWaitTime(options.getMaxWaitTime());
+				.setMaxWaitTime(options.getMaxWaitTime())
+				.setParallelism(options.getParallelism());
+			
+			if (options.getOutputFile() != null) {
+				builder.setContentTextFile(options.getOutputFile());
+			}
 			
 			builder.build().execute();
 		} catch (Throwable t) {
 			System.err.println("Error running CrawlTool: " + t.getMessage());
 			t.printStackTrace(System.err);
 			System.exit(-1);
+		}
+	}
+
+	private static BaseHttpFetcherBuilder getFetcherBuilder(CrawlToolOptions options, UserAgent userAgent) throws IOException {
+		if (options.isCommonCrawl()) {
+			return new CommonCrawlFetcherBuilder(options.getMaxThreads(), userAgent)
+					.setCrawlId(options.getCommonCrawlId())
+					.setCacheDir(options.getCommonCrawlCacheDir())
+					.prepCache();
+		} else {
+			return new SimpleHttpFetcherBuilder(userAgent);
 		}
 	}
 
