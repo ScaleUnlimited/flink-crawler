@@ -1,4 +1,4 @@
-package com.scaleunlimited.flinkcrawler.fetcher;
+package com.scaleunlimited.flinkcrawler.fetcher.commoncrawl;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -90,7 +90,7 @@ public class WarcRecord {
 	public String getHttpHeader(String key) {
 		for (String httpHeader : httpHeaders) {
 			String[] keyValue = httpHeader.split(":", 2);
-			if (keyValue[0].equals(key)) {
+			if (keyValue[0].equalsIgnoreCase(key)) {
 				return keyValue[1].trim();
 			}
 		}

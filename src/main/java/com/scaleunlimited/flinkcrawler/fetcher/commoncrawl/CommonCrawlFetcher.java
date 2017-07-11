@@ -1,20 +1,15 @@
-package com.scaleunlimited.flinkcrawler.fetcher;
+package com.scaleunlimited.flinkcrawler.fetcher.commoncrawl;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -30,12 +25,7 @@ import org.apache.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.amazonaws.AmazonClientException;
-import com.amazonaws.auth.AWSCredentials;
-import com.amazonaws.auth.AWSCredentialsProvider;
-import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
 import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.model.S3ObjectInputStream;
@@ -63,7 +53,6 @@ import crawlercommons.util.Headers;
  * 
  * TODO:
  *  Aborting fetches.
- *  
  *  Validate domain reversal code against "standard" implementation.
  *  Add unit test for cache
  *
@@ -73,110 +62,37 @@ import crawlercommons.util.Headers;
 public class CommonCrawlFetcher extends BaseHttpFetcher {
     private static Logger LOGGER = LoggerFactory.getLogger(CommonCrawlFetcher.class);
 
-    // Path to files in S3 looks like s3://commoncrawl/cc-index/collections/CC-MAIN-2017-17/indexes/cluster.idx
-    // "2017-17" is a crawl ID
-    // "cluster.idx" is the name of an index file (the single secondary index file, in this case)
-    // If it's one of the many primary index files, the name is cdx-<ddddd>.gz, e.g. cdx-00000.gz
-    
-    private static final String COMMONCRAWL_BUCKET = "commoncrawl";
-    private static final String INDEX_FILES_PATH = "cc-index/collections/CC-MAIN-%s/indexes/%s";    
-    private static final String SECONDARY_INDEX_FILENAME = "cluster.idx";
-    
-    // Format is <reversed domain>)<path><space><timestamp>\t<filename>\t<offset>\t<length>\t<sequence id>
-    // 146,207,118,124)/interviewpicservlet?curpage=0&sort=picall 20170427202839       cdx-00000.gz    4750379 186507  26
-    private static final Pattern IDX_LINE_PATTERN = Pattern.compile("(.+?)[ ]+(\\d+)\t(.+?)\t(\\d+)\t(\\d+)\t(\\d+)");
-    
     // 0,124,148,146)/index.php 20170429211342 {"url": "http://146.148.124.0/index.php", "mim....
     private static final Pattern CDX_LINE_PATTERN = Pattern.compile("(.+?)[ ]+(\\d+)[ ]+(\\{.+\\})");
     
     private static final Headers EMPTY_HEADERS = new Headers();
     private static final byte[] EMPTY_CONTENT = new byte[0];
 
-    protected static final String DEFAULT_CRAWL_ID = "2017-17";
+    protected static final String DEFAULT_CRAWL_ID = "2017-22";
     protected static final int DEFAULT_THREADS = 1;
 	protected static final int DEFAULT_CACHE_SIZE = 8 * 1024 * 1024;
     
     private final String _crawlId;
     private final AmazonS3 _s3Client;
-    private final String[] _secondaryIndexUrls;
-    private final SecondaryIndex[] _secondaryIndex;
     private final JsonParser _jsonParser;
     private final SegmentCache _cache;
     private ExecutorService _executorService;
     private volatile boolean _keepGoing;
+    private final SecondaryIndexMap _secondaryIndexMap;
     
-	public CommonCrawlFetcher() throws IOException {
-		this(DEFAULT_CRAWL_ID, DEFAULT_THREADS, DEFAULT_CACHE_SIZE);
-	}
-
-	public CommonCrawlFetcher(String crawlId) throws IOException {
-		this(crawlId, DEFAULT_THREADS, DEFAULT_CACHE_SIZE);
-	}
-
-	public CommonCrawlFetcher(String crawlId, int maxThreads, int cacheSize) throws IOException {
+	public CommonCrawlFetcher(AmazonS3 client, String crawlId, int maxThreads, int cacheSize, SecondaryIndexMap secondaryIndexMap) throws IOException {
 		// We don't care about the user agent, since we aren't doing real fetches.
 		super(maxThreads, new UserAgent("", "", ""));
 		
+		_s3Client = client;
 		_crawlId = crawlId;
 		_jsonParser = new JsonParser();
 		_cache = new SegmentCache(cacheSize);
 		
 	    _executorService = Executors.newFixedThreadPool(maxThreads);
 	    _keepGoing = true;
-	    
-		_s3Client = AmazonS3ClientBuilder
-                .standard()
-                .withCredentials(new MyS3CredentialsProviderChain())
-                // TODO control the region???
-                .withRegion("us-east-1")
-                .build();
 
-		// Fetch the secondary index file, which we need in memory.
-		String s3Path = String.format(INDEX_FILES_PATH, _crawlId, SECONDARY_INDEX_FILENAME);
-		
-		// See if we have the file saved already. If so, read it in.
-		// TODO let caller specify the location here, if not specified then use
-		// a temp directory location.
-		File cachedFile = new File("./target/CommonCrawlFetcherData" + s3Path);
-		if (!cachedFile.exists()) {
-			LOGGER.info("Loading secondary index file for " + _crawlId);
-			cachedFile.getParentFile().mkdirs();
-			cachedFile.createNewFile();
-			FileOutputStream fos = new FileOutputStream(cachedFile);
-			try (S3Object object = _s3Client.getObject(new GetObjectRequest(COMMONCRAWL_BUCKET, s3Path))) {
-				IOUtils.copy(object.getObjectContent(), fos);
-			} finally {
-				IOUtils.closeQuietly(fos);
-			}
-		} else {
-			LOGGER.info("Loading secondary index file for cache at " + cachedFile);
-		}
-		
-		// Iterate over the secondary index file and create entries. Typically there are about 1.1M of these.
-		LOGGER.info("Parsing secondary index file to create segment map");
-		try (FileInputStream fis = new FileInputStream(cachedFile)) {
-			List<String> lines = IOUtils.readLines(fis);
-			int numEntries = lines.size();
-			_secondaryIndexUrls = new String[numEntries];
-			_secondaryIndex = new SecondaryIndex[numEntries];
-			
-			int index = 0;
-			for (String line : lines) {
-				// 0,124,148,146)/index.php 20170429211342 cdx-00000.gz 0 195191 1
-				Matcher m = IDX_LINE_PATTERN.matcher(line);
-				if (!m.matches()) {
-					throw new IOException("Invalid .idx line: " + line);
-				}
-				_secondaryIndexUrls[index] = m.group(1);
-				
-				String filename = m.group(3);
-				long offset = Long.parseLong(m.group(4));
-				long length = Long.parseLong(m.group(5));
-				int id = Integer.parseInt(m.group(6));
-				_secondaryIndex[index] = new SecondaryIndex(filename, offset, length, id);
-				index++;
-			}
-		}
+	    _secondaryIndexMap = secondaryIndexMap;
 	}
 	
 	@Override
@@ -192,6 +108,8 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 	@Override
 	public FetchedResult get(String url, Payload payload) throws BaseFetchException {
         try {
+        	LOGGER.debug("Fetch request for " + url);
+        	
             URL realUrl = new URL(url);
             String protocol = realUrl.getProtocol();
             if (!protocol.equals("http") && !protocol.equals("https")) {
@@ -253,23 +171,14 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 
 		// Figure out which segment it's in.
 		String targetKey = reverseDomain(redirectUrl);
-		int index = Arrays.binarySearch(_secondaryIndexUrls, targetKey);
-		if (index < 0) {
-			index = -(index + 1);
-
-			if (index <= 0) {
-				return make404FetchResult(redirectUrl, payload);
-			}
-
-			// And now we know that the actual index will be the one before the insertion point,
-			// so back it off by one.
-			index -= 1;
+		SecondaryIndex indexEntry = _secondaryIndexMap.get(targetKey);
+		if (indexEntry == null) {
+			return make404FetchResult(redirectUrl, numRedirects, payload);
 		}
-
-		SecondaryIndex indexEntry = _secondaryIndex[index];
+		
 		JsonObject jsonObj = findUrlInSegment(redirectUrl, targetKey, indexEntry);
 		if (jsonObj == null) {
-			return make404FetchResult(redirectUrl, payload);
+			return make404FetchResult(redirectUrl, numRedirects, payload);
 		}
 
 		int status = jsonObj.get("status").getAsInt();
@@ -287,7 +196,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 		long timestamp = System.currentTimeMillis(); // TODO add timestamp to JSON, then jsonObj.get("timestamp").getAsLong();
 
 		// We have the data required to fetch the WARC entry and return that as a result.
-		GetObjectRequest warcRequest = new GetObjectRequest(COMMONCRAWL_BUCKET, warcFile);
+		GetObjectRequest warcRequest = new GetObjectRequest(S3Utils.getBucket(), warcFile);
 		warcRequest.setRange(offset, offset + length);
 
 		String newRedirectUrlAsStr = "";
@@ -301,13 +210,6 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 			double responseRateExact = (double)warcReader.getBytesRead() / deltaTime;
 			// Response rate is bytes/second, not bytes/millisecond
 			int responseRate = (int)Math.round(responseRateExact * 1000.0);
-
-			// if WARC-Truncated is true, and mime-type is not text, then throw an
-			// exception (see SimpleHttpFetcher code for example)
-			boolean truncated = pageRecord.getHeaderMetadataItem("WARC-Truncated") != null;
-			if ((truncated) && (!isTextMimeType(mimeType))) {
-				throw new AbortedFetchException(redirectUrl.toString(), "Truncated binary data", AbortedFetchReason.CONTENT_SIZE);
-			}
 
 			Headers headers = new Headers();
 			for (String httpHeader : pageRecord.getHttpHeaders()) {
@@ -386,6 +288,13 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 				}
 			}
 			
+			// if WARC-Truncated is true, and mime-type is not text, then throw an
+			// exception (see SimpleHttpFetcher code for example)
+			boolean truncated = pageRecord.getHeaderMetadataItem("WARC-Truncated") != null;
+			if ((truncated) && (!isTextMimeType(mimeType))) {
+				throw new AbortedFetchException(redirectUrl.toString(), "Truncated binary data", AbortedFetchReason.CONTENT_SIZE);
+			}
+
 			// FUTURE - use WARC-Target-URI???
 			// FUTURE - set up newBaseUrl if we have a "SC_MOVED_PERMANANTLY" result, since we
 			// have a new base url.
@@ -470,8 +379,8 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 		}
 	
 		result = new byte[(int)indexEntry.getSegmentLength()];
-		String s3Path = String.format(INDEX_FILES_PATH, _crawlId, indexEntry.getIndexFilename());
-		GetObjectRequest objectRequest = new GetObjectRequest(COMMONCRAWL_BUCKET, s3Path);
+		String s3Path = S3Utils.makeS3FilePath(_crawlId, indexEntry.getIndexFilename());
+		GetObjectRequest objectRequest = new GetObjectRequest(S3Utils.getBucket(), s3Path);
 		objectRequest.setRange(indexEntry.getSegmentOffset(), indexEntry.getSegmentOffset() + indexEntry.getSegmentLength());
 		
 		try (S3Object object = _s3Client.getObject(objectRequest)) {
@@ -501,7 +410,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
         }
 	}
 
-	private FetchedResult makeNotOKFetchResult(URL url, String mimeType, int status, Payload payload) {
+	private FetchedResult makeNotOKFetchResult(URL url, String mimeType, int status, int numRedirects, Payload payload) {
 		String urlAsString = url.toString();
 		return new FetchedResult(	urlAsString,
 									urlAsString, 
@@ -512,14 +421,14 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 									0, 
 									payload, 
 									urlAsString, 
-									0, 
+									numRedirects, 
 									url.getHost(), 
 									status, 
 									"");
 	}
 
-	private FetchedResult make404FetchResult(URL url, Payload payload) {
-		return makeNotOKFetchResult(url, "text/plain", HttpStatus.SC_NOT_FOUND, payload);
+	private FetchedResult make404FetchResult(URL url, int numRedirects, Payload payload) {
+		return makeNotOKFetchResult(url, "text/plain", HttpStatus.SC_NOT_FOUND, numRedirects, payload);
 	}
 
 	// FUTURE is there a better way to figure out what a good set of mime-types is?
@@ -581,50 +490,6 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 		return reversedUrl.toString();
     }
     
-    /**
-     * We want to use the S3CredentialsProviderChain, which supports the --no-sign-request (CLI) option,
-     * but that's not visible. So always pretend like we have no credentials.
-     *
-     */
-    private static class MyS3CredentialsProviderChain extends DefaultAWSCredentialsProviderChain {
-    	
-    	@Override
-    	public AWSCredentials getCredentials() {
-    		return null;
-    	}
-    }
-    
-	private static class SecondaryIndex {
-		private String _indexFilename;
-		
-		private long _segmentOffset;
-		private long _segmentLength;
-		private int _segmentId;
-		
-		public SecondaryIndex(String indexFilename, long segmentOffset, long segmentLength, int segmentId) {
-			_indexFilename = indexFilename;
-			_segmentOffset = segmentOffset;
-			_segmentLength = segmentLength;
-			_segmentId = segmentId;
-		}
-
-		public String getIndexFilename() {
-			return _indexFilename;
-		}
-
-		public long getSegmentOffset() {
-			return _segmentOffset;
-		}
-
-		public long getSegmentLength() {
-			return _segmentLength;
-		}
-
-		public int getSegmentId() {
-			return _segmentId;
-		}
-	}
-	
 	private static class SegmentCache {
 		private static final int AVERAGE_SEGMENT_SIZE = 190_000;
 		
@@ -661,14 +526,4 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 		}
 	}
 
-	protected int getNumSegments() {
-		return _secondaryIndex.length;
-	}
-
-	public void loadSegment(int index) throws IOFetchException, MalformedURLException {
-		SecondaryIndex indexEntry = _secondaryIndex[index];
-		findUrlInSegment(new URL("http://domain.com/page.html"), "com.domain)/page.html", indexEntry);
-	}
-	
-	
 }

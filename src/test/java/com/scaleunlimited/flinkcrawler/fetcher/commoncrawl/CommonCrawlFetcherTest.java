@@ -1,20 +1,27 @@
-package com.scaleunlimited.flinkcrawler.fetcher;
+package com.scaleunlimited.flinkcrawler.fetcher.commoncrawl;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
-import java.util.Random;
-
+import org.apache.http.HttpStatus;
 import org.junit.Test;
 
 import crawlercommons.fetcher.BaseFetchException;
 import crawlercommons.fetcher.FetchedResult;
 import crawlercommons.fetcher.http.BaseHttpFetcher;
+import crawlercommons.fetcher.http.UserAgent;
+import crawlercommons.util.Headers;
 
 public class CommonCrawlFetcherTest {
 
+	private static final String CACHE_DIR = "./target/commoncrawlcache/";
+
 	@Test
 	public void testSingleUrlFetchWithRedirects() throws Exception {
-		BaseHttpFetcher fetcher = new CommonCrawlFetcher("2017-17");
+		CommonCrawlFetcherBuilder builder = new CommonCrawlFetcherBuilder(1, new UserAgent("", "", ""))
+			.setCrawlId("2017-17")
+			.setCacheDir(CACHE_DIR)
+			.prepCache();
+		BaseHttpFetcher fetcher = builder.build();
 		
 		FetchedResult result = fetcher.get("http://cloudera.com/");
 		
@@ -24,23 +31,44 @@ public class CommonCrawlFetcherTest {
 		assertEquals(200, result.getStatusCode());
 		
 		// TODO parse the resulting page, to verify it's valid HTML
-		System.out.format("'%s' (%d): %s\n", result.getBaseUrl(), result.getStatusCode(), new String(result.getContent()));
+		// System.out.format("'%s' (%d): %s\n", result.getBaseUrl(), result.getStatusCode(), new String(result.getContent()));
+	}
+	
+	@Test
+	public void testTwitter() throws Exception {
+		CommonCrawlFetcherBuilder builder = new CommonCrawlFetcherBuilder(1, new UserAgent("", "", ""))
+				.setCrawlId("2017-17")
+				.setCacheDir(CACHE_DIR)
+				.prepCache();
+			BaseHttpFetcher fetcher = builder.build();
+		
+		FetchedResult result = fetcher.get("http://www.twitter.com/");
+		
+		// Redirects to https://www.twitter.com/, which isn't in the index.
+		assertEquals(HttpStatus.SC_NOT_FOUND, result.getStatusCode());
+		assertEquals(1, result.getNumRedirects());
 	}
 	
 	@Test
 	public void testMultiThreading() throws Exception {
-		final int numThreads = 2;
-		BaseHttpFetcher fetcher = new CommonCrawlFetcher("2017-22", numThreads, 1 * 1024 * 1024);
+		final int numThreads = 3;
+		CommonCrawlFetcherBuilder builder = new CommonCrawlFetcherBuilder(numThreads, new UserAgent("", "", ""))
+				.setCrawlId("2017-22")
+				.setCacheDir(CACHE_DIR)
+				.prepCache();
+		BaseHttpFetcher fetcher = builder.build();
 		
 		// TODO need to deal with URL normalization, since no trailing / means we don't find
 		// any of these pages.
 		final String[] urlsToFetch = new String[] {
 				"http://cloudera.com/",
 				"http://cnn.com/",
-				"http://google.com/",
-				"http://facebook.com/",
-				"http://twitter.com/",
-				"http://uspto.gov/"
+				"http://uspto.gov/",
+				"http://www.google.com/",
+				"http://www.scaleunlimited.com/",
+				"http://www.linkedin.com/",
+				"http://www.pinterest.com/",
+				"http://www.instagram.com/"
 		};
 		
 		final Thread[] threads = new Thread[urlsToFetch.length];
@@ -57,6 +85,7 @@ public class CommonCrawlFetcherTest {
 	                	results[index] = fetcher.get(url);
 	                } catch (BaseFetchException e) {
 	                    System.out.println("Exception fetching url: " + e.getMessage());
+	                    results[index] = new FetchedResult(url, url, System.currentTimeMillis(), new Headers(), null, null, 0, null, url, 0, null, HttpStatus.SC_INTERNAL_SERVER_ERROR, e.getMessage());
 	                }
 	            }
 	        });
@@ -79,6 +108,10 @@ public class CommonCrawlFetcherTest {
 					break;
 				}
 			}
+		}
+		
+		for (FetchedResult result : results) {
+			assertEquals("Error fetching " + result.getBaseUrl(), HttpStatus.SC_OK, result.getStatusCode());
 		}
 	}
 

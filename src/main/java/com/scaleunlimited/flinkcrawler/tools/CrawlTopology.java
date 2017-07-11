@@ -13,6 +13,7 @@ import org.apache.flink.api.common.JobExecutionResult;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.core.fs.FileSystem.WriteMode;
 import org.apache.flink.streaming.api.collector.selector.OutputSelector;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
@@ -89,7 +90,7 @@ public class CrawlTopology {
 
     public static class CrawlTopologyBuilder {
 
-        private static final int DEFAULT_PARALLELISM = -1;
+        public static final int DEFAULT_PARALLELISM = -1;
 
         private StreamExecutionEnvironment _env;
         private String _jobName = "flink-crawler";
@@ -396,7 +397,7 @@ public class CrawlTopology {
             if (_contentTextSink != null) {
             	contentText.addSink(_contentTextSink);
             } else if (_contentTextFilePathString != null) {
-            	contentText.writeAsText(_contentTextFilePathString);
+            	contentText.writeAsText(_contentTextFilePathString, WriteMode.OVERWRITE);
             } else {
             	contentText.print();
             }

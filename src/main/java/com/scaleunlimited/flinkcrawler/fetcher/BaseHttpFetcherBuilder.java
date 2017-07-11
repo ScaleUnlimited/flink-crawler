@@ -83,7 +83,7 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
      * @return a new BaseHttpFetcher instance configured to match how this
      * builder was configured
      */
-    public abstract BaseHttpFetcher build();
+    public abstract BaseHttpFetcher build() throws Exception;
     
     /**
      * Helper method that {@link #build()} can use to configure a newly

@@ -1,4 +1,4 @@
-package com.scaleunlimited.flinkcrawler.fetcher;
+package com.scaleunlimited.flinkcrawler.fetcher.commoncrawl;
 
 import java.io.DataInputStream;
 import java.io.IOException;
