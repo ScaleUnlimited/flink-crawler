@@ -620,7 +620,9 @@ under the License.
 									<exclude>commons-lang:commons-lang</exclude>
 									<exclude>junit:junit</exclude>
 									<exclude>de.javakaffee:kryo-serializers</exclude>
+									<!-- Apparently aws-java-sdk-core really needs this to access S3
 									<exclude>joda-time:joda-time</exclude>
+									  -->
 									<exclude>org.apache.commons:commons-lang3</exclude>
 									<exclude>org.slf4j:slf4j-api</exclude>
 									<exclude>org.slf4j:slf4j-log4j12</exclude>
@@ -687,7 +689,7 @@ under the License.
 				<version>2.19.1</version>
 
                 <configuration>
-                    <argLine>-Xms256m -Xmx512m -XX:PermSize=512m -XX:MaxPermSize=512m</argLine>
+                    <argLine>-Xms1g -Xmx1g -XX:PermSize=1g -XX:MaxPermSize=1g</argLine>
                     <systemProperties>
                         <property>
                             <name>log4j.configuration</name>
