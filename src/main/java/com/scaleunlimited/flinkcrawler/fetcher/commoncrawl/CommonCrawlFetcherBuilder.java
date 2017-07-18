@@ -109,6 +109,15 @@ public class CommonCrawlFetcherBuilder extends BaseHttpFetcherBuilder {
 	public BaseHttpFetcher build() throws Exception {
 		AmazonS3 client = makeClient();
 
+		// If the caller hasn't set up the cacheDir, then let prepCache do so.
+		if (_cacheDir == null) {
+			File tempDir = File.createTempFile("cache-dir", "");
+			tempDir.delete();
+			tempDir.mkdir();
+			_cacheDir = tempDir.toString();
+			prepCache();
+		}
+		
 		File cachedFile = makeCacheFile();
 		LOGGER.info("Loading serialized secondary index for cache from " + cachedFile);
 		try (DataInputStream in = new DataInputStream(new GZIPInputStream(new FileInputStream(cachedFile)))) {

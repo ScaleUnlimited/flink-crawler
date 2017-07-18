@@ -11,9 +11,7 @@ import org.apache.flink.configuration.Configuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.amazonaws.auth.EnvironmentVariableCredentialsProvider;
 import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.S3Object;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
@@ -100,13 +98,18 @@ public class SeedUrlSource extends BaseUrlSource {
 		_seedUrlIndex = 0;
 
 		if (useS3File()) {
-			// TODO move this code into S3Utils? Or S3Helper?
-			// See http://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/services/s3/AmazonS3ClientBuilder.html
-			AmazonS3ClientBuilder builder = AmazonS3ClientBuilder.standard();
 			
-			// http://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/auth/EnvironmentVariableCredentialsProvider.html
-			builder.setCredentials(new EnvironmentVariableCredentialsProvider());
-			AmazonS3 s3Client = builder.build();
+//			// TODO move this code into S3Utils? Or S3Helper?
+//			// See http://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/services/s3/AmazonS3ClientBuilder.html
+//			AmazonS3ClientBuilder builder = AmazonS3ClientBuilder.standard();
+//			
+//			// http://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/auth/EnvironmentVariableCredentialsProvider.html
+//			builder.setCredentials(new EnvironmentVariableCredentialsProvider());
+//			AmazonS3 s3Client = builder.build();
+//			S3Object object = s3Client.getObject(new GetObjectRequest(_seedUrlsS3Bucket, _seedUrlsS3Path));
+//			_s3FileStream = object.getObjectContent();
+
+			AmazonS3 s3Client = S3Utils.makeS3Client();
 			S3Object object = s3Client.getObject(new GetObjectRequest(_seedUrlsS3Bucket, _seedUrlsS3Path));
 			_s3FileStream = object.getObjectContent();
 		}
