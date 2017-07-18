@@ -31,7 +31,7 @@ public class FetchQueue {
 		if (fetchStatus == FetchStatus.UNFETCHED) {
 			if (_fetchQueue.size() < _maxQueueSize) {
 				url.setStatus(FetchStatus.FETCHING);
-				_fetchQueue.add(new FetchUrl(url, url.getEstimatedScore(), url.getActualScore()));
+				_fetchQueue.add(new FetchUrl(url, url.getScore()));
 			}
 			
 			return UrlState.ACTIVE;

@@ -14,7 +14,7 @@ public class CrawlStateUrlTest {
 	@Test
 	public void testWriteThenRead() throws Exception {
 		ValidUrl url = new ValidUrl("http://domain.com?q=s");
-		CrawlStateUrl csu = new CrawlStateUrl(url, FetchStatus.FETCHED, 1.0f, 0.5f, 100, 1000);
+		CrawlStateUrl csu = new CrawlStateUrl(url, FetchStatus.FETCHED, 1.0f, 100, 1000);
 		
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
 		DataOutputStream dos = new DataOutputStream(baos);

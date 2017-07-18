@@ -1,7 +1,5 @@
 package com.scaleunlimited.flinkcrawler.crawldb;
 
-import java.io.IOException;
-
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDBMerger.MergeResult;
 import com.scaleunlimited.flinkcrawler.utils.ByteUtils;
 

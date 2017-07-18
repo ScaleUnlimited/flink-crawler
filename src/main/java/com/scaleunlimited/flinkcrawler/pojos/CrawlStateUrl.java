@@ -11,15 +11,20 @@ import com.scaleunlimited.flinkcrawler.utils.HashUtils;
 @SuppressWarnings("serial")
 public class CrawlStateUrl extends ValidUrl {
 
-	// Status = 2 bytes, status time = 8 bytes.
-	private static final int HAS_VALUE_LENGTH = 2 + 8;
+	// Status = 2 bytes, status time = 4 bytes, fetch time = 4 bytes,
+	// score = 2 bytes
+	private static final int HAS_VALUE_LENGTH = 2 + 4 + 4 + 2;
 	
+	private static final float MAX_FRACTIONAL_SCORE = (float)((short)0x0FFF);
+	
+	// all bits set in 4.12 format
+	private static final float MAX_SCORE = 15.99975586f;
+			
 	// Data needed in-memory for CrawlDB merging
 	private FetchStatus _status;		// TODO make this an enum ?
 	
 	// Data kept in the CrawlDB on-disk payload
-	private float _actualScore;			// TODO do we maintain separate page and link scores ?
-	private float _estimatedScore;
+	private float _score;
 	private long _statusTime;
 	private long _nextFetchTime;
 
@@ -28,15 +33,14 @@ public class CrawlStateUrl extends ValidUrl {
 	}
 	
 	public CrawlStateUrl(FetchUrl url, FetchStatus status, long nextFetchTime) {
-		this(url, status, url.getActualScore(), url.getEstimatedScore(), System.currentTimeMillis(), nextFetchTime);
+		this(url, status, url.getScore(), System.currentTimeMillis(), nextFetchTime);
 	}
 	
-	public CrawlStateUrl(ValidUrl url, FetchStatus status, float actualScore, float estimatedScore, long statusTime, long nextFetchTime) {
+	public CrawlStateUrl(ValidUrl url, FetchStatus status, float score, long statusTime, long nextFetchTime) {
 		super(url);
 
 		_status = status;
-		_actualScore = actualScore;
-		_estimatedScore = estimatedScore;
+		_score = score;
 		_statusTime = statusTime;
 		_nextFetchTime = nextFetchTime;
 	}
@@ -52,20 +56,12 @@ public class CrawlStateUrl extends ValidUrl {
 		_status = status;
 	}
 
-	public float getActualScore() {
-		return _actualScore;
+	public float getScore() {
+		return _score;
 	}
 
-	public void setActualScore(float actualScore) {
-		_actualScore = actualScore;
-	}
-
-	public float getEstimatedScore() {
-		return _estimatedScore;
-	}
-
-	public void setEstimatedScore(float estimatedScore) {
-		_estimatedScore = estimatedScore;
+	public void setScore(float score) {
+		_score = score;
 	}
 
 	public long getStatusTime() {
@@ -94,16 +90,52 @@ public class CrawlStateUrl extends ValidUrl {
 	public void setFromValue(byte[] value) {
 		int valueLength = DrumKeyValue.getValueLength(value);
 		
-		if (valueLength == 0) {
-			_status = FetchStatus.UNFETCHED;
-			_statusTime = 0;
-		} else if (valueLength < HAS_VALUE_LENGTH) {
-			throw new IllegalArgumentException(String.format("Length of value must be 0 or %d, got %d", HAS_VALUE_LENGTH, valueLength));
+		if (valueLength != HAS_VALUE_LENGTH) {
+			throw new IllegalArgumentException(String.format("Length of value must be %d, got %d", HAS_VALUE_LENGTH, valueLength));
 		} else {
-			// TODO handle additional status values.
-			_status = FetchStatus.values()[ByteUtils.bytesToShort(value, 1)];
-			_statusTime = ByteUtils.bytesToLong(value, 3);
+			int offset = 1;
+			_status = FetchStatus.values()[ByteUtils.bytesToShort(value, offset)];
+			offset += 2;
+			_statusTime = getTimeFromBytes(value, offset);
+			offset += 4;
+			_nextFetchTime = getTimeFromBytes(value, offset);
+			offset += 4;
+			_score = getScoreFromBytes(value, offset);
+			offset += 2;
 		}
+	}
+	
+	private float getScoreFromBytes(byte[] value, int offset) {
+		short scoreAsShort = ByteUtils.bytesToShort(value, offset);
+		
+		// High 4 bits are integral value (0..15), low 12 bits are fractional
+		int integralScore = (scoreAsShort >> 12) & 0x000F;
+		int fractionalScore = scoreAsShort & 0x0FFF;
+		
+		return integralScore + fractionalScore/MAX_FRACTIONAL_SCORE;
+	}
+
+	private long getTimeFromBytes(byte[] value, int offset) {
+		int timeInSeconds = ByteUtils.bytesToInt(value, offset);
+		return timeInSeconds * 1000L;
+	}
+
+	private int timeToInt(long time) {
+		return (int)(time / 1000L);
+	}
+	
+	private short scoreToShort(float score) {
+		if (score > MAX_SCORE) {
+			score = MAX_SCORE;
+		} else if (score < 0.0) {
+			score = 0.0f;
+		}
+
+		float fractionalPart = score % 1;
+		float integralPart = score - fractionalPart;
+
+		int result = ((int)integralPart << 12) | (int)(fractionalPart * (MAX_FRACTIONAL_SCORE + 1));
+		return (short)result;
 	}
 	
 	@Override
@@ -119,14 +151,16 @@ public class CrawlStateUrl extends ValidUrl {
 	 * @return the buffer.
 	 */
 	public byte[] getValue(byte[] value) {
-		if (_status == FetchStatus.UNFETCHED) {
-			value[0] = 0;
-		} else {
-			// TODO set up other values as needed.
-			value[0] = HAS_VALUE_LENGTH;
-			ByteUtils.shortToBytes((short)_status.ordinal(), value, 1);
-			ByteUtils.longToBytes(_statusTime, value, 3);
-		}
+		int offset = 0;
+		value[offset] = HAS_VALUE_LENGTH;
+		offset += 1;
+		ByteUtils.shortToBytes((short)_status.ordinal(), value, offset);
+		offset += 2;
+		ByteUtils.intToBytes(timeToInt(_statusTime), value, offset);
+		offset += 4;
+		ByteUtils.intToBytes(timeToInt(_nextFetchTime), value, offset);
+		offset += 4;
+		ByteUtils.shortToBytes(scoreToShort(_score), value, offset);
 		
 		return value;
 	}
@@ -170,8 +204,7 @@ public class CrawlStateUrl extends ValidUrl {
 	public void clear() {
 		super.clear();
 		
-		_actualScore = 0.0f;
-		_estimatedScore = 0.0f;
+		_score = 0.0f;
 		_statusTime = 0;
 		_nextFetchTime = 0;
 	}
@@ -180,8 +213,7 @@ public class CrawlStateUrl extends ValidUrl {
 	public int hashCode() {
 		final int prime = 31;
 		int result = super.hashCode();
-		result = prime * result + Float.floatToIntBits(_actualScore);
-		result = prime * result + Float.floatToIntBits(_estimatedScore);
+		result = prime * result + Float.floatToIntBits(_score);
 		result = prime * result
 				+ (int) (_statusTime ^ (_statusTime >>> 32));
 		result = prime * result
@@ -199,11 +231,8 @@ public class CrawlStateUrl extends ValidUrl {
 		if (getClass() != obj.getClass())
 			return false;
 		CrawlStateUrl other = (CrawlStateUrl) obj;
-		if (Float.floatToIntBits(_actualScore) != Float
-				.floatToIntBits(other._actualScore))
-			return false;
-		if (Float.floatToIntBits(_estimatedScore) != Float
-				.floatToIntBits(other._estimatedScore))
+		if (Float.floatToIntBits(_score) != Float
+				.floatToIntBits(other._score))
 			return false;
 		if (_statusTime != other._statusTime)
 			return false;
