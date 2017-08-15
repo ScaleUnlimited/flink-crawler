@@ -6,18 +6,19 @@ import java.io.Serializable;
 public abstract class BaseCrawlDBMerger implements Serializable {
 
 	public static enum MergeResult {
-		USE_OLD,
-		USE_NEW,
+		USE_FIRST,
+		USE_SECOND,
 		USE_MERGED
 	}
 	
 	/**
-	 * Merge <oldValue> with <newValue>, and put results into <mergedValue>
+	 * Merge two entries, and put results into <mergedValue> if the results
+	 * actually need to be merged.
 	 * 
-	 * @param oldValue "value" from disk, first byte is length.
-	 * @param newValue "value" from memory, first byte is length
+	 * @param firstValue
+	 * @param secondValue
 	 * @param mergedValue Preallocated buffer for result, but only if USE_MERGED is returned
 	 * @return Result of the merge.
 	 */
-	public abstract MergeResult doMerge(byte[] oldValue, byte[] newValue, byte[] mergedValue);
+	public abstract MergeResult doMerge(byte[] firstValue, byte[] secondValue, byte[] mergedValue);
 }

@@ -8,13 +8,27 @@ import com.scaleunlimited.flinkcrawler.utils.ByteUtils;
 import com.scaleunlimited.flinkcrawler.utils.HashUtils;
 
 
+/**
+ * The CrawlStateUrl is the fundamental unit of state in the CrawlDB. It consists of the
+ * actual URL (stored in the payload of the DrumMap), plus other fields necessary to handle
+ * merging of URLs and prioritizing of URLs to be fetched.
+ * 
+ * There's the in-memory version, as represented by the class fields, and the compacted
+ * version used by the DrumMap, which is a packed byte array of size VALUE_LENGTH.
+ *
+ */
 @SuppressWarnings("serial")
 public class CrawlStateUrl extends ValidUrl {
 
-	// Status = 2 bytes, status time = 4 bytes, fetch time = 4 bytes,
-	// score = 2 bytes
-	private static final int HAS_VALUE_LENGTH = 2 + 4 + 4 + 2;
+	private static final int LENGTH_OFFSET = 0;
+	private static final int STATUS_OFFSET = LENGTH_OFFSET + 1;
+	private static final int STATUS_TIME_OFFSET = STATUS_OFFSET + 1;
+	private static final int SCORE_OFFSET = STATUS_TIME_OFFSET + 4;
+	private static final int FETCH_TIME_OFFSET = SCORE_OFFSET + 2;
 	
+	public static final int VALUE_LENGTH = FETCH_TIME_OFFSET + 4;
+	public static final int VALUE_SIZE = VALUE_LENGTH + 1;
+
 	private static final float MAX_FRACTIONAL_SCORE = (float)((short)0x0FFF);
 	
 	// all bits set in 4.12 format
@@ -22,21 +36,21 @@ public class CrawlStateUrl extends ValidUrl {
 			
 	// Data needed in-memory for CrawlDB merging
 	private FetchStatus _status;		// TODO make this an enum ?
-	
-	// Data kept in the CrawlDB on-disk payload
-	private float _score;
 	private long _statusTime;
+	private float _score;
 	private long _nextFetchTime;
 
+	// Payload has all of the above fields, plus the URL.
+	
 	public CrawlStateUrl() {
 		// For creating from payload
 	}
 	
 	public CrawlStateUrl(FetchUrl url, FetchStatus status, long nextFetchTime) {
-		this(url, status, url.getScore(), System.currentTimeMillis(), nextFetchTime);
+		this(url, status, System.currentTimeMillis(), url.getScore(), nextFetchTime);
 	}
 	
-	public CrawlStateUrl(ValidUrl url, FetchStatus status, float score, long statusTime, long nextFetchTime) {
+	public CrawlStateUrl(ValidUrl url, FetchStatus status, long statusTime, float score, long nextFetchTime) {
 		super(url);
 
 		_status = status;
@@ -72,7 +86,7 @@ public class CrawlStateUrl extends ValidUrl {
 		_statusTime = statusTime;
 	}
 
-	public float getNextFetchTime() {
+	public long getNextFetchTime() {
 		return _nextFetchTime;
 	}
 
@@ -88,24 +102,16 @@ public class CrawlStateUrl extends ValidUrl {
 	 * @param value
 	 */
 	public void setFromValue(byte[] value) {
-		int valueLength = DrumKeyValue.getValueLength(value);
+		checkValue(value);
 		
-		if (valueLength != HAS_VALUE_LENGTH) {
-			throw new IllegalArgumentException(String.format("Length of value must be %d, got %d", HAS_VALUE_LENGTH, valueLength));
-		} else {
-			int offset = 1;
-			_status = FetchStatus.values()[ByteUtils.bytesToShort(value, offset)];
-			offset += 2;
-			_statusTime = getTimeFromBytes(value, offset);
-			offset += 4;
-			_nextFetchTime = getTimeFromBytes(value, offset);
-			offset += 4;
-			_score = getScoreFromBytes(value, offset);
-			offset += 2;
-		}
+		_status = FetchStatus.values()[value[STATUS_OFFSET]];
+		_statusTime = getTimeFromBytes(value, STATUS_TIME_OFFSET);
+		_score = getScoreFromBytes(value, SCORE_OFFSET);
+		_nextFetchTime = getTimeFromBytes(value, FETCH_TIME_OFFSET);
 	}
 	
-	private float getScoreFromBytes(byte[] value, int offset) {
+	// TODO move into ByteUtils?
+	private static float getScoreFromBytes(byte[] value, int offset) {
 		short scoreAsShort = ByteUtils.bytesToShort(value, offset);
 		
 		// High 4 bits are integral value (0..15), low 12 bits are fractional
@@ -115,16 +121,17 @@ public class CrawlStateUrl extends ValidUrl {
 		return integralScore + fractionalScore/MAX_FRACTIONAL_SCORE;
 	}
 
-	private long getTimeFromBytes(byte[] value, int offset) {
+	// TODO move into ByteUtils?
+	private static long getTimeFromBytes(byte[] value, int offset) {
 		int timeInSeconds = ByteUtils.bytesToInt(value, offset);
 		return timeInSeconds * 1000L;
 	}
 
-	private int timeToInt(long time) {
+	private static int timeToInt(long time) {
 		return (int)(time / 1000L);
 	}
 	
-	private short scoreToShort(float score) {
+	private static short scoreToShort(float score) {
 		if (score > MAX_SCORE) {
 			score = MAX_SCORE;
 		} else if (score < 0.0) {
@@ -145,68 +152,48 @@ public class CrawlStateUrl extends ValidUrl {
 	}
 
 	/**
-	 * Return in a new object all the fields that we need for merging one CrawlStateUrl
+	 * Return in the provided byte array all the fields that we need for merging one CrawlStateUrl
 	 * with another one in the CrawlDB DrumMap.
 	 * 
 	 * @return the buffer.
 	 */
 	public byte[] getValue(byte[] value) {
-		int offset = 0;
-		value[offset] = HAS_VALUE_LENGTH;
-		offset += 1;
-		ByteUtils.shortToBytes((short)_status.ordinal(), value, offset);
-		offset += 2;
-		ByteUtils.intToBytes(timeToInt(_statusTime), value, offset);
-		offset += 4;
-		ByteUtils.intToBytes(timeToInt(_nextFetchTime), value, offset);
-		offset += 4;
-		ByteUtils.shortToBytes(scoreToShort(_score), value, offset);
-		
+		value[LENGTH_OFFSET] = VALUE_LENGTH;
+		value[STATUS_OFFSET] = (byte)_status.ordinal();
+		ByteUtils.intToBytes(timeToInt(_statusTime), value, STATUS_TIME_OFFSET);
+		ByteUtils.shortToBytes(scoreToShort(_score), value, SCORE_OFFSET);
+		ByteUtils.intToBytes(timeToInt(_nextFetchTime), value, FETCH_TIME_OFFSET);
+
 		return value;
 	}
 
-	// TODO have everyone use DrumMap.MAX_VALUE_SIZE vs. calling this + 1.
-	public static int maxValueLength() {
-		return HAS_VALUE_LENGTH;
-	}
-	
-	public static int averageValueLength() {
-		// TODO - figure out empirical value for this. Somewhere between 0 (unfetched) and this value.
-		return HAS_VALUE_LENGTH;
-	}
-	
 	public static FetchStatus getFetchStatus(byte[] value) {
-		int valueLength = DrumKeyValue.getValueLength(value);
-		
-		if (valueLength == 0) {
-			return FetchStatus.UNFETCHED;
-		} else if (valueLength < 2) {
-			throw new IllegalArgumentException("Length of value must be 0 or >= 2, got " + valueLength);
-		} else {
-			return FetchStatus.values()[ByteUtils.bytesToShort(value, 1)];
-		}
+		checkValue(value);
+		return FetchStatus.values()[value[STATUS_OFFSET]];
 	}
 	
-	public static long getFetchStatusTime(byte[] value) {
-		int valueLength = DrumKeyValue.getValueLength(value);
-		
-		if (valueLength == 0) {
-			return 0;
-		} else if (valueLength != HAS_VALUE_LENGTH) {
-			throw new IllegalArgumentException(String.format("Length of value must be 0 or %d, got %d", HAS_VALUE_LENGTH, valueLength));
-		} else {
-			return ByteUtils.bytesToLong(value, 3);
-		}
+	public static long getStatusTime(byte[] value) {
+		checkValue(value);
+		return getTimeFromBytes(value, STATUS_TIME_OFFSET);
 	}
 	
-	// Clear the payload fields
-	@Override
-	public void clear() {
-		super.clear();
+	public static float getScore(byte[] value) {
+		checkValue(value);
 		
-		_score = 0.0f;
-		_statusTime = 0;
-		_nextFetchTime = 0;
+		return getScoreFromBytes(value, SCORE_OFFSET);
+	}
+	
+	public static long getFetchTime(byte[] value) {
+		checkValue(value);
+		return ByteUtils.bytesToLong(value, FETCH_TIME_OFFSET);
+	}
+	
+	private static void checkValue(byte[] value) {
+		int valueLength = DrumKeyValue.getValueLength(value);
+		
+		if (valueLength != VALUE_LENGTH) {
+			throw new IllegalArgumentException(String.format("Length of value must be %d, got %d", VALUE_LENGTH, valueLength));
+		}
 	}
 
 	@Override
@@ -254,6 +241,15 @@ public class CrawlStateUrl extends ValidUrl {
 		result.setFromValue(dkv.getValue());
 		
 		return result;
+	}
+
+	public static void setValue(byte[] value, FetchStatus status, long statusTime, float score, long fetchTime) {
+		value[LENGTH_OFFSET] = VALUE_LENGTH;
+		value[STATUS_OFFSET] = (byte)status.ordinal();
+		
+		ByteUtils.intToBytes(timeToInt(statusTime), value, STATUS_TIME_OFFSET);
+		ByteUtils.shortToBytes(scoreToShort(score), value, SCORE_OFFSET);
+		ByteUtils.intToBytes(timeToInt(fetchTime), value, FETCH_TIME_OFFSET);
 	}
 
 	

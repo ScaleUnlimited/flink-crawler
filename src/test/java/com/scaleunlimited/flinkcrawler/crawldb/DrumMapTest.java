@@ -12,9 +12,11 @@ import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 
 import org.apache.commons.io.FileUtils;
 import org.junit.Assert;
@@ -40,7 +42,7 @@ public class DrumMapTest {
 		final IPayload payload = new LongPayload(0);
 		
 		for (int test = 0; test < 5; test++) {
-			DrumMap dm = new DrumMap(numEntries, CrawlStateUrl.averageValueLength(), dataDir, new DefaultCrawlDBMerger());
+			DrumMap dm = new DrumMap(numEntries, CrawlStateUrl.VALUE_LENGTH, dataDir, new DefaultCrawlDBMerger());
 			dm.open();
 			Random rand = new Random(System.currentTimeMillis());
 
@@ -72,26 +74,50 @@ public class DrumMapTest {
 		}
 		
 		final int maxEntries = 1000;
-		DrumMap dm = new DrumMap(maxEntries, CrawlStateUrl.averageValueLength(), dataDir, new DefaultCrawlDBMerger());
+		DrumMap dm = new DrumMap(maxEntries, CrawlStateUrl.VALUE_LENGTH, dataDir, new DefaultCrawlDBMerger());
 		dm.open();
 		
-		addUrl(dm, "http://domain.com/page0", FetchStatus.FETCHED, 10);
-		addUrl(dm, "http://domain.com/page0", FetchStatus.FETCHED, 10);
+		// Two pages that are both already fetched. We want to take the one that has the
+		// later status time
+		addUrl(dm, makeUrl("http://domain.com/page0", FetchStatus.FETCHED, 1000, 1.0f, 10000));
+		addUrl(dm, makeUrl("http://domain.com/page0", FetchStatus.FETCHED, 5000, 1.0f, 50000));
+		
+		// A fetched and an unfetched entry (take the fetched one)
 		addUrl(dm, "http://domain.com/page1", FetchStatus.FETCHED, 1000);
 		addUrl(dm, "http://domain.com/page1", FetchStatus.UNFETCHED, 0);
-		addUrl(dm, "http://domain.com/page2", FetchStatus.UNFETCHED, 0);
+		
+		// Two unfetched, so they'll be merged.
+		addUrl(dm, "http://domain.com/page2", FetchStatus.UNFETCHED, 1.0f, 0);
+		addUrl(dm, "http://domain.com/page2", FetchStatus.UNFETCHED, 2.0f, 0);
+		
+		// A single fetched page.
 		addUrl(dm, "http://domain.com/page3", FetchStatus.FETCHED, 100);
 
 		FetchQueue queue = new FetchQueue(maxEntries);
 		dm.merge(queue);
 		
-		// We should wind up with just one entry in the queue.
+		// We should wind up with just one entry in the queue, with the
+		// (estimated) score set to the sum of the two entries.
 		FetchUrl urlToFetch = queue.poll();
 		Assert.assertNotNull(urlToFetch);
 		Assert.assertEquals("http://domain.com/page2", urlToFetch.getUrl());
+		Assert.assertEquals(3.0f, urlToFetch.getScore(), 0.01f);
 		Assert.assertTrue(queue.isEmpty());
 		
-		// TODO verify what's in the active on-disk map.
+		// Verify what's in the active on-disk map.
+		DrumMapFile dmf = dm.getActiveFile();
+		Iterator<CrawlStateUrl> iter = dmf.iterator();
+		Set<String> activeUrls = new HashSet<>();
+		while (iter.hasNext()) {
+			CrawlStateUrl url = iter.next();
+			Assert.assertTrue(activeUrls.add(url.getUrl()));
+			if (url.getUrl().equals("http://domain.com/page0")) {
+				Assert.assertEquals(50000L, url.getNextFetchTime());
+			}
+		}
+		
+		// We should have all pages (fetched & unfetched) in the active list
+		Assert.assertEquals(4, activeUrls.size());
 		
 		// Now, to ensure we're still usable after the merge, add a few more URLs and test again
 		addUrl(dm, "http://domain.com/page4", FetchStatus.UNFETCHED, 100);
@@ -119,9 +145,6 @@ public class DrumMapTest {
 		Assert.assertTrue(gotPage4);
 		Assert.assertTrue(gotPage5);
 		
-		// TODO verify if we have two unfetched for the same URL, we merge scores, take the lower
-		// next fetch time, etc.
-		
 		dm.close();
 	}
 	
@@ -129,9 +152,9 @@ public class DrumMapTest {
 	public void testMemoryDiskMerging() throws Exception {
 		final String[][] testCases = {
 		//	mem, disk, queue, active, archive
-				{"1u,2u,2f,3u",	"1f,3u,4f", "3g", "1f,2f,3g,4f",	""},		// mix of entries
+			{"1u,2u,2f,3u",	"1f,3u,4f", "3g", "1f,2f,3g,4f",	""},		// mix of entries
 
-				{"",	"",		"", 	"", 	""},
+			{"",	"",		"", 	"", 	""},
 		
 			{"1u",	"",		"1g",	"1g",	""},		// single entry (unfetched)
 			{"1f",	"",		"",		"1f",	""},		// single entry (fetched)
@@ -163,7 +186,7 @@ public class DrumMapTest {
 			createDiskFile(dataDir, diskTestCase);
 
 			final int maxEntries = 1000;
-			DrumMap dm = new DrumMap(maxEntries, CrawlStateUrl.averageValueLength(), dataDir, new DefaultCrawlDBMerger());
+			DrumMap dm = new DrumMap(maxEntries, CrawlStateUrl.VALUE_LENGTH, dataDir, new DefaultCrawlDBMerger());
 			dm.open();
 
 			if (!memTestCase.isEmpty()) {
@@ -290,7 +313,7 @@ public class DrumMapTest {
 		DrumKeyValueFile dkvf = active.getKeyValueFile();
 		DrumPayloadFile dpf = active.getPayloadFile();
 		DrumDataOutput ddo = dpf.getDrumDataOutput();
-		byte[] valueBuffer = new byte[1 + CrawlStateUrl.maxValueLength()];
+		byte[] valueBuffer = new byte[CrawlStateUrl.VALUE_SIZE];
 		
 		if (!testcase.isEmpty()) {
 			DrumKeyValue dkv = new DrumKeyValue();
@@ -328,16 +351,30 @@ public class DrumMapTest {
 	}
 
 	private void addUrl(DrumMap dm, String urlAsString, FetchStatus status, long nextFetchTime) throws IOException {
-		byte[] valueBuffer = new byte[1 + CrawlStateUrl.maxValueLength()];
-		CrawlStateUrl url = new CrawlStateUrl(new FetchUrl(new ValidUrl(urlAsString)), status, nextFetchTime);
+		addUrl(dm, urlAsString, status, 1.0f, nextFetchTime);
+	}
+	
+	private void addUrl(DrumMap dm, String urlAsString, FetchStatus status, float score, long nextFetchTime) throws IOException {
+		byte[] valueBuffer = new byte[CrawlStateUrl.VALUE_SIZE];
+		FetchUrl fetchUrl = new FetchUrl(new ValidUrl(urlAsString));
+		CrawlStateUrl url = new CrawlStateUrl(fetchUrl, status, System.currentTimeMillis(), score, nextFetchTime);
+		Assert.assertFalse(dm.add(url.makeKey(), url.getValue(valueBuffer), url));
+	}
+
+	private void addUrl(DrumMap dm, CrawlStateUrl url) throws IOException {
+		byte[] valueBuffer = new byte[CrawlStateUrl.VALUE_SIZE];
 		Assert.assertFalse(dm.add(url.makeKey(), url.getValue(valueBuffer), url));
 	}
 
 	private static CrawlStateUrl makeUrl(String urlAsString, FetchStatus status, long nextFetchTime) throws MalformedURLException {
-		CrawlStateUrl url = new CrawlStateUrl(new FetchUrl(new ValidUrl(urlAsString)), status, nextFetchTime);
-		return url;
+		return new CrawlStateUrl(new FetchUrl(new ValidUrl(urlAsString)), status, nextFetchTime);
 	}
 	
+	private CrawlStateUrl makeUrl(String urlAsString, FetchStatus status, long statusTime, float score, long nextFetchTime) throws IOException {
+		return new CrawlStateUrl(new FetchUrl(new ValidUrl(urlAsString)), status, statusTime, score, nextFetchTime);
+	}
+	
+
 	private static class LongPayload implements IPayload {
 
 		private Long _payload;
@@ -356,11 +393,6 @@ public class DrumMapTest {
 		@Override
 		public void readFields(DataInput in) throws IOException {
 			_payload = in.readLong();
-		}
-		
-		@Override
-		public void clear() {
-			_payload = null;
 		}
 		
 		public Long getPayload() {

@@ -48,7 +48,7 @@ public class DrumCrawlDBTest {
 
 	private CrawlStateUrl makeUrl(String url, FetchStatus status) throws MalformedURLException {
 		ValidUrl vu = new ValidUrl("http://" + url);
-		return new CrawlStateUrl(vu, status, 1.0f, 0L, System.currentTimeMillis());
+		return new CrawlStateUrl(vu, status, System.currentTimeMillis(), 1.0f, System.currentTimeMillis());
 	}
 
 }

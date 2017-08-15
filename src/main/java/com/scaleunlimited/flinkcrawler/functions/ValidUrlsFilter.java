@@ -32,7 +32,7 @@ public class ValidUrlsFilter extends RichFlatMapFunction<RawUrl, CrawlStateUrl> 
 		if (_urlValidator.isValid(urlAsString)) {
 			try {
 				ValidUrl validatedUrl = new ValidUrl(urlAsString);
-				collector.collect(new CrawlStateUrl(validatedUrl, FetchStatus.UNFETCHED, url.getScore(), 0, 0));
+				collector.collect(new CrawlStateUrl(validatedUrl, FetchStatus.UNFETCHED, System.currentTimeMillis(), url.getScore(), 0));
 			} catch (MalformedURLException e) {
 				LOGGER.debug("Filtering malformed URL " + urlAsString);
 			}
