@@ -5,6 +5,8 @@ import java.net.MalformedURLException;
 @SuppressWarnings("serial")
 public class RawUrl extends BaseUrl {
 
+	public static final float DEFAULT_SCORE = 1.0f;
+	
 	private float _score;
 	
 	public RawUrl() {
@@ -12,7 +14,7 @@ public class RawUrl extends BaseUrl {
 	}
 	
 	public RawUrl(String url) throws MalformedURLException {
-		this(url, 0.0f);
+		this(url, DEFAULT_SCORE);
 	}
 	
 	public RawUrl(String url, float score) throws MalformedURLException {

@@ -25,6 +25,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.scaleunlimited.flinkcrawler.focused.FocusedFetchQueue;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
@@ -144,6 +145,49 @@ public class DrumMapTest {
 		
 		Assert.assertTrue(gotPage4);
 		Assert.assertTrue(gotPage5);
+		
+		dm.close();
+	}
+	
+	@Test
+	public void testFocusedFetching() throws Exception {
+		File dataDir = new File("target/test/testFocusedFetching/data");
+		if (dataDir.exists()) {
+			FileUtils.deleteDirectory(dataDir);
+		}
+		
+		final int maxEntries = 1000;
+		DrumMap dm = new DrumMap(maxEntries, CrawlStateUrl.VALUE_LENGTH, dataDir, new DefaultCrawlDBMerger());
+		dm.open();
+		
+		final float minFetchScore = 1.0f;
+		
+		// A page that's above the focused fetch min score.
+		addUrl(dm, makeUrl("http://domain.com/page0", FetchStatus.UNFETCHED, 1000, 1.5f, 10000));
+		
+		// A page that's below the focused fetch min score.
+		addUrl(dm, makeUrl("http://domain.com/page1", FetchStatus.UNFETCHED, 1000, 0.5f, 10000));
+		
+		// Two pages with a combined score above the minimum.
+		addUrl(dm, "http://domain.com/page2", FetchStatus.UNFETCHED, 0.75f, 0);
+		addUrl(dm, "http://domain.com/page2", FetchStatus.UNFETCHED, 0.75f, 0);
+		
+		// Two pages with a combined score below the minimum.
+		addUrl(dm, "http://domain.com/page3", FetchStatus.UNFETCHED, 0.25f, 0);
+		addUrl(dm, "http://domain.com/page3", FetchStatus.UNFETCHED, 0.25f, 0);
+		
+		FetchQueue queue = new FocusedFetchQueue(maxEntries, minFetchScore);
+		dm.merge(queue);
+		
+		Set<String> urlsToFetch = new HashSet<>();
+		FetchUrl urlToFetch;
+		while ((urlToFetch = queue.poll()) != null) {
+			assertTrue(urlsToFetch.add(urlToFetch.getUrl()));
+		}
+		
+		assertTrue(urlsToFetch.remove("http://domain.com/page0"));
+		assertTrue(urlsToFetch.remove("http://domain.com/page2"));
+		assertTrue(urlsToFetch.isEmpty());
 		
 		dm.close();
 	}

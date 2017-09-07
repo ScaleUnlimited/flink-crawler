@@ -17,6 +17,7 @@ import com.scaleunlimited.flinkcrawler.fetcher.commoncrawl.CommonCrawlFetcherBui
 import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
 import com.scaleunlimited.flinkcrawler.parser.SimpleSiteMapParser;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
+import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
 import com.scaleunlimited.flinkcrawler.tools.CrawlTopology.CrawlTopologyBuilder;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlLengthener;
@@ -240,7 +241,7 @@ public class CrawlTool {
 				.setDefaultMaxContentSize(options.getMaxContentSize());
 			CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
 //				.setMaxWaitTime(100000)
-				.setUrlSource(new SeedUrlSource(options.getSeedUrlsFilename(), 1.0f))
+				.setUrlSource(new SeedUrlSource(options.getSeedUrlsFilename(), RawUrl.DEFAULT_SCORE))
 				.setCrawlDB(new InMemoryCrawlDB())
 				.setUrlLengthener(new SimpleUrlLengthener())
 				.setRobotsFetcherBuilder(pageFetcherBuilder)

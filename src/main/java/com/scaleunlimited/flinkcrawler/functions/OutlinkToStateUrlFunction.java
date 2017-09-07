@@ -18,7 +18,7 @@ public class OutlinkToStateUrlFunction implements MapFunction<Tuple3<ExtractedUr
 		UrlLogger.record(this.getClass(), outlinkUrl);
 		
 		// TODO the extracted url needs to have an estimated score as part of it.
-		return new RawUrl(outlinkUrl.getUrl(), 1.0f);
+		return new RawUrl(outlinkUrl.getUrl(), outlinkUrl.getScore());
 	}
 
 }

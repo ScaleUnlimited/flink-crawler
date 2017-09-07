@@ -221,12 +221,6 @@ under the License.
 			</dependency>
 			
 			<dependency>
-				<groupId>org.tukaani</groupId>
-				<artifactId>xz</artifactId>
-				<version>1.5</version>
-			</dependency>
-			
-			<dependency>
 				<groupId>commons-codec</groupId>
 				<artifactId>commons-codec</artifactId>
 				<version>1.10</version>

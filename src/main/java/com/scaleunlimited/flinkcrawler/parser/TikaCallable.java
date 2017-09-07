@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
+import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ValidUrl;
 
 
@@ -115,7 +116,7 @@ class TikaCallable implements Callable<ParserResult> {
             // an exception.
             ValidUrl parsedUrl = new ValidUrl(_metadata.get(Metadata.RESOURCE_NAME_KEY));
             return new ParserResult(new ParsedUrl(parsedUrl, _contentExtractor.getContent(), lang,
-                    _metadata.get(TikaCoreProperties.TITLE), makeMap(_metadata)),
+                    _metadata.get(TikaCoreProperties.TITLE), makeMap(_metadata), RawUrl.DEFAULT_SCORE),
                     _linkExtractor.getLinks());
         } catch (Exception e) {
             // Generic exception that's OK to re-throw

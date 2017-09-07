@@ -5,7 +5,6 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
 
-import org.apache.tika.metadata.Metadata;
 import org.apache.tika.utils.CharsetUtils;
 
 import com.scaleunlimited.flinkcrawler.config.ParserPolicy;
