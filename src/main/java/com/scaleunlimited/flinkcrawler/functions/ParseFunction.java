@@ -3,6 +3,8 @@ package com.scaleunlimited.flinkcrawler.functions;
 import org.apache.flink.api.common.functions.RichFlatMapFunction;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.util.Collector;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.parser.BasePageParser;
 import com.scaleunlimited.flinkcrawler.parser.ParserResult;
@@ -13,6 +15,7 @@ import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
 @SuppressWarnings("serial")
 public class ParseFunction extends RichFlatMapFunction<FetchedUrl, Tuple3<ExtractedUrl, ParsedUrl, String>> {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ParseFunction.class);
 
     private static final String TABS_AND_RETURNS_PATTERN = "[\t\r\n]";
 	private BasePageParser _parser;
@@ -26,7 +29,13 @@ public class ParseFunction extends RichFlatMapFunction<FetchedUrl, Tuple3<Extrac
 			
 		UrlLogger.record(this.getClass(), fetchedUrl);
 		
-		ParserResult result = _parser.parse(fetchedUrl);
+		ParserResult result;
+		try {
+			result = _parser.parse(fetchedUrl);
+		} catch (Exception e) {
+			LOGGER.warn("Parsing exception", e);
+			return;
+		}
 		
 		// Output the content
 		collector.collect(new Tuple3<ExtractedUrl, ParsedUrl, String>(null, result.getParsedUrl(), null));

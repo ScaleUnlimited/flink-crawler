@@ -21,7 +21,7 @@ public class UrlLogger {
 			URL_LOGGER = (IUrlLogger)clazz.newInstance();
 		} catch (Exception e) {
 			// Ignore - no logger available.
-			LOGGER.error("Can't load logger: " + e.getMessage());
+			LOGGER.warn("Can't load logger: " + e.getMessage());
 		}
 	}
 	
