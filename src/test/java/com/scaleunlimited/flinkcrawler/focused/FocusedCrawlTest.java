@@ -47,7 +47,7 @@ public class FocusedCrawlTest {
 		ScoredWebGraph graph = new ScoredWebGraph(normalizer)
 			.add("domain1.com", 2.0f, "domain1.com/page1", "domain1.com/page2")
 			
-			// This page will get fetched right away, because the two links have score of 1.0f
+			// This page will get fetched right away, because the two links from domain1.com have score of 1.0f
 			.add("domain1.com/page1", 1.0f, "domain1.com/page3", "domain1.com/page4")
 			
 			// This page will get fetched right away, because the two links have score of 1.0f
@@ -56,10 +56,11 @@ public class FocusedCrawlTest {
 			// This page will never be fetched.
 			.add("domain1.com/page3", 1.0f)
 
-			// This page will eventually be fetched.
+			// This page will eventually be fetched. The first inbound link (from page1) has a score of 0.5,
+			// and then the next link from page5 adds 1.0 to push us over the threshhold
 			.add("domain1.com/page4", 1.0f)
 
-			// This page will fetched right away, and gives enough juice to page4 to get it fetched.
+			// This page will fetched right away, because page2 gives all of its score (1.0) to page5
 			.add("domain1.com/page5", 1.0f, "domain1.com/page4");
 			
 		File testDir = new File("target/FocusedCrawlTest/");
@@ -120,12 +121,14 @@ public class FocusedCrawlTest {
 		results
 			.assertUrlLoggedBy(FetchUrlsFunction.class, domain1page1, 1)
 			.assertUrlLoggedBy(FetchUrlsFunction.class, domain1page2, 1)
+			// This page never got a high enough estimated score.
 			.assertUrlLoggedBy(FetchUrlsFunction.class, domain1page3, 0)
 			.assertUrlLoggedBy(FetchUrlsFunction.class, domain1page4, 1)
 			.assertUrlLoggedBy(FetchUrlsFunction.class, domain1page5, 1)
 			;
 	}
 	
+	@SuppressWarnings("serial")
 	private static class PageNumberScorer extends BasePageScorer {
 		
 		@Override
