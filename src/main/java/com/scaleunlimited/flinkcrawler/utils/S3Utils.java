@@ -1,5 +1,12 @@
 package com.scaleunlimited.flinkcrawler.utils;
 
+import java.io.InputStream;
+
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import com.amazonaws.services.s3.model.GetObjectRequest;
+import com.amazonaws.services.s3.model.S3Object;
+
 public class S3Utils {
 	
 	private static final String S3_PROTOCOL = "s3://";
@@ -13,9 +20,12 @@ public class S3Utils {
 			return false;
 		}
 		
-		// TODO make request to see if file exists. Hmm, might need then
-		// to make this an object with credentials.
-		return false;
+		// TODO It would obviously be better to have some kind of S3Helper object
+		// that would have its own AmazonS3 client instance.
+		AmazonS3 s3Client = makeS3Client();
+		String bucket = getBucket(filename);
+		String key = getPath(filename);
+		return s3Client.doesObjectExist(bucket, key);
 	}
 
 	public static String getBucket(String filename) {
@@ -44,5 +54,21 @@ public class S3Utils {
 		}
 		
 		return filename.substring(pathStart + 1);
+	}
+	
+	public static InputStream makeS3FileStream(String bucketName, String key) {
+		AmazonS3 s3Client = makeS3Client();
+		S3Object object = s3Client.getObject(new GetObjectRequest(bucketName, key));
+		return object.getObjectContent();
+	}
+	
+	public static AmazonS3 makeS3Client() {
+		return AmazonS3ClientBuilder.defaultClient();
+		
+//		AmazonS3ClientBuilder builder = AmazonS3ClientBuilder.standard();
+//		
+//		// http://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/auth/EnvironmentVariableCredentialsProvider.html
+//		builder.setCredentials(new DefaultAWSCredentialsProviderChain());
+//		return builder.build();
 	}
 }

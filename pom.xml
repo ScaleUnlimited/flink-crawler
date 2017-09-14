@@ -613,7 +613,11 @@ under the License.
 									<exclude>com.twitter:bijection-avro_*</exclude>
 									<exclude>commons-lang:commons-lang</exclude>
 									<exclude>junit:junit</exclude>
+									<!-- Not sure why I only ran into this problem (see CrawlTopology.java:232)
+									     when running in Common Crawl mode, but (at least running Flink locally),
+									     it choked with java.lang.NoClassDefFoundError: de/javakaffee/kryoserializers/UnmodifiableCollectionsSerializer
 									<exclude>de.javakaffee:kryo-serializers</exclude>
+									  -->
 									<!-- Apparently aws-java-sdk-core really needs this to access S3
 									<exclude>joda-time:joda-time</exclude>
 									  -->

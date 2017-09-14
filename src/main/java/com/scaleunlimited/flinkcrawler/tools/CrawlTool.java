@@ -32,9 +32,13 @@ import crawlercommons.sitemaps.SiteMapParser;
 
 public class CrawlTool {
 
-	static class CrawlToolOptions {
-	    private String _urlsFilename;
+	public static final long DO_NOT_FORCE_CRAWL_DELAY = -1L;
+
+	public static class CrawlToolOptions {
+		
+		private String _urlsFilename;
 	    private String _singleDomain;
+        private long _forceCrawlDelay = CrawlTool.DO_NOT_FORCE_CRAWL_DELAY;
         private long _defaultCrawlDelay = 10 * 1000L;
         private int _maxContentSize = SimpleHttpFetcher.DEFAULT_MAX_CONTENT_SIZE;
         private long _maxWaitTime = 5000;
@@ -53,6 +57,11 @@ public class CrawlTool {
 		@Option(name = "-singledomain", usage = "only fetch URLs within this domain (and its sub-domains)", required = false)
 	    public void setSingleDomain(String urlsFilename) {
 			_singleDomain = urlsFilename;
+	    }
+		
+		@Option(name = "-forcecrawldelay", usage = "use this crawl delay (ms) even if robots.txt provides something else", required = false)
+	    public void setForceCrawlDelay(long forceCrawlDelay) {
+			_forceCrawlDelay = forceCrawlDelay;
 	    }
 		
 		@Option(name = "-defaultcrawldelay", usage = "use this crawl delay (ms) when robots.txt doesn't provide it", required = false)
@@ -108,6 +117,10 @@ public class CrawlTool {
 			return _singleDomain;
 		}
 		
+		public long getForceCrawlDelay() {
+			return _forceCrawlDelay;
+		}
+
 		public long getDefaultCrawlDelay() {
 			return _defaultCrawlDelay;
 		}
@@ -253,6 +266,7 @@ public class CrawlTool {
 				.setSiteMapFetcherBuilder(siteMapFetcherBuilder)
 				.setSiteMapParser(new SimpleSiteMapParser())
 				.setPageFetcherBuilder(pageFetcherBuilder)
+				.setForceCrawlDelay(options.getForceCrawlDelay())
 				.setDefaultCrawlDelay(options.getDefaultCrawlDelay())
 				.setMaxWaitTime(options.getMaxWaitTime())
 				.setParallelism(options.getParallelism());

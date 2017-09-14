@@ -21,6 +21,7 @@ import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ValidUrl;
+import com.scaleunlimited.flinkcrawler.tools.CrawlTool;
 import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
 import crawlercommons.fetcher.FetchedResult;
@@ -43,6 +44,7 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 	private BaseHttpFetcherBuilder _fetcherBuilder;
 	private BaseHttpFetcher _fetcher;
 	private SimpleRobotRulesParser _parser;
+	private long _forceCrawlDelay;
 	private long _defaultCrawlDelay;
 	
 	private transient ThreadPoolExecutor _executor;
@@ -54,9 +56,10 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 	private transient Map<String, BaseRobotRules> _rules;
 	private transient ConcurrentLinkedQueue<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> _output;
 	
-	public CheckUrlWithRobotsFunction(BaseHttpFetcherBuilder fetcherBuider, SimpleRobotRulesParser parser, long defaultCrawlDelay) {
+	public CheckUrlWithRobotsFunction(BaseHttpFetcherBuilder fetcherBuider, SimpleRobotRulesParser parser, long forceCrawlDelay, long defaultCrawlDelay) {
 		_fetcherBuilder = fetcherBuider;
 		_parser = parser;
+		_forceCrawlDelay = forceCrawlDelay;
 		_defaultCrawlDelay = defaultCrawlDelay;
 	}
 	
@@ -168,11 +171,13 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 	private Tuple3<CrawlStateUrl, FetchUrl, FetchUrl> processUrl(BaseRobotRules rules, FetchUrl url) {
 		if (rules.isAllowed(url.getUrl())) {
 			// Add the crawl delay to the url, so that it can be used to do delay limiting in the fetcher
-			long crawlDelay = rules.getCrawlDelay();
-			if (crawlDelay == BaseRobotRules.UNSET_CRAWL_DELAY) {
-				crawlDelay = _defaultCrawlDelay;
-			}
-			
+			long crawlDelay = _forceCrawlDelay;
+			if (_forceCrawlDelay == CrawlTool.DO_NOT_FORCE_CRAWL_DELAY) {
+				crawlDelay = rules.getCrawlDelay();
+				if (crawlDelay == BaseRobotRules.UNSET_CRAWL_DELAY) {
+					crawlDelay = _defaultCrawlDelay;
+				}
+			}			
 			url.setCrawlDelay(crawlDelay);
 			return new Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>(null, url, null);
 		} else {

@@ -95,6 +95,7 @@ public class CrawlTopology {
         private String _jobName = "flink-crawler";
         private int _parallelism = DEFAULT_PARALLELISM;
         private long _maxWaitTime = 5000;
+        private long _forceCrawlDelay = CrawlTool.DO_NOT_FORCE_CRAWL_DELAY;
         private long _defaultCrawlDelay = 10 * 1000L;
         
         private BaseUrlSource _urlSource;
@@ -127,6 +128,11 @@ public class CrawlTopology {
 
         public CrawlTopologyBuilder setMaxWaitTime(long maxWaitTime) {
         	_maxWaitTime = maxWaitTime;
+            return this;
+        }
+
+        public CrawlTopologyBuilder setForceCrawlDelay(long forceCrawlDelay) {
+        	_forceCrawlDelay = forceCrawlDelay;
             return this;
         }
 
@@ -264,7 +270,7 @@ public class CrawlTopology {
             		.process(new CrawlDBFunction(_crawlDB, new DefaultCrawlDBMerger(), _fetchQueue))
             		.name("CrawlDBFunction")
             		.keyBy(new PldKeySelector<FetchUrl>())
-                    .process(new CheckUrlWithRobotsFunction(_robotsFetcherBuilder, _robotsParser, _defaultCrawlDelay))
+                    .process(new CheckUrlWithRobotsFunction(_robotsFetcherBuilder, _robotsParser, _forceCrawlDelay, _defaultCrawlDelay))
                     .name("CheckUrlWithRobotsFunction");
             
             // Split this stream into passed, blocked or sitemap.
