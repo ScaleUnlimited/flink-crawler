@@ -1,6 +1,8 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
 import org.apache.flink.api.common.functions.RuntimeContext;
+import org.apache.flink.configuration.ConfigOption;
+import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.RichProcessFunction;
 import org.apache.flink.util.Collector;
@@ -57,7 +59,7 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 		RuntimeContext context = getRuntimeContext();
 		_parallelism = context.getNumberOfParallelSubtasks();
 		_index = context.getIndexOfThisSubtask();
-
+		
 		_fetchQueue.open();
 		
 		_crawlDB.open(_index, _fetchQueue, _merger);
@@ -104,6 +106,7 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 			if (_fetchQueue.isEmpty()) {
 				// We don't have any active URLs left.
 				// Call the CrawlDB to trigger a merge.
+				LOGGER.debug("CrawlDBFunction merging crawlDB");
 				_crawlDB.merge();
 			}
 		}

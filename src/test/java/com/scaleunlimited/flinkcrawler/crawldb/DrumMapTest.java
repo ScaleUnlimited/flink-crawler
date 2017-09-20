@@ -95,6 +95,7 @@ public class DrumMapTest {
 		addUrl(dm, "http://domain.com/page3", FetchStatus.FETCHED, 100);
 
 		FetchQueue queue = new FetchQueue(maxEntries);
+		queue.open();
 		dm.merge(queue);
 		
 		// We should wind up with just one entry in the queue, with the
@@ -177,6 +178,7 @@ public class DrumMapTest {
 		addUrl(dm, "http://domain.com/page3", FetchStatus.UNFETCHED, 0.25f, 0);
 		
 		FetchQueue queue = new FocusedFetchQueue(maxEntries, minFetchScore);
+		queue.open();
 		dm.merge(queue);
 		
 		Set<String> urlsToFetch = new HashSet<>();
@@ -240,6 +242,7 @@ public class DrumMapTest {
 			}
 
 			FetchQueue queue = new FetchQueue(maxEntries);
+			queue.open();
 			dm.merge(queue);
 
 			String queueResults = testCase[2];

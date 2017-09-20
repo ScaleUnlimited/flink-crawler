@@ -2,7 +2,6 @@ package com.scaleunlimited.flinkcrawler.focused;
 
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
-import com.scaleunlimited.flinkcrawler.utils.FetchQueue.UrlState;
 
 /**
  * A FetchQueue that archives any URL with a low score.
@@ -13,6 +12,7 @@ import com.scaleunlimited.flinkcrawler.utils.FetchQueue.UrlState;
  * do something interesting :) with the ones in the middle.
  *
  */
+@SuppressWarnings("serial")
 public class FocusedFetchQueue extends FetchQueue {
 
 	private final float _minFetchScore;

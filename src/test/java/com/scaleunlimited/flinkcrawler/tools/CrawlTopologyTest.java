@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.crawldb.DrumCrawlDB;
+import com.scaleunlimited.flinkcrawler.crawldb.InMemoryCrawlDB;
 import com.scaleunlimited.flinkcrawler.fetcher.MockRobotsFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.SiteMapGraphFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.WebGraphFetcher;
@@ -31,6 +32,7 @@ import com.scaleunlimited.flinkcrawler.tools.CrawlTopology.CrawlTopologyBuilder;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlLengthener;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlValidator;
+import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
 import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 import com.scaleunlimited.flinkcrawler.utils.UrlLoggerImpl.UrlLoggerResults;
 import com.scaleunlimited.flinkcrawler.webgraph.SimpleWebGraph;
@@ -44,6 +46,8 @@ public class CrawlTopologyTest {
 
 	@Test
 	public void test() throws Exception {
+		UrlLogger.clear();
+		
 		LocalStreamEnvironment env = StreamExecutionEnvironment.createLocalEnvironment();
 
 		SimpleUrlNormalizer normalizer = new SimpleUrlNormalizer();
@@ -89,6 +93,8 @@ public class CrawlTopologyTest {
 			.setUrlLengthener(new SimpleUrlLengthener())
 			.setCrawlDB(new DrumCrawlDB(10_000, drumDBDir.getAbsolutePath()))
 			// .setCrawlDB(new InMemoryCrawlDB())
+			.setFetchQueue(new FetchQueue(1_000))
+			// .setCrawlDB(new InMemoryCrawlDB())
 			.setRobotsFetcherBuilder(new MockRobotsFetcher.MockRobotsFetcherBuilder(new MockRobotsFetcher(robotPages)))
 			.setRobotsParser(new SimpleRobotRulesParser())
 			.setPageParser(new SimplePageParser())
@@ -99,10 +105,9 @@ public class CrawlTopologyTest {
 			// Create MockSitemapFetcher - that will return a valid sitemap
 			.setSiteMapFetcherBuilder(new SiteMapGraphFetcher.SiteMapGraphFetcherBuilder(new SiteMapGraphFetcher(sitemapGraph)))
 			.setSiteMapParser(new SimpleSiteMapParser())
-			// You can increase this value from 10000 to say 100000 if you need time inside of a threaded
+			// You can increase this value from 5000 to say 100000 if you need time inside of a threaded
 			// executor before the cluster terminates.
-			// TODO 5000 was long enough, but with new async crawlDB the iteration terminates too quickly.
-			.setMaxWaitTime(10000)
+			.setMaxWaitTime(5000)
 			.setDefaultCrawlDelay(0)
 			// Explicitly set parallelism so that it doesn't vary based on # of cores
 			.setParallelism(2)

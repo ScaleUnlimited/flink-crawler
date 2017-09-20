@@ -23,8 +23,10 @@ public class DrumCrawlDBTest {
 			FileUtils.deleteDirectory(testDir);
 		}
 		
-		DrumCrawlDB cdb = new DrumCrawlDB(10, "target/test/DrumCrawlDBTest/testMergingAndKeepingState/");
 		FetchQueue fq = new FetchQueue(100);
+		fq.open();
+
+		DrumCrawlDB cdb = new DrumCrawlDB(10, "target/test/DrumCrawlDBTest/testMergingAndKeepingState/");
 		cdb.open(0, fq, new DefaultCrawlDBMerger());
 		
 		CrawlStateUrl url1 = makeUrl("domain1.com/page1", FetchStatus.UNFETCHED);

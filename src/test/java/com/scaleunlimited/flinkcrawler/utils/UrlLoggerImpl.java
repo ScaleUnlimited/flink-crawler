@@ -49,6 +49,11 @@ public class UrlLoggerImpl implements IUrlLogger {
 		return _log;
 	}
 	
+	public void clear() {
+		_log.clear();
+		_byClass.clear();
+	}
+	
 	private static Map<String, String> makeMetaDataMap(String... metaData) {
 		if (metaData.length == 0) {
 			return EMPTY_METADATA_MAP;

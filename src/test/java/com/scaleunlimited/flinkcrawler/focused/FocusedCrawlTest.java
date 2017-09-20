@@ -40,6 +40,8 @@ public class FocusedCrawlTest {
 	
 	@Test
 	public void test() throws Exception {
+		UrlLogger.clear();
+
 		LocalStreamEnvironment env = StreamExecutionEnvironment.createLocalEnvironment();
 
 		final float minFetchScore = 0.75f;
@@ -88,10 +90,9 @@ public class FocusedCrawlTest {
 			.setUrlFilter(new SimpleUrlValidator())
 			.setSiteMapFetcherBuilder(new SiteMapGraphFetcher.SiteMapGraphFetcherBuilder(new SiteMapGraphFetcher(BaseWebGraph.EMPTY_GRAPH)))
 			.setSiteMapParser(new SimpleSiteMapParser())
-			// You can increase this value from 10000 to say 100000 if you need time inside of a threaded
+			// You can increase this value from 5000 to say 100000 if you need time inside of a threaded
 			// executor before the cluster terminates.
-			// TODO 5000 was long enough, but with new async crawlDB the iteration terminates too quickly.
-			.setMaxWaitTime(10000)
+			.setMaxWaitTime(5000)
 			.setDefaultCrawlDelay(0)
 			// Explicitly set parallelism so that it doesn't vary based on # of cores
 			.setParallelism(2)
