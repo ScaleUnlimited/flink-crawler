@@ -102,12 +102,10 @@ public class CrawlStateUrl extends ValidUrl {
 	 * @param value
 	 */
 	public void setFromValue(byte[] value) {
-		checkValue(value);
-		
-		_status = FetchStatus.values()[value[STATUS_OFFSET]];
-		_statusTime = getTimeFromBytes(value, STATUS_TIME_OFFSET);
-		_score = getScoreFromBytes(value, SCORE_OFFSET);
-		_nextFetchTime = getTimeFromBytes(value, FETCH_TIME_OFFSET);
+		_status = getFetchStatus(value);
+		_statusTime = getStatusTime(value);
+		_score = getScore(value);
+		_nextFetchTime = getFetchTime(value);
 	}
 	
 	// TODO move into ByteUtils?
@@ -169,11 +167,13 @@ public class CrawlStateUrl extends ValidUrl {
 
 	public static FetchStatus getFetchStatus(byte[] value) {
 		checkValue(value);
+		
 		return FetchStatus.values()[value[STATUS_OFFSET]];
 	}
 	
 	public static long getStatusTime(byte[] value) {
 		checkValue(value);
+		
 		return getTimeFromBytes(value, STATUS_TIME_OFFSET);
 	}
 	
@@ -185,7 +185,8 @@ public class CrawlStateUrl extends ValidUrl {
 	
 	public static long getFetchTime(byte[] value) {
 		checkValue(value);
-		return ByteUtils.bytesToLong(value, FETCH_TIME_OFFSET);
+		
+		return getTimeFromBytes(value, FETCH_TIME_OFFSET);
 	}
 	
 	private static void checkValue(byte[] value) {
