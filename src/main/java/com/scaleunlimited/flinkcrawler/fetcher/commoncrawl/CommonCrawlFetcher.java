@@ -207,10 +207,16 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 			WarcRecordReader warcReader = new WarcRecordReader(dis);
 			WarcRecord pageRecord = warcReader.readNextRecord();
 			long deltaTime = System.currentTimeMillis() - startTime;
-			double responseRateExact = (double)warcReader.getBytesRead() / deltaTime;
+			int bytesRead = warcReader.getBytesRead();
+			double responseRateExact = (double)bytesRead / deltaTime;
 			// Response rate is bytes/second, not bytes/millisecond
 			int responseRate = (int)Math.round(responseRateExact * 1000.0);
-
+			LOGGER.debug(String.format(	"Read %,d bytes from page at %,d offset within %s in %,d seconds (%,d bytes/sec)",
+										bytesRead,
+										offset,
+										warcFile,
+										deltaTime / 1000,
+										responseRate));
 			Headers headers = new Headers();
 			for (String httpHeader : pageRecord.getHttpHeaders()) {
 				String[] keyValue = httpHeader.split(":", 2);
@@ -378,14 +384,28 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 			return result;
 		}
 	
-		result = new byte[(int)indexEntry.getSegmentLength()];
-		String s3Path = S3Utils.makeS3FilePath(_crawlId, indexEntry.getIndexFilename());
+		long length = indexEntry.getSegmentLength();
+		result = new byte[(int)length];
+		String indexFilename = indexEntry.getIndexFilename();
+		String s3Path = S3Utils.makeS3FilePath(_crawlId, indexFilename);
 		GetObjectRequest objectRequest = new GetObjectRequest(S3Utils.getBucket(), s3Path);
-		objectRequest.setRange(indexEntry.getSegmentOffset(), indexEntry.getSegmentOffset() + indexEntry.getSegmentLength());
+		long offset = indexEntry.getSegmentOffset();
+		objectRequest.setRange(offset, offset + length);
 		
 		try (S3Object object = _s3Client.getObject(objectRequest)) {
 			S3ObjectInputStream is = object.getObjectContent();
+			long startTime = System.currentTimeMillis();
 			IOUtils.read(is, result);
+			long deltaTime = System.currentTimeMillis() - startTime;
+			double responseRateExact = (double)length / deltaTime;
+			// Response rate is bytes/second, not bytes/millisecond
+			int responseRate = (int)Math.round(responseRateExact * 1000.0);
+			LOGGER.debug(String.format(	"Read %,d byte segment at %,d offset within %s in %,d seconds (%,d bytes/sec)",
+										length,
+										offset,
+										indexFilename,
+										deltaTime / 1000,
+										responseRate));
 			
 			_cache.put(indexEntry.getSegmentId(), result);
 			return result;
