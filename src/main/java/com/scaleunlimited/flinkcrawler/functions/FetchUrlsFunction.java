@@ -133,13 +133,13 @@ public class FetchUrlsFunction extends RichProcessFunction<FetchUrl, Tuple2<Craw
 					// If we got an error, put null in for fetchedUrl so we don't try to process it downstream.
 					if (result.getStatusCode() != HttpStatus.SC_OK) {
 						FetchStatus fetchStatus = ExceptionUtils.mapHttpStatusToFetchStatus(result.getStatusCode());
-						_output.add(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url, fetchStatus, 0, 0, System.currentTimeMillis(), 0L), null));
+						_output.add(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url, fetchStatus, 0, System.currentTimeMillis(), 0L), null));
 					} else {
-						_output.add(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url, FetchStatus.FETCHED, 0, 0, fetchedUrl.getFetchTime(), 0L), fetchedUrl));
+						_output.add(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url, FetchStatus.FETCHED, 0, fetchedUrl.getFetchTime(), 0L), fetchedUrl));
 					}
 				} catch (Exception e) {
 					if (e instanceof BaseFetchException) {
-						_output.add(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url, ExceptionUtils.mapExceptionToFetchStatus(e), 0, 0, System.currentTimeMillis(), 0L), null));
+						_output.add(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url, ExceptionUtils.mapExceptionToFetchStatus(e), 0, System.currentTimeMillis(), 0L), null));
 					} else {
 						throw new RuntimeException("Exception fetching " + url, e);
 					}

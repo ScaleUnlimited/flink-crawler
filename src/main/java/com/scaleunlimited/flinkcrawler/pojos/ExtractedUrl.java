@@ -7,13 +7,22 @@ public class ExtractedUrl extends BaseUrl {
 
     private String _anchorText;
     private String _relAttributes;
-    // TODO does an outlink get an estimated score to begin with ?
-
+    private float _score;
+    
+    public ExtractedUrl(String url) {
+    	this(url, null, null);
+    }
+    
     public ExtractedUrl(String url, String anchorText, String relAttributes) {
+    	this(url, anchorText, relAttributes, RawUrl.DEFAULT_SCORE);
+    }
+    
+    public ExtractedUrl(String url, String anchorText, String relAttributes, float score) {
     	super(url);
     	
         _anchorText = anchorText;
         _relAttributes = relAttributes;
+        _score = score;
     }
     
     public String getAnchorText() {
@@ -37,4 +46,12 @@ public class ExtractedUrl extends BaseUrl {
         // TODO add more fields
         return super.toString();
     }
+
+	public float getScore() {
+		return _score;
+	}
+	
+	public void setScore(float score) {
+		_score = score;
+	}
 }

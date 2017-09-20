@@ -50,4 +50,14 @@ public class ByteUtils {
 		return result;
 	}
 
+	public static int bytesToInt(byte[] src, int srcOffset) {
+		int result = 0;
+		for (int i = 0; i < 4; i++) {
+			result <<= 8;
+			result |= (src[srcOffset++] & 0x00FF);
+		}
+		
+		return result;
+	}
+
 }

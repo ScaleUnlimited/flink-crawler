@@ -12,6 +12,7 @@ import org.xml.sax.helpers.DefaultHandler;
 
 import com.scaleunlimited.flinkcrawler.config.ParserPolicy;
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
+import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 
 
 @SuppressWarnings("serial")
@@ -134,7 +135,7 @@ public abstract class BaseLinkExtractor extends DefaultHandler implements Serial
         super.endElement(uri, localName, name);
 
         if (localName.equalsIgnoreCase(_inAnchorTag)) {
-        	addLink(new ExtractedUrl(_curUrl, _curAnchor.toString(), _curRelAttributes));
+        	addLink(new ExtractedUrl(_curUrl, _curAnchor.toString(), _curRelAttributes, RawUrl.DEFAULT_SCORE));
         	_inAnchorTag = null;
         }
     }

@@ -34,9 +34,9 @@ public class InMemoryCrawlDB extends BaseCrawlDB {
 		_crawlState = new HashMap<>();
 		_archiveDB = new HashMap<>();
 		
-		_curValue = new byte[1 + CrawlStateUrl.maxValueLength()];
-		_newValue = new byte[1  + CrawlStateUrl.maxValueLength()];
-		_mergedValue = new byte[1 + CrawlStateUrl.maxValueLength()];
+		_curValue = new byte[CrawlStateUrl.VALUE_SIZE];
+		_newValue = new byte[CrawlStateUrl.VALUE_SIZE];
+		_mergedValue = new byte[CrawlStateUrl.VALUE_SIZE];
 	}
 
 	@Override
@@ -58,9 +58,9 @@ public class InMemoryCrawlDB extends BaseCrawlDB {
 				url.getValue(_newValue);
 				
 				MergeResult result = _merger.doMerge(_curValue, _newValue, _mergedValue);
-				if (result == MergeResult.USE_OLD) {
+				if (result == MergeResult.USE_FIRST) {
 					// All set, nothing to do.
-				} else if (result == MergeResult.USE_NEW) {
+				} else if (result == MergeResult.USE_SECOND) {
 					curState.setFromValue(_newValue);
 				} else if (result == MergeResult.USE_MERGED) {
 					curState.setFromValue(_mergedValue);

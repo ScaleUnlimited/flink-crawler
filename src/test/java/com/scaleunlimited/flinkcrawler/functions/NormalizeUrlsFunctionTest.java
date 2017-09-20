@@ -19,7 +19,7 @@ public class NormalizeUrlsFunctionTest {
 		// parallelism in the open method.
 		NormalizeUrlsFunction func = new NormalizeUrlsFunction();
 		Collector<RawUrl> collector = Mockito.mock(Collector.class);
-		func.flatMap(new RawUrl(" http://www.foo.com/foo.html#ref ", 300.0f), collector );
+		func.flatMap(new RawUrl(" http://www.foo.com/foo.html#ref ", 10.0f), collector );
 		
         Mockito.verify(collector).collect(Mockito.argThat(new MatchNormalizedUrl()));
 	}
@@ -29,7 +29,7 @@ public class NormalizeUrlsFunctionTest {
 		@Override
 		public boolean matches(RawUrl normalizedUrl) {
 			if (normalizedUrl.getUrl().equals("http://www.foo.com/foo.html") &&
-					normalizedUrl.getEstimatedScore() == 300.0f) {
+					normalizedUrl.getScore() == 10.0f) {
 				return true;
 			}
 			return false;

@@ -161,10 +161,9 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 	private Tuple3<CrawlStateUrl, FetchUrl, FetchUrl> invalidUrl(FetchUrl url) {
 		long now = System.currentTimeMillis();
 		CrawlStateUrl crawlStateUrl = new CrawlStateUrl(url, 
-														FetchStatus.ERROR_INVALID_URL, 
-														url.getActualScore(), 
-														url.getEstimatedScore(), 
+														FetchStatus.ERROR_INVALID_URL,
 														now,
+														url.getScore(), 
 														Long.MAX_VALUE);
 		return new Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>(crawlStateUrl, null, null);
 	}
@@ -186,9 +185,8 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 			long now = System.currentTimeMillis();
 			CrawlStateUrl crawlStateUrl = new CrawlStateUrl(url,
 															rules.isDeferVisits() ? FetchStatus.SKIPPED_DEFERRED : FetchStatus.SKIPPED_BLOCKED, 
-															url.getActualScore(), 
-															url.getEstimatedScore(), 
 															now,
+															url.getScore(), 
 															now + DEFAULT_RETRY_INTERVAL_MS);
 			return new Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>(crawlStateUrl, null, null);
 		}

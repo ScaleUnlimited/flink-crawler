@@ -23,8 +23,10 @@ public class DrumCrawlDBTest {
 			FileUtils.deleteDirectory(testDir);
 		}
 		
-		DrumCrawlDB cdb = new DrumCrawlDB(10, "target/test/DrumCrawlDBTest/testMergingAndKeepingState/");
 		FetchQueue fq = new FetchQueue(100);
+		fq.open();
+
+		DrumCrawlDB cdb = new DrumCrawlDB(10, "target/test/DrumCrawlDBTest/testMergingAndKeepingState/");
 		cdb.open(0, fq, new DefaultCrawlDBMerger());
 		
 		CrawlStateUrl url1 = makeUrl("domain1.com/page1", FetchStatus.UNFETCHED);
@@ -48,7 +50,7 @@ public class DrumCrawlDBTest {
 
 	private CrawlStateUrl makeUrl(String url, FetchStatus status) throws MalformedURLException {
 		ValidUrl vu = new ValidUrl("http://" + url);
-		return new CrawlStateUrl(vu, status, 1.0f, 1.0f, 0L, System.currentTimeMillis());
+		return new CrawlStateUrl(vu, status, System.currentTimeMillis(), 1.0f, System.currentTimeMillis());
 	}
 
 }

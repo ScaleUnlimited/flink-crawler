@@ -61,7 +61,7 @@ public class SimpleWebGraph extends BaseWebGraph {
 		return this;
 	}
 	
-	private String normalize(String url) {
+	protected String normalize(String url) {
 		if (!url.startsWith("http")) {
 			url = "http://" + url;
 		}

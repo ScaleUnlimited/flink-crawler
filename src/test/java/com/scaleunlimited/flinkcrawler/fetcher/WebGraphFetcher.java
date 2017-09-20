@@ -23,7 +23,7 @@ public class WebGraphFetcher extends BaseHttpFetcher {
         + "\"http://www.w3.org/TR/html4/loose.dtd\">\n"
         + "<html lang=\"en\">\n<head>\n"
         + "\t<meta http-equiv=\"content-type\" content=\"text/html; charset=utf-8\">\n"
-        + "\t<title>Synthetic page</title>\n</head>\n"
+        + "\t<title>Synthetic page - score = %f</title>\n</head>\n"
         + "<body>\n<ul>%s</ul>\n</body>\n</html>";
 	
 	private static final String OUTLINK = "<li><a href=\"%s\">outlink %d</a></li>\n";
@@ -88,7 +88,7 @@ public class WebGraphFetcher extends BaseHttpFetcher {
 				linksList.append(String.format(OUTLINK, outlink, outlinkIndex++));
 			}
 			
-			String contentAsStr = String.format(TEMPLATE, linksList);
+			String contentAsStr = String.format(TEMPLATE, _graph.getScore(urlToFetch), linksList);
 			return new FetchedResult(
 					urlToFetch, 
 					urlToFetch, 
