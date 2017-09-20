@@ -423,10 +423,10 @@ public class DrumMap implements Closeable {
 			} else {
 				MergeResult result = _merger.doMerge(diskKV.getValue(), memKV.getValue(), mergedKV.getValue());
 
-				if (result == MergeResult.USE_OLD) {
+				if (result == MergeResult.USE_FIRST) {
 					nextKV = diskKV;
 					nextPayloadRAF = diskPayloadRAF;
-				} else if (result == MergeResult.USE_NEW) {
+				} else if (result == MergeResult.USE_SECOND) {
 					nextKV = memKV;
 					nextPayloadRAF = memPayloadRAF;
 				} else if (result == MergeResult.USE_MERGED) {

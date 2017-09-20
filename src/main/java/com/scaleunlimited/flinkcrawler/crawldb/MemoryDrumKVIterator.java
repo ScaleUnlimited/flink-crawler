@@ -1,7 +1,5 @@
 package com.scaleunlimited.flinkcrawler.crawldb;
 
-import java.io.IOException;
-
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDBMerger.MergeResult;
 import com.scaleunlimited.flinkcrawler.utils.ByteUtils;
 
@@ -70,9 +68,9 @@ public class MemoryDrumKVIterator extends DrumKVIterator {
 		while (hasNext() && (result.getKeyHash() == getKeyHash())) {
 			getValue(_nextValue);
 			MergeResult mr = _merger.doMerge(result.getValue(), _nextValue, _mergedValue);
-			if (mr == MergeResult.USE_OLD) {
+			if (mr == MergeResult.USE_FIRST) {
 				// all set
-			} else if  (mr == MergeResult.USE_NEW) {
+			} else if  (mr == MergeResult.USE_SECOND) {
 				result.setValue(_nextValue);
 			} else if (mr == MergeResult.USE_MERGED) {
 				result.setValue(_mergedValue);

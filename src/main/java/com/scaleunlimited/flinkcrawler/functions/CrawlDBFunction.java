@@ -1,6 +1,8 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
 import org.apache.flink.api.common.functions.RuntimeContext;
+import org.apache.flink.configuration.ConfigOption;
+import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.RichProcessFunction;
 import org.apache.flink.util.Collector;
@@ -30,9 +32,6 @@ import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl> {
     static final Logger LOGGER = LoggerFactory.getLogger(CrawlDBFunction.class);
     
-	// TODO configure this
-	private static final int MAX_ACTIVE_URLS = 10_000;
-	
 	// TODO pick good time for this
 	private static final long QUEUE_CHECK_DELAY = 100L;
 
@@ -42,14 +41,15 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 	private BaseCrawlDBMerger _merger;
 	
 	// List of URLs that are available to be fetched.
-	private transient FetchQueue _fetchQueue;
+	private final FetchQueue _fetchQueue;
 	
 	private transient int _parallelism;
 	private transient int _index;
 	
-	public CrawlDBFunction(BaseCrawlDB crawlDB, BaseCrawlDBMerger merger) {
+	public CrawlDBFunction(BaseCrawlDB crawlDB, BaseCrawlDBMerger merger, FetchQueue fetchQueue) {
 		_crawlDB = crawlDB;
 		_merger = merger;
+		_fetchQueue = fetchQueue;
 	}
 
 	@Override
@@ -59,8 +59,8 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 		RuntimeContext context = getRuntimeContext();
 		_parallelism = context.getNumberOfParallelSubtasks();
 		_index = context.getIndexOfThisSubtask();
-
-		_fetchQueue = new FetchQueue(MAX_ACTIVE_URLS);
+		
+		_fetchQueue.open();
 		
 		_crawlDB.open(_index, _fetchQueue, _merger);
 	}
@@ -106,6 +106,7 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 			if (_fetchQueue.isEmpty()) {
 				// We don't have any active URLs left.
 				// Call the CrawlDB to trigger a merge.
+				LOGGER.debug("CrawlDBFunction merging crawlDB");
 				_crawlDB.merge();
 			}
 		}

@@ -49,6 +49,7 @@ import com.scaleunlimited.flinkcrawler.sources.BaseUrlSource;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlLengthener;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlValidator;
+import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
 import com.scaleunlimited.flinkcrawler.utils.FlinkUtils;
 
 import crawlercommons.robots.SimpleRobotRulesParser;
@@ -98,7 +99,7 @@ public class CrawlTopology {
         private long _defaultCrawlDelay = 10 * 1000L;
         
         private BaseUrlSource _urlSource;
-
+        private FetchQueue _fetchQueue;
         private BaseCrawlDB _crawlDB;
         
         private BaseHttpFetcherBuilder _robotsFetcherBuilder;
@@ -180,6 +181,11 @@ public class CrawlTopology {
             return this;
         }
 
+        public CrawlTopologyBuilder setFetchQueue(FetchQueue fetchQueue) {
+        	_fetchQueue = fetchQueue;
+        	return this;
+        }
+        
         public CrawlTopologyBuilder setSiteMapParser(BasePageParser siteMapParser) {
             _siteMapParser = siteMapParser;
             return this;
@@ -261,7 +267,7 @@ public class CrawlTopology {
             IterativeStream<CrawlStateUrl> crawlDbIteration = cleanedUrls.iterate(_maxWaitTime);
             DataStream<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> postRobotsUrls = crawlDbIteration
             		.keyBy(new PldKeySelector<CrawlStateUrl>())
-            		.process(new CrawlDBFunction(_crawlDB, new DefaultCrawlDBMerger()))
+            		.process(new CrawlDBFunction(_crawlDB, new DefaultCrawlDBMerger(), _fetchQueue))
             		.name("CrawlDBFunction")
             		.keyBy(new PldKeySelector<FetchUrl>())
                     .process(new CheckUrlWithRobotsFunction(_robotsFetcherBuilder, _robotsParser, _forceCrawlDelay, _defaultCrawlDelay))

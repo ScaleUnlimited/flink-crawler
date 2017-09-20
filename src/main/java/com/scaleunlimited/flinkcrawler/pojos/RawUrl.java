@@ -5,34 +5,36 @@ import java.net.MalformedURLException;
 @SuppressWarnings("serial")
 public class RawUrl extends BaseUrl {
 
-	private float _estimatedScore;
+	public static final float DEFAULT_SCORE = 1.0f;
+	
+	private float _score;
 	
 	public RawUrl() {
 		super();
 	}
 	
 	public RawUrl(String url) throws MalformedURLException {
-		this(url, 0.0f);
+		this(url, DEFAULT_SCORE);
 	}
 	
-	public RawUrl(String url, float estimatedScore) throws MalformedURLException {
+	public RawUrl(String url, float score) throws MalformedURLException {
 		super(url);
 		
-		setEstimatedScore(estimatedScore);
+		setScore(score);
 	}
 
-	public RawUrl(BaseUrl url, float estimatedScore) {
+	public RawUrl(BaseUrl url, float score) {
 		super(url.getUrl());
 		
-		setEstimatedScore(estimatedScore);
+		setScore(score);
 	}
 
-	public float getEstimatedScore() {
-		return _estimatedScore;
+	public float getScore() {
+		return _score;
 	}
 
-	public void setEstimatedScore(float estimatedScore) {
-		_estimatedScore = estimatedScore;
+	public void setScore(float score) {
+		_score = score;
 	}
 	
 	@Override

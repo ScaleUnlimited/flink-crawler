@@ -52,7 +52,7 @@ public class SimpleSiteMapParser extends BasePageParser {
 			Collection<SiteMapURL> siteMapUrls = ((SiteMap) parsedSiteMap).getSiteMapUrls();
 			ArrayList<ExtractedUrl> extractedUrls = new ArrayList<ExtractedUrl>();
 			for (SiteMapURL siteMapURL : siteMapUrls) {
-				extractedUrls.add(new ExtractedUrl(siteMapURL.getUrl().toExternalForm(), null, null));
+				extractedUrls.add(new ExtractedUrl(siteMapURL.getUrl().toExternalForm()));
 			}
 			return new ParserResult(null, extractedUrls.toArray(new ExtractedUrl[extractedUrls.size()]));
 		} else {

@@ -31,10 +31,10 @@ public class DrumCrawlDB extends BaseCrawlDB {
 
 		File topDataDir = new File(_dataDirname);
 		File dataDir = new File(topDataDir, "index-" + index);
-		_drumMap = new DrumMap(_maxRamEntries, CrawlStateUrl.averageValueLength(), dataDir, merger);
+		_drumMap = new DrumMap(_maxRamEntries, CrawlStateUrl.VALUE_LENGTH, dataDir, merger);
 		_drumMap.open();
 		
-		_urlValue = new byte[1 + CrawlStateUrl.maxValueLength()];
+		_urlValue = new byte[CrawlStateUrl.VALUE_SIZE];
 	}
 	
 	@Override
