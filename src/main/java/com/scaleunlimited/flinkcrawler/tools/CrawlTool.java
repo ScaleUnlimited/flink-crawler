@@ -6,6 +6,7 @@ import java.net.URL;
 
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
+import org.apache.http.HttpStatus;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
@@ -25,10 +26,15 @@ import com.scaleunlimited.flinkcrawler.urls.SimpleUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlValidator;
 
 import crawlercommons.domains.PaidLevelDomain;
+import crawlercommons.fetcher.BaseFetchException;
+import crawlercommons.fetcher.FetchedResult;
+import crawlercommons.fetcher.Payload;
+import crawlercommons.fetcher.http.BaseHttpFetcher;
 import crawlercommons.fetcher.http.SimpleHttpFetcher;
 import crawlercommons.fetcher.http.UserAgent;
 import crawlercommons.robots.SimpleRobotRulesParser;
 import crawlercommons.sitemaps.SiteMapParser;
+import crawlercommons.util.Headers;
 
 public class CrawlTool {
 
@@ -248,16 +254,18 @@ public class CrawlTool {
 					new SingleDomainUrlValidator(options.getSingleDomain())
 				:	new SimpleUrlValidator());
 			
-			BaseHttpFetcherBuilder siteMapFetcherBuilder = getFetcherBuilder(options, userAgent)
+			BaseHttpFetcherBuilder siteMapFetcherBuilder = getPageFetcherBuilder(options, userAgent)
 				.setDefaultMaxContentSize(SiteMapParser.MAX_BYTES_ALLOWED);
-			BaseHttpFetcherBuilder pageFetcherBuilder = getFetcherBuilder(options, userAgent)
+			BaseHttpFetcherBuilder robotsFetcherBuilder = getRobotsFetcherBuilder(options, userAgent)
 				.setDefaultMaxContentSize(options.getMaxContentSize());
+			BaseHttpFetcherBuilder pageFetcherBuilder = getPageFetcherBuilder(options, userAgent)
+					.setDefaultMaxContentSize(options.getMaxContentSize());
 			CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
 //				.setMaxWaitTime(100000)
 				.setUrlSource(new SeedUrlSource(options.getSeedUrlsFilename(), RawUrl.DEFAULT_SCORE))
 				.setCrawlDB(new InMemoryCrawlDB())
 				.setUrlLengthener(new SimpleUrlLengthener())
-				.setRobotsFetcherBuilder(pageFetcherBuilder)
+				.setRobotsFetcherBuilder(robotsFetcherBuilder)
 				.setRobotsParser(new SimpleRobotRulesParser())
 				.setPageParser(new SimplePageParser())
 				.setContentSink(new DiscardingSink<ParsedUrl>())
@@ -283,12 +291,57 @@ public class CrawlTool {
 		}
 	}
 
-	private static BaseHttpFetcherBuilder getFetcherBuilder(CrawlToolOptions options, UserAgent userAgent) throws IOException {
+	private static BaseHttpFetcherBuilder getPageFetcherBuilder(CrawlToolOptions options, UserAgent userAgent) throws IOException {
 		if (options.isCommonCrawl()) {
 			return new CommonCrawlFetcherBuilder(options.getMaxThreads(), userAgent)
 					.setCrawlId(options.getCommonCrawlId())
 					.setCacheDir(options.getCommonCrawlCacheDir())
 					.prepCache();
+		} else {
+			return new SimpleHttpFetcherBuilder(userAgent);
+		}
+	}
+
+	@SuppressWarnings("serial")
+	private static BaseHttpFetcherBuilder getRobotsFetcherBuilder(CrawlToolOptions options, UserAgent userAgent) throws IOException {
+		
+		// Although the static Common Crawl data does have robots.txt files
+		// (in a separate location), there's no index, so it would be ugly to
+		// have to download the whole thing.  For now, let's just pretend that
+		// nobody has a robots.txt file by using a fetcher that always returns
+		// a 404.
+		if (options.isCommonCrawl()) {
+			return new BaseHttpFetcherBuilder(0, userAgent) {
+				
+				@Override
+				public BaseHttpFetcher build() throws Exception {
+					return new BaseHttpFetcher(0, userAgent) {
+						
+						@Override
+						public FetchedResult get(String robotsUrl, Payload payload)
+								throws BaseFetchException {
+							final int responseRate = 1000;
+							return new FetchedResult(	robotsUrl, 
+														robotsUrl, 
+														0, 
+														new Headers(), 
+														new byte[0], 
+														"text/plain", 
+														responseRate, 
+														payload, 
+														robotsUrl, 
+														0, 
+														"192.168.1.1", 
+														HttpStatus.SC_NOT_FOUND, 
+														null);
+						}
+						
+						@Override
+						public void abort() {
+						}
+					};
+				}
+			};
 		} else {
 			return new SimpleHttpFetcherBuilder(userAgent);
 		}
