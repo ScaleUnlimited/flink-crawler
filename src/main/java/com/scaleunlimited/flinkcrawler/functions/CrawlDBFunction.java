@@ -1,10 +1,8 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
 import org.apache.flink.api.common.functions.RuntimeContext;
-import org.apache.flink.configuration.ConfigOption;
-import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.streaming.api.functions.RichProcessFunction;
+import org.apache.flink.streaming.api.functions.ProcessFunction;
 import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +27,7 @@ import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
  * 
  */
 @SuppressWarnings("serial")
-public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl> {
+public class CrawlDBFunction extends ProcessFunction<CrawlStateUrl, FetchUrl> {
     static final Logger LOGGER = LoggerFactory.getLogger(CrawlDBFunction.class);
     
 	// TODO pick good time for this

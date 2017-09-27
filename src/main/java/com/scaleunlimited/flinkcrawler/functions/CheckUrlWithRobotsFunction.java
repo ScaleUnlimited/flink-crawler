@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.streaming.api.functions.RichProcessFunction;
+import org.apache.flink.streaming.api.functions.ProcessFunction;
 import org.apache.flink.util.Collector;
 import org.apache.http.HttpStatus;
 
@@ -30,7 +30,7 @@ import crawlercommons.robots.BaseRobotRules;
 import crawlercommons.robots.SimpleRobotRulesParser;
 
 @SuppressWarnings("serial")
-public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> {
+public class CheckUrlWithRobotsFunction extends ProcessFunction<FetchUrl, Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> {
 
 	// TODO pick good time for this
 	private static final long QUEUE_CHECK_DELAY = 10;

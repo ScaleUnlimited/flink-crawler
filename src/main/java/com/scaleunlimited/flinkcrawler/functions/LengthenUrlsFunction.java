@@ -7,7 +7,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.streaming.api.functions.RichProcessFunction;
+import org.apache.flink.streaming.api.functions.ProcessFunction;
 import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,7 +17,7 @@ import com.scaleunlimited.flinkcrawler.urls.BaseUrlLengthener;
 import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
 @SuppressWarnings({ "serial" })
-public class LengthenUrlsFunction extends RichProcessFunction<RawUrl, RawUrl> {
+public class LengthenUrlsFunction extends ProcessFunction<RawUrl, RawUrl> {
 	static final Logger LOGGER = LoggerFactory.getLogger(LengthenUrlsFunction.class);
 	
 	private static final int MIN_THREAD_COUNT = 10;
