@@ -92,7 +92,7 @@ public class FocusedCrawlTest {
 			.setSiteMapParser(new SimpleSiteMapParser())
 			// You can increase this value from 5000 to say 100000 if you need time inside of a threaded
 			// executor before the cluster terminates.
-			.setMaxWaitTime(5000)
+			.setMaxWaitTime(10000)
 			.setDefaultCrawlDelay(0)
 			// Explicitly set parallelism so that it doesn't vary based on # of cores
 			.setParallelism(2)
