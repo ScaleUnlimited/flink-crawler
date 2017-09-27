@@ -2,6 +2,7 @@ package com.scaleunlimited.flinkcrawler.tools;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -25,7 +26,9 @@ import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDB;
 import com.scaleunlimited.flinkcrawler.crawldb.DefaultCrawlDBMerger;
+import com.scaleunlimited.flinkcrawler.crawldb.InMemoryCrawlDB;
 import com.scaleunlimited.flinkcrawler.fetcher.BaseHttpFetcherBuilder;
+import com.scaleunlimited.flinkcrawler.fetcher.SimpleHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.functions.CheckUrlWithRobotsFunction;
 import com.scaleunlimited.flinkcrawler.functions.CrawlDBFunction;
 import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
@@ -39,6 +42,8 @@ import com.scaleunlimited.flinkcrawler.functions.PldKeySelector;
 import com.scaleunlimited.flinkcrawler.functions.UrlKeySelector;
 import com.scaleunlimited.flinkcrawler.functions.ValidUrlsFilter;
 import com.scaleunlimited.flinkcrawler.parser.BasePageParser;
+import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
+import com.scaleunlimited.flinkcrawler.parser.SimpleSiteMapParser;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
@@ -46,12 +51,17 @@ import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.sources.BaseUrlSource;
+import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlLengthener;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlValidator;
+import com.scaleunlimited.flinkcrawler.urls.SimpleUrlLengthener;
+import com.scaleunlimited.flinkcrawler.urls.SimpleUrlNormalizer;
+import com.scaleunlimited.flinkcrawler.urls.SimpleUrlValidator;
 import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
 import com.scaleunlimited.flinkcrawler.utils.FlinkUtils;
 
+import crawlercommons.fetcher.http.UserAgent;
 import crawlercommons.robots.SimpleRobotRulesParser;
 import de.javakaffee.kryoserializers.UnmodifiableCollectionsSerializer;
 
@@ -89,32 +99,37 @@ public class CrawlTopology {
 
     public static class CrawlTopologyBuilder {
 
-        public static final int DEFAULT_PARALLELISM = -1;
+		private static final UserAgent INVALID_USER_AGENT = 
+			new UserAgent(	"DO NOT USE THIS USER AGENT (i.e., MAKE YOUR OWN)!", 
+							"flink-crawler@scaleunlimited.com", 
+							"https://github.com/ScaleUnlimited/flink-crawler/wiki/Crawler-Policy");
+
+		public static final int DEFAULT_PARALLELISM = -1;
 
         private StreamExecutionEnvironment _env;
         private String _jobName = "flink-crawler";
         private int _parallelism = DEFAULT_PARALLELISM;
         private long _maxWaitTime = 5000;
         private long _forceCrawlDelay = CrawlTool.DO_NOT_FORCE_CRAWL_DELAY;
-        private long _defaultCrawlDelay = 10 * 1000L;
+        private long _defaultCrawlDelay = 10_000L;
         
-        private BaseUrlSource _urlSource;
-        private FetchQueue _fetchQueue;
-        private BaseCrawlDB _crawlDB;
+        private BaseUrlSource _urlSource = new SeedUrlSource(makeDefaultSeedUrl());;
+        private FetchQueue _fetchQueue = new FetchQueue(10_000);
+        private BaseCrawlDB _crawlDB = new InMemoryCrawlDB();
         
-        private BaseHttpFetcherBuilder _robotsFetcherBuilder;
-        private SimpleRobotRulesParser _robotsParser;
+        private BaseHttpFetcherBuilder _robotsFetcherBuilder = new SimpleHttpFetcherBuilder(INVALID_USER_AGENT);
+        private SimpleRobotRulesParser _robotsParser = new SimpleRobotRulesParser();
 
-        private BaseUrlLengthener _urlLengthener;
-        private SinkFunction<ParsedUrl> _contentSink;
+        private BaseUrlLengthener _urlLengthener = new SimpleUrlLengthener();
+        private SinkFunction<ParsedUrl> _contentSink = new DiscardingSink<ParsedUrl>();
         private SinkFunction<String> _contentTextSink;
         private String _contentTextFilePathString;
-        private BaseUrlNormalizer _urlNormalizer;
-        private BaseUrlValidator _urlFilter;
-        private BaseHttpFetcherBuilder _pageFetcherBuilder;
-        private BaseHttpFetcherBuilder _siteMapFetcherBuilder;
-        private BasePageParser _pageParser;
-		private BasePageParser _siteMapParser;
+        private BaseUrlNormalizer _urlNormalizer = new SimpleUrlNormalizer();
+        private BaseUrlValidator _urlFilter = new SimpleUrlValidator();
+        private BaseHttpFetcherBuilder _pageFetcherBuilder = new SimpleHttpFetcherBuilder(INVALID_USER_AGENT);
+        private BaseHttpFetcherBuilder _siteMapFetcherBuilder = new SimpleHttpFetcherBuilder(INVALID_USER_AGENT);
+        private BasePageParser _pageParser = new SimplePageParser();
+		private BasePageParser _siteMapParser = new SimpleSiteMapParser();
 
 
         public CrawlTopologyBuilder(StreamExecutionEnvironment env) {
@@ -164,6 +179,13 @@ public class CrawlTopology {
         public CrawlTopologyBuilder setRobotsParser(SimpleRobotRulesParser robotsParser) {
         	_robotsParser = robotsParser;
             return this;
+        }
+        
+        public CrawlTopologyBuilder setUserAgent(UserAgent userAgent) {
+        	_pageFetcherBuilder.setUserAgent(userAgent);
+        	_siteMapFetcherBuilder.setUserAgent(userAgent);
+        	_robotsFetcherBuilder.setUserAgent(userAgent);
+        	return this;
         }
 
         public CrawlTopologyBuilder setPageFetcherBuilder(BaseHttpFetcherBuilder pageFetcherBuilder) {
@@ -231,6 +253,12 @@ public class CrawlTopology {
         public CrawlTopology build() {
             if (_parallelism != DEFAULT_PARALLELISM) {
             	_env.setParallelism(_parallelism);
+            }
+            
+            if	(	(_robotsFetcherBuilder.getUserAgent() == INVALID_USER_AGENT)
+        		||	(_siteMapFetcherBuilder.getUserAgent() == INVALID_USER_AGENT)
+            	||	(_pageFetcherBuilder.getUserAgent() == INVALID_USER_AGENT)) {
+            	throw new IllegalArgumentException("You must define your own UserAgent!");
             }
             
             // The Headers class in http-fetcher uses an unmodifiable list, which Kryo can't handle
@@ -491,4 +519,13 @@ public class CrawlTopology {
 		}
 
     }
+    
+	private static RawUrl makeDefaultSeedUrl() {
+		try {
+			return new RawUrl("http://www.scaleunlimited.com/");
+		} catch (MalformedURLException e) {
+			throw new RuntimeException("URL should parse just fine?");
+		}
+	}
+
 }
