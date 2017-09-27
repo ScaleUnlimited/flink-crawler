@@ -11,11 +11,6 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
@@ -76,8 +71,6 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
     private final AmazonS3 _s3Client;
     private final JsonParser _jsonParser;
     private final SegmentCache _cache;
-    private ExecutorService _executorService;
-    private volatile boolean _keepGoing;
     private final SecondaryIndexMap _secondaryIndexMap;
     
 	public CommonCrawlFetcher(AmazonS3 client, String crawlId, int maxThreads, int cacheSize, SecondaryIndexMap secondaryIndexMap) throws IOException {
@@ -89,20 +82,13 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 		_jsonParser = new JsonParser();
 		_cache = new SegmentCache(cacheSize);
 		
-	    _executorService = Executors.newFixedThreadPool(maxThreads);
-	    _keepGoing = true;
-
 	    _secondaryIndexMap = secondaryIndexMap;
 	}
 	
 	@Override
 	public void abort() {
-		// TODO abort all pending requests.
-		// If we have a threaded fetch queue, we can interrupt it, which should work
-		// because we can abort an S3 request. But might need to make it async, vs. sync client.
-		_keepGoing = false;
-		
-		// TODO do we need to wait until returning?
+		// TODO I guess we could try to abort any S3 requests, but they don't
+		// typically take very long to complete anyway.
 	}
 
 	@Override
@@ -117,37 +103,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
             }
             
             
-            Future<FetchedResult> result = _executorService.submit(new Callable<FetchedResult>() {
-
-				@Override
-				public FetchedResult call() throws Exception {
-		            // Can we re-use S3Client here (thread safe?)
-		            return fetch(realUrl, realUrl, payload, 0);
-				}
-			});
-
-            // FUTURE add timeout
-            while (!result.isDone()) {
-            	if (!_keepGoing) {
-            		result.cancel(true);
-            		throw new AbortedFetchException(url, AbortedFetchReason.INTERRUPTED);
-            	} else {
-            		try {
-						Thread.sleep(100);
-					} catch (InterruptedException e) {
-						_keepGoing = false;
-						Thread.currentThread().interrupt();
-					}
-            	}
-            }
-            
-            try {
-				return result.get();
-			} catch (InterruptedException e) {
-        		throw new AbortedFetchException(url, AbortedFetchReason.INTERRUPTED);
-			} catch (ExecutionException e) {
-				throw new UrlFetchException(url, e.getMessage());
-			}
+            return fetch(realUrl, realUrl, payload, 0);
         } catch (MalformedURLException e) {
             throw new UrlFetchException(url, e.getMessage());
         } catch (AbortedFetchException e) {
