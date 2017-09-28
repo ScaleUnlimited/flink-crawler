@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.streaming.api.functions.RichProcessFunction;
+import org.apache.flink.streaming.api.functions.ProcessFunction;
 import org.apache.flink.util.Collector;
 import org.apache.http.HttpStatus;
 import org.slf4j.Logger;
@@ -31,7 +31,7 @@ import crawlercommons.fetcher.http.BaseHttpFetcher;
 
 
 @SuppressWarnings("serial")
-public class FetchUrlsFunction extends RichProcessFunction<FetchUrl, Tuple2<CrawlStateUrl, FetchedUrl>> {
+public class FetchUrlsFunction extends ProcessFunction<FetchUrl, Tuple2<CrawlStateUrl, FetchedUrl>> {
     static final Logger LOGGER = LoggerFactory.getLogger(FetchUrlsFunction.class);
     
 	private static final int MIN_THREAD_COUNT = 10;
