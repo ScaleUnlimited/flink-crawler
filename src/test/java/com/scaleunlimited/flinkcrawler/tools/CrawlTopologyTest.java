@@ -4,6 +4,7 @@ import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.flink.api.common.JobExecutionResult;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -14,7 +15,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.crawldb.DrumCrawlDB;
-import com.scaleunlimited.flinkcrawler.crawldb.InMemoryCrawlDB;
 import com.scaleunlimited.flinkcrawler.fetcher.MockRobotsFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.SiteMapGraphFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.WebGraphFetcher;
@@ -118,7 +118,12 @@ public class CrawlTopologyTest {
 		File dotFile = new File(testDir, "topology.dot");
 		ct.printDotFile(dotFile);
 		
-		ct.execute();
+		JobExecutionResult jobExecutionResult = ct.execute();
+		
+		Map<String, Object> accumulatorResults = jobExecutionResult.getAllAccumulatorResults();
+		for (String key : accumulatorResults.keySet()) {
+			System.out.println(key + ":\t" + accumulatorResults.get(key));
+		}
 		
 		for (Tuple3<Class<?>, String, Map<String, String>> entry : UrlLogger.getLog()) {
 			LOGGER.info(String.format("%s: %s", entry.f0, entry.f1));

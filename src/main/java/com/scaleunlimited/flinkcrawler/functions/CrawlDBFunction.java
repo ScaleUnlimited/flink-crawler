@@ -12,6 +12,7 @@ import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDBMerger;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
+import com.scaleunlimited.flinkcrawler.utils.CounterUtils;
 import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
 import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
@@ -61,6 +62,7 @@ public class CrawlDBFunction extends ProcessFunction<CrawlStateUrl, FetchUrl> {
 		_fetchQueue.open();
 		
 		_crawlDB.open(_index, _fetchQueue, _merger);
+		
 	}
 	
 	@Override
@@ -73,6 +75,8 @@ public class CrawlDBFunction extends ProcessFunction<CrawlStateUrl, FetchUrl> {
 	public void processElement(CrawlStateUrl url, Context context, Collector<FetchUrl> collector) throws Exception {
 		UrlLogger.record(this.getClass(), url, FetchStatus.class.getSimpleName(), url.getStatus().toString());
 		
+		
+		CounterUtils.increment(getRuntimeContext(), url.getStatus());
 		// Add to our in-memory queue. If this is full, it might trigger a merge.
 		// TODO Start the merge in a thread, and use an in-memory array to hold URLs until the merge is done. If this array gets
 		// too big, then we need to block until we're done with the merge.
