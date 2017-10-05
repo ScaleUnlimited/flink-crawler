@@ -14,6 +14,9 @@ import crawlercommons.fetcher.http.UserAgent;
 @SuppressWarnings("serial")
 public abstract class BaseHttpFetcherBuilder implements Serializable {
 	
+	// TODO set timeout explicitly.
+	private static final int DEFAULT_FETCH_TIMEOUT = 10;
+	
 	// From BaseFetcher:
     protected Map<String, Integer> _maxContentSizes = new HashMap<String, Integer>();
     protected int _defaultMaxContentSize = BaseFetcher.DEFAULT_MAX_CONTENT_SIZE;
@@ -84,6 +87,10 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
      * builder was configured
      */
     public abstract BaseHttpFetcher build() throws Exception;
+    
+    public int getTimeoutInSeconds() {
+    	return DEFAULT_FETCH_TIMEOUT;
+    }
     
     /**
      * Helper method that {@link #build()} can use to configure a newly

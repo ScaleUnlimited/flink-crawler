@@ -21,7 +21,7 @@ public class ValidUrl extends BaseUrl implements IPayload {
 	private String _query;
 	
 	public ValidUrl() {
-		// Constructor so it's a valid POJO
+		super();
 	}
 	
 	public ValidUrl(String urlAsString) throws MalformedURLException {

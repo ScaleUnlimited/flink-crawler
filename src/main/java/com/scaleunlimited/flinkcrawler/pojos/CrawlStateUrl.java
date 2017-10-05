@@ -31,11 +31,11 @@ public class CrawlStateUrl extends ValidUrl {
 
 	private static final float MAX_FRACTIONAL_SCORE = (float)((short)0x0FFF);
 	
-	// all bits set in 4.12 format
+	// all bits set in 4.12 format for scores.
 	private static final float MAX_SCORE = 15.99975586f;
 			
 	// Data needed in-memory for CrawlDB merging
-	private FetchStatus _status;		// TODO make this an enum ?
+	private FetchStatus _status;
 	private long _statusTime;
 	private float _score;
 	private long _nextFetchTime;
@@ -66,6 +66,7 @@ public class CrawlStateUrl extends ValidUrl {
 	public FetchStatus getStatus() {
 		return _status;
 	}
+	
 	public void setStatus(FetchStatus status) {
 		_status = status;
 	}
@@ -106,6 +107,9 @@ public class CrawlStateUrl extends ValidUrl {
 		_statusTime = getStatusTime(value);
 		_score = getScore(value);
 		_nextFetchTime = getFetchTime(value);
+		
+		// A persisted URL is always validated.
+		// setUrlType(UrlType.VALIDATED);
 	}
 	
 	// TODO move into ByteUtils?

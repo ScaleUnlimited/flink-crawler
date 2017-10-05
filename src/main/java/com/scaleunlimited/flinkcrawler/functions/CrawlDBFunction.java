@@ -1,8 +1,8 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.apache.flink.api.common.functions.RuntimeContext;
-import org.apache.flink.configuration.ConfigOption;
-import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.RichProcessFunction;
 import org.apache.flink.util.Collector;
@@ -46,6 +46,9 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 	private transient int _parallelism;
 	private transient int _index;
 	
+	// True if merging would do anything.
+	private transient AtomicBoolean _addSinceMerge;
+	
 	public CrawlDBFunction(BaseCrawlDB crawlDB, BaseCrawlDBMerger merger, FetchQueue fetchQueue) {
 		_crawlDB = crawlDB;
 		_merger = merger;
@@ -59,6 +62,8 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 		RuntimeContext context = getRuntimeContext();
 		_parallelism = context.getNumberOfParallelSubtasks();
 		_index = context.getIndexOfThisSubtask();
+		
+		_addSinceMerge = new AtomicBoolean(false);
 		
 		_fetchQueue.open();
 		
@@ -79,9 +84,13 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 		// TODO Start the merge in a thread, and use an in-memory array to hold URLs until the merge is done. If this array gets
 		// too big, then we need to block until we're done with the merge.
 		synchronized (_crawlDB) {
+			
 			// TODO trigger a merge when the _fetchQueue hits a low water mark, but only if we have something to merge, of course.
 			if (_crawlDB.add(url)) {
 				_crawlDB.merge();
+				_addSinceMerge.set(false);
+			} else {
+				_addSinceMerge.set(true);
 			}
 		}
 		
@@ -103,16 +112,16 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 		}
 		
 		synchronized (_crawlDB) {
-			if (_fetchQueue.isEmpty()) {
+			if (_fetchQueue.isEmpty() && _addSinceMerge.get()) {
 				// We don't have any active URLs left.
 				// Call the CrawlDB to trigger a merge.
 				LOGGER.debug("CrawlDBFunction merging crawlDB");
 				_crawlDB.merge();
+				_addSinceMerge.set(false);
 			}
 		}
 
 		context.timerService().registerProcessingTimeTimer(context.timerService().currentProcessingTime() + QUEUE_CHECK_DELAY);
 	}
-
 
 }

@@ -1,19 +1,20 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
 import java.net.MalformedURLException;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.streaming.api.functions.RichProcessFunction;
-import org.apache.flink.util.Collector;
+import org.apache.flink.streaming.api.functions.async.RichAsyncFunction;
+import org.apache.flink.streaming.api.functions.async.collector.AsyncCollector;
 import org.apache.http.HttpStatus;
 
 import com.scaleunlimited.flinkcrawler.fetcher.BaseHttpFetcherBuilder;
@@ -30,10 +31,9 @@ import crawlercommons.robots.BaseRobotRules;
 import crawlercommons.robots.SimpleRobotRulesParser;
 
 @SuppressWarnings("serial")
-public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> {
+public class CheckUrlWithRobotsFunction extends RichAsyncFunction<FetchUrl, Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> {
 
 	// TODO pick good time for this
-	private static final long QUEUE_CHECK_DELAY = 10;
 	protected static final long DEFAULT_RETRY_INTERVAL_MS = 100_000 * 1000L;
 
 	private static final int MAX_QUEUED_URLS = 1000;
@@ -42,19 +42,18 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 	private static final int MAX_THREAD_COUNT = 100;
 
 	private BaseHttpFetcherBuilder _fetcherBuilder;
-	private BaseHttpFetcher _fetcher;
 	private SimpleRobotRulesParser _parser;
 	private long _forceCrawlDelay;
 	private long _defaultCrawlDelay;
 	
 	private transient ThreadPoolExecutor _executor;
+	private transient BaseHttpFetcher _fetcher;
 
 	// TODO we need a map from domain to sitemap & refresh time, maintained here.
 	
 	// FUTURE checkpoint the rules.
 	// FUTURE expire the rules.
 	private transient Map<String, BaseRobotRules> _rules;
-	private transient ConcurrentLinkedQueue<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> _output;
 	
 	public CheckUrlWithRobotsFunction(BaseHttpFetcherBuilder fetcherBuider, SimpleRobotRulesParser parser, long forceCrawlDelay, long defaultCrawlDelay) {
 		_fetcherBuilder = fetcherBuider;
@@ -68,7 +67,6 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 		super.open(parameters);
 		
 		_fetcher = _fetcherBuilder.build();
-		_output = new ConcurrentLinkedQueue<>();
 		_rules = new ConcurrentHashMap<>();
 		
 		BlockingQueue<Runnable> workQueue = new ArrayBlockingQueue<>(MAX_QUEUED_URLS);
@@ -79,16 +77,58 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 	public void close() throws Exception {
 		_executor.shutdown();
 		
-		// TODO get timeout from fetcher
-		if (!_executor.awaitTermination(1, TimeUnit.SECONDS)) {
+		if (!_executor.awaitTermination(_fetcherBuilder.getTimeoutInSeconds(), TimeUnit.SECONDS)) {
 			// TODO handle timeout.
 		}
 		
 		super.close();
 	}
 	
+	private Collection<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> invalidUrl(FetchUrl url) {
+		long now = System.currentTimeMillis();
+		CrawlStateUrl crawlStateUrl = new CrawlStateUrl(url, 
+														FetchStatus.ERROR_INVALID_URL,
+														now,
+														url.getScore(), 
+														Long.MAX_VALUE);
+		return Collections.singleton(new Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>(crawlStateUrl, null, null));
+	}
+
+	private Collection<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> processUrl(BaseRobotRules rules, FetchUrl url) {
+		if (rules.isAllowed(url.getUrl())) {
+			// Add the crawl delay to the url, so that it can be used to do delay limiting in the fetcher
+			long crawlDelay = _forceCrawlDelay;
+			if (_forceCrawlDelay == CrawlTool.DO_NOT_FORCE_CRAWL_DELAY) {
+				crawlDelay = rules.getCrawlDelay();
+				if (crawlDelay == BaseRobotRules.UNSET_CRAWL_DELAY) {
+					crawlDelay = _defaultCrawlDelay;
+				}
+			}			
+			url.setCrawlDelay(crawlDelay);
+			return Collections.singleton(new Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>(null, url, null));
+		} else {
+			// FUTURE use time when robot rules expire to set the refetch time.
+			long now = System.currentTimeMillis();
+			CrawlStateUrl crawlStateUrl = new CrawlStateUrl(url,
+															rules.isDeferVisits() ? FetchStatus.SKIPPED_DEFERRED : FetchStatus.SKIPPED_BLOCKED, 
+															now,
+															url.getScore(), 
+															now + DEFAULT_RETRY_INTERVAL_MS);
+			return Collections.singleton(new Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>(crawlStateUrl, null, null));
+		}
+	}
+
+	private String makeRobotsKey(FetchUrl url) throws MalformedURLException {
+		int port = url.getPort();
+		if (port == -1) {
+			return String.format("%s://%s", url.getProtocol(), url.getHostname());
+		} else {
+			return String.format("%s://%s:%d", url.getProtocol(), url.getHostname(), port);
+		}
+	}
+
 	@Override
-	public void processElement(final FetchUrl url, Context context, Collector<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> collector) throws Exception {
+	public void asyncInvoke(FetchUrl url, AsyncCollector<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> collector) throws Exception {
 		UrlLogger.record(this.getClass(), url);
 		
 		final String robotsKey;
@@ -117,7 +157,7 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 				long robotFetchRetryTime = System.currentTimeMillis();
 				BaseRobotRules rules = _rules.get(robotsKey);
 				if (rules != null) {
-					_output.add(processUrl(rules, url));
+					collector.collect(processUrl(rules, url));
 					return;
 				}
 				
@@ -141,73 +181,19 @@ public class CheckUrlWithRobotsFunction extends RichProcessFunction<FetchUrl, Tu
 					if (sitemaps != null && sitemaps.size() > 0) {
 						// Output the sitemap urls in the tuple3
 						for (String sitemap : sitemaps) {
-							_output.add(new Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>(null, null, new FetchUrl(new ValidUrl(sitemap))));
+							collector.collect(Collections.singleton(new Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>(null, null, new FetchUrl(new ValidUrl(sitemap)))));
 						}
 					} else {
 						// TODO use robotFetchRetryTime to set up when we want to purge our rules
-							_output.add(processUrl(rules, url));
+						collector.collect(processUrl(rules, url));
 					}
+					
 					_rules.put(makeRobotsKey(url), rules);
 				} catch (MalformedURLException e) {
-					_output.add(invalidUrl(url));
+					collector.collect(invalidUrl(url));
 				}
 			}
 		});
-		
-		// Every time we get called, we'll set up a new timer that fires
-		context.timerService().registerProcessingTimeTimer(context.timerService().currentProcessingTime() + QUEUE_CHECK_DELAY);
-	}
-
-	private Tuple3<CrawlStateUrl, FetchUrl, FetchUrl> invalidUrl(FetchUrl url) {
-		long now = System.currentTimeMillis();
-		CrawlStateUrl crawlStateUrl = new CrawlStateUrl(url, 
-														FetchStatus.ERROR_INVALID_URL,
-														now,
-														url.getScore(), 
-														Long.MAX_VALUE);
-		return new Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>(crawlStateUrl, null, null);
-	}
-
-	private Tuple3<CrawlStateUrl, FetchUrl, FetchUrl> processUrl(BaseRobotRules rules, FetchUrl url) {
-		if (rules.isAllowed(url.getUrl())) {
-			// Add the crawl delay to the url, so that it can be used to do delay limiting in the fetcher
-			long crawlDelay = _forceCrawlDelay;
-			if (_forceCrawlDelay == CrawlTool.DO_NOT_FORCE_CRAWL_DELAY) {
-				crawlDelay = rules.getCrawlDelay();
-				if (crawlDelay == BaseRobotRules.UNSET_CRAWL_DELAY) {
-					crawlDelay = _defaultCrawlDelay;
-				}
-			}			
-			url.setCrawlDelay(crawlDelay);
-			return new Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>(null, url, null);
-		} else {
-			// FUTURE use time when robot rules expire to set the refetch time.
-			long now = System.currentTimeMillis();
-			CrawlStateUrl crawlStateUrl = new CrawlStateUrl(url,
-															rules.isDeferVisits() ? FetchStatus.SKIPPED_DEFERRED : FetchStatus.SKIPPED_BLOCKED, 
-															now,
-															url.getScore(), 
-															now + DEFAULT_RETRY_INTERVAL_MS);
-			return new Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>(crawlStateUrl, null, null);
-		}
-	}
-
-	private String makeRobotsKey(FetchUrl url) throws MalformedURLException {
-		int port = url.getPort();
-		if (port == -1) {
-			return String.format("%s://%s", url.getProtocol(), url.getHostname());
-		} else {
-			return String.format("%s://%s:%d", url.getProtocol(), url.getHostname(), port);
-		}
-	}
-
-	@Override
-	public void onTimer(long time, OnTimerContext context, Collector<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> collector) throws Exception {
-		if (!_output.isEmpty()) {
-			collector.collect(_output.remove());
-		}
-
-		context.timerService().registerProcessingTimeTimer(context.timerService().currentProcessingTime() + QUEUE_CHECK_DELAY);
 	}
 
 }

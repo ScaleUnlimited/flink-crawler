@@ -8,7 +8,6 @@ import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDBMerger.MergeResult;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
-import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
 import com.scaleunlimited.flinkcrawler.utils.FetchQueue.UrlState;
 
@@ -85,7 +84,6 @@ public class InMemoryCrawlDB extends BaseCrawlDB {
 		synchronized (_crawlState) {
 			for (String url : _crawlState.keySet()) {
 				CrawlStateUrl curState = _crawlState.get(url);
-				curState.getValue(_curValue);
 				UrlState urlState = _fetchQueue.add(curState);
 				
 				if (urlState == UrlState.ACTIVE) {
