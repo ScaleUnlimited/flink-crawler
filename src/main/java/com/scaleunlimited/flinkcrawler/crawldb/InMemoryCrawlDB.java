@@ -8,7 +8,6 @@ import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDBMerger.MergeResult;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
-import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
 import com.scaleunlimited.flinkcrawler.utils.FetchQueue.UrlState;
 
