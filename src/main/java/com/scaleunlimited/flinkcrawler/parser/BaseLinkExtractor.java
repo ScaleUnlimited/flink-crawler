@@ -42,10 +42,10 @@ public abstract class BaseLinkExtractor extends DefaultHandler implements Serial
             add("embed");
         }};
         
-        public static final Set<String> DEFAULT_LINK_ATTRIBUTE_TYPES =
-            new HashSet<String>() {{
-                add("href");
-            }};
+    public static final Set<String> DEFAULT_LINK_ATTRIBUTE_TYPES =
+        new HashSet<String>() {{
+            add("href");
+        }};
             
     public static final Set<String> ALL_LINK_ATTRIBUTE_TYPES =
         new HashSet<String>() {{

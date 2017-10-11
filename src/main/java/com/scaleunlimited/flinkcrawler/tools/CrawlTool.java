@@ -5,24 +5,17 @@ import java.net.MalformedURLException;
 import java.net.URL;
 
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.http.HttpStatus;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 
-import com.scaleunlimited.flinkcrawler.crawldb.InMemoryCrawlDB;
 import com.scaleunlimited.flinkcrawler.fetcher.BaseHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.fetcher.SimpleHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.fetcher.commoncrawl.CommonCrawlFetcherBuilder;
-import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
-import com.scaleunlimited.flinkcrawler.parser.SimpleSiteMapParser;
-import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
 import com.scaleunlimited.flinkcrawler.tools.CrawlTopology.CrawlTopologyBuilder;
-import com.scaleunlimited.flinkcrawler.urls.SimpleUrlLengthener;
-import com.scaleunlimited.flinkcrawler.urls.SimpleUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlValidator;
 
 import crawlercommons.domains.PaidLevelDomain;
@@ -32,7 +25,6 @@ import crawlercommons.fetcher.Payload;
 import crawlercommons.fetcher.http.BaseHttpFetcher;
 import crawlercommons.fetcher.http.SimpleHttpFetcher;
 import crawlercommons.fetcher.http.UserAgent;
-import crawlercommons.robots.SimpleRobotRulesParser;
 import crawlercommons.sitemaps.SiteMapParser;
 import crawlercommons.util.Headers;
 
@@ -263,16 +255,9 @@ public class CrawlTool {
 			CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
 //				.setMaxWaitTime(100000)
 				.setUrlSource(new SeedUrlSource(options.getSeedUrlsFilename(), RawUrl.DEFAULT_SCORE))
-				.setCrawlDB(new InMemoryCrawlDB())
-				.setUrlLengthener(new SimpleUrlLengthener())
 				.setRobotsFetcherBuilder(robotsFetcherBuilder)
-				.setRobotsParser(new SimpleRobotRulesParser())
-				.setPageParser(new SimplePageParser())
-				.setContentSink(new DiscardingSink<ParsedUrl>())
-				.setUrlNormalizer(new SimpleUrlNormalizer())
 				.setUrlFilter(urlValidator)
 				.setSiteMapFetcherBuilder(siteMapFetcherBuilder)
-				.setSiteMapParser(new SimpleSiteMapParser())
 				.setPageFetcherBuilder(pageFetcherBuilder)
 				.setForceCrawlDelay(options.getForceCrawlDelay())
 				.setDefaultCrawlDelay(options.getDefaultCrawlDelay())

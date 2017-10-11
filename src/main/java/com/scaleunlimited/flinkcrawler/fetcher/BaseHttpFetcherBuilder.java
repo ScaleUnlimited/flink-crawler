@@ -91,6 +91,14 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
     public int getTimeoutInSeconds() {
     	return DEFAULT_FETCH_TIMEOUT;
     }
+
+    public UserAgent getUserAgent() {
+    	return _userAgent;
+    }
+    
+    public void setUserAgent(UserAgent userAgent) {
+    	_userAgent = userAgent;
+    }
     
     /**
      * Helper method that {@link #build()} can use to configure a newly

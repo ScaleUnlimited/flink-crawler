@@ -1,7 +1,7 @@
 package com.scaleunlimited.flinkcrawler.parser;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
@@ -11,10 +11,22 @@ import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
 
 @SuppressWarnings("serial")
 public class SimpleLinkExtractor extends BaseLinkExtractor {
-    private boolean _inHead;
+    private static final int DEFAULT_MAX_EXTRACTED_LINKS_SIZE = 100;
+    
+	private boolean _inHead;
     private boolean _skipLinks;
-    private List<ExtractedUrl> _extractedUrls = new ArrayList<ExtractedUrl>();
+    private int _maxExtractedLinksSize = DEFAULT_MAX_EXTRACTED_LINKS_SIZE;
+    
+    private Set<ExtractedUrl> _extractedUrls = new HashSet<ExtractedUrl>();
 
+    public SimpleLinkExtractor() {
+    	this(DEFAULT_MAX_EXTRACTED_LINKS_SIZE);
+	}
+    
+    public SimpleLinkExtractor(int maxExtractedLinksSize) {
+    	_maxExtractedLinksSize = maxExtractedLinksSize;
+	}
+    
     @Override
     public void startElement(String uri, String localName, String qName, Attributes attributes) throws org.xml.sax.SAXException {
         super.startElement(uri, localName, qName, attributes);
@@ -59,7 +71,9 @@ public class SimpleLinkExtractor extends BaseLinkExtractor {
     @Override
     public void addLink(ExtractedUrl link) {
         if (!_skipLinks) {
-            _extractedUrls.add(link);
+        	if (_extractedUrls.size() <= _maxExtractedLinksSize) {
+        		_extractedUrls.add(link);
+        	} 
         }
     }
 
