@@ -46,7 +46,9 @@ import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
+import com.scaleunlimited.flinkcrawler.pojos.TicklerTuple;
 import com.scaleunlimited.flinkcrawler.sources.BaseUrlSource;
+import com.scaleunlimited.flinkcrawler.sources.TicklerSource;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlLengthener;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlValidator;
@@ -95,6 +97,7 @@ public class CrawlTopology {
         private StreamExecutionEnvironment _env;
         private String _jobName = "flink-crawler";
         private int _parallelism = DEFAULT_PARALLELISM;
+        private long _maxDuration = TicklerSource.NO_MAX_DURATION;
         private long _maxWaitTime = 5000;
         private long _forceCrawlDelay = CrawlTool.DO_NOT_FORCE_CRAWL_DELAY;
         private long _defaultCrawlDelay = 10 * 1000L;
@@ -228,6 +231,12 @@ public class CrawlTopology {
             return this;
         }
 
+		public CrawlTopologyBuilder setMaxDuration(int maxDuration) {
+			_maxDuration = maxDuration;
+			
+			return this;
+		}
+
         @SuppressWarnings("serial")
         public CrawlTopology build() {
             if (_parallelism != DEFAULT_PARALLELISM) {
@@ -241,6 +250,8 @@ public class CrawlTopology {
             DataStream<RawUrl> seedUrls = _env.addSource(_urlSource).name("Seed urls source");
             DataStream<CrawlStateUrl> cleanedUrls = cleanUrls(seedUrls);
             
+            DataStream<TicklerTuple> tickler = _env.addSource(new TicklerSource(_maxDuration)).name("tickler");
+            
             // Update the Crawl DB, then run URLs it emits through robots filtering.
             
             // FUTURE use something like double the fetch timeout here? or add fetch timeout to parse timeout? Maybe we
@@ -251,7 +262,8 @@ public class CrawlTopology {
             IterativeStream<CrawlStateUrl> crawlDbIteration = cleanedUrls.iterate(_maxWaitTime);
             KeyedStream<FetchUrl, String> preRobotsUrls = crawlDbIteration
             		.keyBy(new PldKeySelector<CrawlStateUrl>())
-            		.process(new CrawlDBFunction(_crawlDB, new DefaultCrawlDBMerger(), _fetchQueue))
+            		.connect(tickler)
+            		.flatMap(new CrawlDBFunction(_crawlDB, new DefaultCrawlDBMerger(), _fetchQueue))
             		.name("CrawlDBFunction")
             		.keyBy(new PldKeySelector<FetchUrl>());
             
@@ -318,7 +330,6 @@ public class CrawlTopology {
             		.map(new OutlinkToStateUrlFunction())
             		.name("OutlinkToStateUrlFunction");
 
-            
             // Split off rejected URLs. These will get unioned (merged) with the status of URLs that we
             // attempt to fetch, and then fed back into the crawl DB via the inner iteration.
             DataStream<CrawlStateUrl> robotBlockedUrls = blockedOrPassedOrSitemapUrls.select("blocked")
@@ -507,6 +518,7 @@ public class CrawlTopology {
                     });
 			return outlinksOrContent;
 		}
+
 
     }
 }

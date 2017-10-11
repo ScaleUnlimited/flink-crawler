@@ -4,7 +4,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.flink.api.common.functions.RuntimeContext;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.streaming.api.functions.RichProcessFunction;
+import org.apache.flink.streaming.api.functions.co.RichCoFlatMapFunction;
 import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,6 +14,7 @@ import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDBMerger;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
+import com.scaleunlimited.flinkcrawler.pojos.TicklerTuple;
 import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
 import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
@@ -22,20 +23,10 @@ import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
  * When the in-memory structure is too full, or we need to generate more URLs to fetch, then we merge
  * with an on-disk version; during that process we archive low-scoring URLs and add the highest-scoring
  * URLs to the fetch queue.
- * 
- * We take as input two streams - one is fed by the SeedUrlSource, plus a loop-back Iteration, and this
- * contains actual CrawlStateUrl tuples. The other stream is a timed "trigger" stream that regularly
- * generates an ignorable Tuple that we .
- * 
  */
 @SuppressWarnings("serial")
-public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl> {
+public class CrawlDBFunction extends RichCoFlatMapFunction<CrawlStateUrl, TicklerTuple, FetchUrl> {
     static final Logger LOGGER = LoggerFactory.getLogger(CrawlDBFunction.class);
-    
-	// TODO pick good time for this
-	private static final long QUEUE_CHECK_DELAY = 100L;
-
-	private static final int URLS_PER_TIMER = 1000;
 
 	private BaseCrawlDB _crawlDB;
 	private BaseCrawlDBMerger _merger;
@@ -44,7 +35,7 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 	private final FetchQueue _fetchQueue;
 	
 	private transient int _parallelism;
-	private transient int _index;
+	private transient int _partition;
 	
 	// True if merging would do anything.
 	private transient AtomicBoolean _addSinceMerge;
@@ -61,13 +52,13 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 		
 		RuntimeContext context = getRuntimeContext();
 		_parallelism = context.getNumberOfParallelSubtasks();
-		_index = context.getIndexOfThisSubtask();
+		_partition = context.getIndexOfThisSubtask();
 		
 		_addSinceMerge = new AtomicBoolean(false);
 		
 		_fetchQueue.open();
 		
-		_crawlDB.open(_index, _fetchQueue, _merger);
+		_crawlDB.open(_partition, _fetchQueue, _merger);
 	}
 	
 	@Override
@@ -77,7 +68,7 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 	}
 
 	@Override
-	public void processElement(CrawlStateUrl url, Context context, Collector<FetchUrl> collector) throws Exception {
+	public void flatMap1(CrawlStateUrl url, Collector<FetchUrl> collector) throws Exception {
 		UrlLogger.record(this.getClass(), url, FetchStatus.class.getSimpleName(), url.getStatus().toString());
 		
 		// Add to our in-memory queue. If this is full, it might trigger a merge.
@@ -93,24 +84,17 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 				_addSinceMerge.set(true);
 			}
 		}
-		
-		// Every time we get called, we'll set up a new timer that fires, which will call the onTimer() method to emit URLs.
-		context.timerService().registerProcessingTimeTimer(context.timerService().currentProcessingTime() + QUEUE_CHECK_DELAY);
 	}
-	
-	@Override
-	public void onTimer(long time, OnTimerContext context, Collector<FetchUrl> collector) throws Exception {
-		for (int i = 0; i < URLS_PER_TIMER; i++) {
-			FetchUrl url = _fetchQueue.poll();
 
-			if (url != null) {
-				LOGGER.debug(String.format("CrawlDBFunction emitting URL %s to fetch (partition %d of %d)", url, _index, _parallelism));
-				collector.collect(url);
-			} else {
-				break;
-			}
+	@Override
+	public void flatMap2(TicklerTuple tickler, Collector<FetchUrl> collector) throws Exception {
+		FetchUrl url = _fetchQueue.poll();
+
+		if (url != null) {
+			LOGGER.debug(String.format("CrawlDBFunction emitting URL %s to fetch (partition %d of %d)", url, _partition, _parallelism));
+			collector.collect(url);
 		}
-		
+
 		synchronized (_crawlDB) {
 			if (_fetchQueue.isEmpty() && _addSinceMerge.get()) {
 				// We don't have any active URLs left.
@@ -120,8 +104,6 @@ public class CrawlDBFunction extends RichProcessFunction<CrawlStateUrl, FetchUrl
 				_addSinceMerge.set(false);
 			}
 		}
-
-		context.timerService().registerProcessingTimeTimer(context.timerService().currentProcessingTime() + QUEUE_CHECK_DELAY);
 	}
 
 }

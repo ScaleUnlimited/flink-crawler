@@ -94,6 +94,7 @@ public class FocusedCrawlTest {
 			// executor before the cluster terminates.
 			.setMaxWaitTime(5000)
 			.setDefaultCrawlDelay(0)
+			.setMaxDuration(10_000)
 			// Explicitly set parallelism so that it doesn't vary based on # of cores
 			.setParallelism(2)
 			.setPageFetcherBuilder(new WebGraphFetcher.WebGraphFetcherBuilder(new WebGraphFetcher(graph)))
