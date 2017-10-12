@@ -71,6 +71,8 @@ public class CrawlDBFunction extends RichCoFlatMapFunction<CrawlStateUrl, Tickle
 	public void flatMap1(CrawlStateUrl url, Collector<FetchUrl> collector) throws Exception {
 		UrlLogger.record(this.getClass(), url, FetchStatus.class.getSimpleName(), url.getStatus().toString());
 		
+		LOGGER.debug(String.format("CrawlDBFunction processing URL %s (partition %d of %d)", url, _partition, _parallelism));
+
 		// Add to our in-memory queue. If this is full, it might trigger a merge.
 		// TODO Start the merge in a thread, and use an in-memory array to hold URLs until the merge is done. If this array gets
 		// too big, then we need to block until we're done with the merge.
@@ -78,6 +80,7 @@ public class CrawlDBFunction extends RichCoFlatMapFunction<CrawlStateUrl, Tickle
 			
 			// TODO trigger a merge when the _fetchQueue hits a low water mark, but only if we have something to merge, of course.
 			if (_crawlDB.add(url)) {
+				LOGGER.debug("CrawlDBFunction merging crawlDB");
 				_crawlDB.merge();
 				_addSinceMerge.set(false);
 			} else {

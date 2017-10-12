@@ -4,9 +4,9 @@ import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.flink.api.common.JobSubmissionResult;
 import org.apache.flink.api.java.tuple.Tuple3;
-import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
-import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.environment.AsyncLocalStreamEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.util.FileUtils;
 import org.junit.Test;
@@ -47,7 +47,7 @@ public class CrawlTopologyTest {
 	public void test() throws Exception {
 		UrlLogger.clear();
 		
-		LocalStreamEnvironment env = StreamExecutionEnvironment.createLocalEnvironment();
+		AsyncLocalStreamEnvironment env = new AsyncLocalStreamEnvironment();
 
 		SimpleUrlNormalizer normalizer = new SimpleUrlNormalizer();
 		SimpleWebGraph graph = new SimpleWebGraph(normalizer)
@@ -106,7 +106,7 @@ public class CrawlTopologyTest {
 			.setSiteMapParser(new SimpleSiteMapParser())
 			// You can increase this value from 5000 to say 100000 if you need time inside of a threaded
 			// executor before the cluster terminates.
-			.setMaxWaitTime(5000)
+			.setMaxWaitTime(4000)
 			.setDefaultCrawlDelay(0)
 			.setMaxDuration(10_000)
 			// Explicitly set parallelism so that it doesn't vary based on # of cores
@@ -118,7 +118,17 @@ public class CrawlTopologyTest {
 		File dotFile = new File(testDir, "topology.dot");
 		ct.printDotFile(dotFile);
 		
-		ct.execute();
+		JobSubmissionResult result = ct.executeAsync();
+		long endTime = System.currentTimeMillis() + 20_000;
+		while (System.currentTimeMillis() < endTime) {
+			if (result.isJobExecutionResult()) {
+				System.out.println(result.getJobExecutionResult().getAllAccumulatorResults());
+				break;
+			}
+			
+			Thread.sleep(1000L);
+		}
+		ct.stop();
 		
 		for (Tuple3<Class<?>, String, Map<String, String>> entry : UrlLogger.getLog()) {
 			LOGGER.info(String.format("%s: %s", entry.f0, entry.f1));

@@ -30,7 +30,6 @@ import crawlercommons.fetcher.FetchedResult;
 import crawlercommons.fetcher.http.BaseHttpFetcher;
 
 
-
 @SuppressWarnings("serial")
 public class FetchUrlsFunction extends RichAsyncFunction<FetchUrl, Tuple2<CrawlStateUrl, FetchedUrl>> {
     static final Logger LOGGER = LoggerFactory.getLogger(FetchUrlsFunction.class);

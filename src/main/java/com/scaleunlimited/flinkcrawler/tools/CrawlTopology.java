@@ -11,6 +11,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.flink.api.common.JobExecutionResult;
+import org.apache.flink.api.common.JobSubmissionResult;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
@@ -21,6 +22,7 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.IterativeStream;
 import org.apache.flink.streaming.api.datastream.KeyedStream;
 import org.apache.flink.streaming.api.datastream.SplitStream;
+import org.apache.flink.streaming.api.environment.AsyncLocalStreamEnvironment;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
@@ -100,6 +102,24 @@ public class CrawlTopology {
         return _env.execute(_jobName);
     }
 
+    public JobSubmissionResult executeAsync() throws Exception {
+    	if (!(_env instanceof AsyncLocalStreamEnvironment)) {
+    		throw new IllegalStateException("StreamExecutionEnvironment must be AsyncLocalStreamEnvironment for async execution");
+    	}
+    	
+    	AsyncLocalStreamEnvironment env = (AsyncLocalStreamEnvironment)_env;
+    	return env.executeAsync(_jobName);
+    }
+    
+    public void stop() throws Exception {
+    	if (!(_env instanceof AsyncLocalStreamEnvironment)) {
+    		throw new IllegalStateException("StreamExecutionEnvironment must be AsyncLocalStreamEnvironment for async execution");
+    	}
+    	
+    	AsyncLocalStreamEnvironment env = (AsyncLocalStreamEnvironment)_env;
+    	env.stop();
+    }
+    
     public static class CrawlTopologyBuilder {
 
 		private static final UserAgent INVALID_USER_AGENT = 
@@ -278,15 +298,13 @@ public class CrawlTopology {
             DataStream<RawUrl> seedUrls = _env.addSource(_urlSource).name("Seed urls source");
             DataStream<CrawlStateUrl> cleanedUrls = cleanUrls(seedUrls);
             
-            DataStream<TicklerTuple> tickler = _env.addSource(new TicklerSource(_maxDuration)).name("tickler");
+            DataStream<TicklerTuple> tickler = _env.addSource(new TicklerSource(_maxDuration)).name("Tickler source");
             
             // Update the Crawl DB, then run URLs it emits through robots filtering.
             
             // FUTURE use something like double the fetch timeout here? or add fetch timeout to parse timeout? Maybe we
             // need to be able to ask each operation how long it might take, and use that. Note that we'd also need to
             // worry about a CrawlDB full merge causing us to time out, unless that's run as a background thread.
-            // Easiest might be for now to let the caller set this, so for normal testing this is something very short,
-            // but we crank it up under production.
             IterativeStream<CrawlStateUrl> crawlDbIteration = cleanedUrls.iterate(_maxWaitTime);
             KeyedStream<FetchUrl, String> preRobotsUrls = crawlDbIteration
             		.keyBy(new PldKeySelector<CrawlStateUrl>())

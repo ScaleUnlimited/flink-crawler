@@ -1,5 +1,6 @@
 package com.scaleunlimited.flinkcrawler.sources;
 
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.source.RichParallelSourceFunction;
 
 import com.scaleunlimited.flinkcrawler.pojos.TicklerTuple;
@@ -12,17 +13,25 @@ public class TicklerSource extends RichParallelSourceFunction<TicklerTuple> {
 	private static final long TICKLE_INTERVAL = 100L;
 	
 	private volatile boolean _keepRunning = true;
-	private final long _endTime;
+	private long _maxDuration;
+	
+	private transient long _endTime;
 	
 	public TicklerSource(long maxDuration) {
-		if (maxDuration == NO_MAX_DURATION) {
-			_endTime = Long.MAX_VALUE;
-		} else {
-			_endTime = System.currentTimeMillis() + maxDuration;
-		}
+		_maxDuration = maxDuration;
 	}
 
-
+	@Override
+	public void open(Configuration parameters) throws Exception {
+		super.open(parameters);
+		
+		if (_maxDuration == NO_MAX_DURATION) {
+			_endTime = Long.MAX_VALUE;
+		} else {
+			_endTime = System.currentTimeMillis() + _maxDuration;
+		}
+	}
+	
 	@Override
 	public void cancel() {
 		_keepRunning = false;

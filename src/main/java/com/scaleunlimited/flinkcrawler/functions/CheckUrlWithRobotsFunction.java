@@ -1,6 +1,7 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
 import java.net.MalformedURLException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -16,6 +17,8 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.async.RichAsyncFunction;
 import org.apache.flink.streaming.api.functions.async.collector.AsyncCollector;
 import org.apache.http.HttpStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.fetcher.BaseHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
@@ -30,8 +33,21 @@ import crawlercommons.fetcher.http.BaseHttpFetcher;
 import crawlercommons.robots.BaseRobotRules;
 import crawlercommons.robots.SimpleRobotRulesParser;
 
+/**
+ * We get passed a URL to fetch, that we check against the domain's robots.txt rules. The resulting Tuple3 will
+ * have only one of the three fields set to a none-null value, based on the result (and optional extraction of
+ * sitemap URLs):
+ * 
+ * Blocked: first field (CrawlStateUrl) is set to a blocked by robots status
+ * Allowed: second field (FetchUrl) is set to be the same as the incoming FetchUrl
+ * Sitemap: third field (FetchUrl) is set to the sitemap URL. There can be multiple sitemaps, in which case the
+ *          Collection we pass to the collector will have multiple Tuple3<> values. Sitemap URLs that are invalid
+ *          are logged and dropped.
+ *
+ */
 @SuppressWarnings("serial")
 public class CheckUrlWithRobotsFunction extends RichAsyncFunction<FetchUrl, Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> {
+    static final Logger LOGGER = LoggerFactory.getLogger(CheckUrlWithRobotsFunction.class);
 
 	// TODO pick good time for this
 	protected static final long DEFAULT_RETRY_INTERVAL_MS = 100_000 * 1000L;
@@ -84,16 +100,6 @@ public class CheckUrlWithRobotsFunction extends RichAsyncFunction<FetchUrl, Tupl
 		super.close();
 	}
 	
-	private Collection<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> invalidUrl(FetchUrl url) {
-		long now = System.currentTimeMillis();
-		CrawlStateUrl crawlStateUrl = new CrawlStateUrl(url, 
-														FetchStatus.ERROR_INVALID_URL,
-														now,
-														url.getScore(), 
-														Long.MAX_VALUE);
-		return Collections.singleton(new Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>(crawlStateUrl, null, null));
-	}
-
 	private Collection<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> processUrl(BaseRobotRules rules, FetchUrl url) {
 		if (rules.isAllowed(url.getUrl())) {
 			// Add the crawl delay to the url, so that it can be used to do delay limiting in the fetcher
@@ -118,12 +124,12 @@ public class CheckUrlWithRobotsFunction extends RichAsyncFunction<FetchUrl, Tupl
 		}
 	}
 
-	private String makeRobotsKey(FetchUrl url) throws MalformedURLException {
+	private String makeRobotsKey(FetchUrl url) {
 		int port = url.getPort();
 		if (port == -1) {
-			return String.format("%s://%s", url.getProtocol(), url.getHostname());
+			return String.format("%s://%s/robots.txt", url.getProtocol(), url.getHostname());
 		} else {
-			return String.format("%s://%s:%d", url.getProtocol(), url.getHostname(), port);
+			return String.format("%s://%s:%d/robots.txt", url.getProtocol(), url.getHostname(), port);
 		}
 	}
 
@@ -131,22 +137,14 @@ public class CheckUrlWithRobotsFunction extends RichAsyncFunction<FetchUrl, Tupl
 	public void asyncInvoke(FetchUrl url, AsyncCollector<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> collector) throws Exception {
 		UrlLogger.record(this.getClass(), url);
 		
-		final String robotsKey;
-		
-		try {
-			robotsKey = makeRobotsKey(url);
-			BaseRobotRules rules = _rules.get(robotsKey);
+		final String robotsUrl = makeRobotsKey(url);
+			BaseRobotRules rules = _rules.get(robotsUrl);
 			if (rules != null) {
 				collector.collect(processUrl(rules, url));
 				return;
 			}
-		} catch (MalformedURLException e) {
-			collector.collect(invalidUrl(url));
-			return;
-		}
 		
 		// We don't have robots yet, so queue up the URL for fetching code
-		final String robotsUrl = robotsKey + "/robots.txt";
 		_executor.execute(new Runnable() {
 			
 			@Override
@@ -155,7 +153,7 @@ public class CheckUrlWithRobotsFunction extends RichAsyncFunction<FetchUrl, Tupl
 				// So do the check again, then fetch if needed. We might also have multiple threads processing URLs
 				// for the same domain, but for now let's not worry about that case (just slightly less efficient).
 				long robotFetchRetryTime = System.currentTimeMillis();
-				BaseRobotRules rules = _rules.get(robotsKey);
+				BaseRobotRules rules = _rules.get(robotsUrl);
 				if (rules != null) {
 					collector.collect(processUrl(rules, url));
 					return;
@@ -176,22 +174,26 @@ public class CheckUrlWithRobotsFunction extends RichAsyncFunction<FetchUrl, Tupl
 					robotFetchRetryTime += 24L * 60 * 60 * 1000;
 				}
 				
+				_rules.put(robotsUrl, rules);
+				
+				List<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> result = new ArrayList<>();
+				result.addAll(processUrl(rules, url));
+				
+				// If we have 
 				List<String> sitemaps = rules.getSitemaps();
-				try {
-					if (sitemaps != null && sitemaps.size() > 0) {
-						// Output the sitemap urls in the tuple3
-						for (String sitemap : sitemaps) {
-							collector.collect(Collections.singleton(new Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>(null, null, new FetchUrl(new ValidUrl(sitemap)))));
+				if ((sitemaps != null) && !sitemaps.isEmpty()) {
+
+					// Output the sitemap urls in the tuple3
+					for (String sitemap : sitemaps) {
+						try {
+							result.add(new Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>(null, null, new FetchUrl(new ValidUrl(sitemap))));
+						} catch (MalformedURLException e) {
+							LOGGER.info(String.format("Invalid sitemap URL from %s: %s", robotsUrl, sitemap));
 						}
-					} else {
-						// TODO use robotFetchRetryTime to set up when we want to purge our rules
-						collector.collect(processUrl(rules, url));
 					}
-					
-					_rules.put(makeRobotsKey(url), rules);
-				} catch (MalformedURLException e) {
-					collector.collect(invalidUrl(url));
 				}
+				
+				collector.collect(result);
 			}
 		});
 	}
