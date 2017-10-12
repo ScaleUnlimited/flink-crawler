@@ -94,6 +94,7 @@ public class CrawlTopologyTest {
 			// .setCrawlDB(new InMemoryCrawlDB())
 			.setFetchQueue(new FetchQueue(1_000))
 			// .setCrawlDB(new InMemoryCrawlDB())
+			.setMaxFetcherPoolSize(2)
 			.setRobotsFetcherBuilder(new MockRobotsFetcher.MockRobotsFetcherBuilder(new MockRobotsFetcher(robotPages)))
 			.setRobotsParser(new SimpleRobotRulesParser())
 			.setPageParser(new SimplePageParser())

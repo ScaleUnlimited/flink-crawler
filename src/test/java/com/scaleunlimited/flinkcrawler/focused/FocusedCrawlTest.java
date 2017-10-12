@@ -81,6 +81,7 @@ public class FocusedCrawlTest {
 			.setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
 			.setUrlLengthener(new SimpleUrlLengthener())
 			.setCrawlDB(new DrumCrawlDB(10_000, drumDBDir.getAbsolutePath()))
+			.setMaxFetcherPoolSize(2)
 			.setRobotsFetcherBuilder(new MockRobotsFetcher.MockRobotsFetcherBuilder(new MockRobotsFetcher()))
 			.setRobotsParser(new SimpleRobotRulesParser())
 			.setPageParser(new FocusedPageParser(new PageNumberScorer()))
@@ -92,9 +93,9 @@ public class FocusedCrawlTest {
 			.setSiteMapParser(new SimpleSiteMapParser())
 			// You can increase this value from 5000 to say 100000 if you need time inside of a threaded
 			// executor before the cluster terminates.
-			.setMaxWaitTime(10000)
+			.setMaxWaitTime(10_000)
 			.setDefaultCrawlDelay(0)
-			.setMaxDuration(10_000)
+			.setMaxDuration(20_000)
 			// Explicitly set parallelism so that it doesn't vary based on # of cores
 			.setParallelism(2)
 			.setPageFetcherBuilder(new WebGraphFetcher.WebGraphFetcherBuilder(new WebGraphFetcher(graph)))

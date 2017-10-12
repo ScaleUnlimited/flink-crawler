@@ -121,6 +121,7 @@ public class CrawlTopology {
         private FetchQueue _fetchQueue = new FetchQueue(10_000);
         private BaseCrawlDB _crawlDB = new InMemoryCrawlDB();
         
+        private int _maxFetcherPoolSize = FetchUrlsFunction.DEFAULT_MAX_THREAD_COUNT;
         private BaseHttpFetcherBuilder _robotsFetcherBuilder = new SimpleHttpFetcherBuilder(INVALID_USER_AGENT);
         private SimpleRobotRulesParser _robotsParser = new SimpleRobotRulesParser();
 
@@ -163,6 +164,11 @@ public class CrawlTopology {
         public CrawlTopologyBuilder setUrlSource(BaseUrlSource urlSource) {
             _urlSource = urlSource;
             return this;
+        }
+        
+        public CrawlTopologyBuilder setMaxFetcherPoolSize(int maxPoolSize) {
+        	_maxFetcherPoolSize = maxPoolSize;
+        	return this;
         }
 
         public CrawlTopologyBuilder setUrlLengthener(BaseUrlLengthener lengthener) {
@@ -339,7 +345,7 @@ public class CrawlTopology {
 
             DataStream<Tuple2<CrawlStateUrl, FetchedUrl>> sitemapUrls = 
             		// TODO get capacity from fetcher builder.
-            		AsyncDataStream.unorderedWait(sitemapUrlsToFetch, new FetchUrlsFunction(_siteMapFetcherBuilder), _siteMapFetcherBuilder.getTimeoutInSeconds(), TimeUnit.SECONDS, 10000)
+            		AsyncDataStream.unorderedWait(sitemapUrlsToFetch, new FetchUrlsFunction(_siteMapFetcherBuilder, _maxFetcherPoolSize), _siteMapFetcherBuilder.getTimeoutInSeconds(), TimeUnit.SECONDS, 10000)
 					.name("FetchUrlsFunction for sitemap"); // FUTURE Have a separate FetchSiteMapUrlFunction that extends FetchUrlsFunction
            
             // Run the failed urls into a custom function to log it and then to a DiscardingSink.
@@ -386,7 +392,7 @@ public class CrawlTopology {
             		
             DataStream<Tuple2<CrawlStateUrl, FetchedUrl>> fetchedUrls = 
             		// TODO get capacity from fetcher builder.
-            		AsyncDataStream.unorderedWait(urlsToFetch, new FetchUrlsFunction(_pageFetcherBuilder), _pageFetcherBuilder.getTimeoutInSeconds(), TimeUnit.SECONDS, 10000)
+            		AsyncDataStream.unorderedWait(urlsToFetch, new FetchUrlsFunction(_pageFetcherBuilder, _maxFetcherPoolSize), _pageFetcherBuilder.getTimeoutInSeconds(), TimeUnit.SECONDS, 10000)
                     .name("FetchUrlsFunction");
             
             SplitStream<Tuple2<CrawlStateUrl, FetchedUrl>> fetchAttemptedUrls = splitFetchedUrlsStream(fetchedUrls);
