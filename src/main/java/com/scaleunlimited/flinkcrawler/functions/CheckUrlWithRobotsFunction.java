@@ -16,6 +16,8 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.async.RichAsyncFunction;
 import org.apache.flink.streaming.api.functions.async.collector.AsyncCollector;
 import org.apache.http.HttpStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.fetcher.BaseHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
@@ -32,6 +34,7 @@ import crawlercommons.robots.SimpleRobotRulesParser;
 
 @SuppressWarnings("serial")
 public class CheckUrlWithRobotsFunction extends RichAsyncFunction<FetchUrl, Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> {
+    static final Logger LOGGER = LoggerFactory.getLogger(CheckUrlWithRobotsFunction.class);
 
 	// TODO pick good time for this
 	protected static final long DEFAULT_RETRY_INTERVAL_MS = 100_000 * 1000L;
@@ -131,6 +134,8 @@ public class CheckUrlWithRobotsFunction extends RichAsyncFunction<FetchUrl, Tupl
 	public void asyncInvoke(FetchUrl url, AsyncCollector<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> collector) throws Exception {
 		UrlLogger.record(this.getClass(), url);
 		
+		LOGGER.debug(String.format("CheckUrlWithRobotsFunction processing URL %s", url));
+		
 		final String robotsKey;
 		
 		try {
@@ -163,6 +168,7 @@ public class CheckUrlWithRobotsFunction extends RichAsyncFunction<FetchUrl, Tupl
 				
 				try {
 					FetchedResult result = _fetcher.get(robotsUrl);
+					LOGGER.debug(String.format("CheckUrlWithRobotsFunction fetched URL %s with status %d", robotsUrl, result.getStatusCode()));
 					if (result.getStatusCode() != HttpStatus.SC_OK) {
 						rules = _parser.failedFetch(result.getStatusCode());
 						// TODO set different retry interval for missing.
