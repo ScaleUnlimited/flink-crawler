@@ -4,8 +4,8 @@ import java.io.File;
 import java.util.Map;
 
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.streaming.api.environment.AsyncLocalStreamEnvironment;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
-import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.util.FileUtils;
 import org.junit.Test;
@@ -27,8 +27,8 @@ import com.scaleunlimited.flinkcrawler.tools.CrawlTopologyTest;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlLengthener;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlValidator;
+import com.scaleunlimited.flinkcrawler.utils.TestUrlLogger.UrlLoggerResults;
 import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
-import com.scaleunlimited.flinkcrawler.utils.UrlLoggerImpl.UrlLoggerResults;
 import com.scaleunlimited.flinkcrawler.webgraph.BaseWebGraph;
 import com.scaleunlimited.flinkcrawler.webgraph.ScoredWebGraph;
 
@@ -42,7 +42,7 @@ public class FocusedCrawlTest {
 	public void test() throws Exception {
 		UrlLogger.clear();
 
-		LocalStreamEnvironment env = StreamExecutionEnvironment.createLocalEnvironment();
+		LocalStreamEnvironment env = new AsyncLocalStreamEnvironment();
 
 		final float minFetchScore = 0.75f;
 		SimpleUrlNormalizer normalizer = new SimpleUrlNormalizer();
@@ -81,6 +81,7 @@ public class FocusedCrawlTest {
 			.setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
 			.setUrlLengthener(new SimpleUrlLengthener())
 			.setCrawlDB(new DrumCrawlDB(10_000, drumDBDir.getAbsolutePath()))
+			.setMaxFetcherPoolSize(2)
 			.setRobotsFetcherBuilder(new MockRobotsFetcher.MockRobotsFetcherBuilder(new MockRobotsFetcher()))
 			.setRobotsParser(new SimpleRobotRulesParser())
 			.setPageParser(new FocusedPageParser(new PageNumberScorer()))
@@ -90,11 +91,10 @@ public class FocusedCrawlTest {
 			.setUrlFilter(new SimpleUrlValidator())
 			.setSiteMapFetcherBuilder(new SiteMapGraphFetcher.SiteMapGraphFetcherBuilder(new SiteMapGraphFetcher(BaseWebGraph.EMPTY_GRAPH)))
 			.setSiteMapParser(new SimpleSiteMapParser())
-			// You can increase this value from 5000 to say 100000 if you need time inside of a threaded
-			// executor before the cluster terminates.
-			.setMaxWaitTime(5_000)
+			// You can increase this value from 1000 to say 100000 if you need to set breakpoints and don't
+			// want the cluster to terminate.
+			.setMaxQuietTime(1000L)
 			.setDefaultCrawlDelay(0)
-			.setMaxDuration(10_000)
 			// Explicitly set parallelism so that it doesn't vary based on # of cores
 			.setParallelism(2)
 			.setPageFetcherBuilder(new WebGraphFetcher.WebGraphFetcherBuilder(new WebGraphFetcher(graph)))
@@ -106,7 +106,7 @@ public class FocusedCrawlTest {
 		File dotFile = new File(testDir, "topology.dot");
 		ct.printDotFile(dotFile);
 		
-		ct.execute();
+		ct.execute(20_000);
 		
 		for (Tuple3<Class<?>, String, Map<String, String>> entry : UrlLogger.getLog()) {
 			LOGGER.info(String.format("%s: %s", entry.f0, entry.f1));

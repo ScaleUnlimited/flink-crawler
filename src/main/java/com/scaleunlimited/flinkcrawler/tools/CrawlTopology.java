@@ -11,6 +11,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.flink.api.common.JobExecutionResult;
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobSubmissionResult;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.java.tuple.Tuple2;
@@ -23,6 +24,7 @@ import org.apache.flink.streaming.api.datastream.IterativeStream;
 import org.apache.flink.streaming.api.datastream.KeyedStream;
 import org.apache.flink.streaming.api.datastream.SplitStream;
 import org.apache.flink.streaming.api.environment.AsyncLocalStreamEnvironment;
+import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
@@ -36,6 +38,7 @@ import com.scaleunlimited.flinkcrawler.functions.CheckUrlWithRobotsFunction;
 import com.scaleunlimited.flinkcrawler.functions.CrawlDBFunction;
 import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.HandleFailedSiteMapFunction;
+import com.scaleunlimited.flinkcrawler.functions.HashPartitioner;
 import com.scaleunlimited.flinkcrawler.functions.LengthenUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.NormalizeUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.OutlinkToStateUrlFunction;
@@ -53,10 +56,9 @@ import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
-import com.scaleunlimited.flinkcrawler.pojos.TicklerTuple;
 import com.scaleunlimited.flinkcrawler.sources.BaseUrlSource;
-import com.scaleunlimited.flinkcrawler.sources.TicklerSource;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
+import com.scaleunlimited.flinkcrawler.sources.TicklerSource;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlLengthener;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlValidator;
@@ -87,7 +89,8 @@ public class CrawlTopology {
 
     private StreamExecutionEnvironment _env;
     private String _jobName;
-
+    private JobID _jobID;
+    
     protected CrawlTopology(StreamExecutionEnvironment env, String jobName) {
         _env = env;
         _jobName = jobName;
@@ -108,7 +111,18 @@ public class CrawlTopology {
     	}
     	
     	AsyncLocalStreamEnvironment env = (AsyncLocalStreamEnvironment)_env;
-    	return env.executeAsync(_jobName);
+    	JobSubmissionResult result = env.executeAsync(_jobName);
+    	_jobID = result.getJobID();
+    	return result;
+    }
+    
+    public boolean isRunning() throws Exception {
+    	if (!(_env instanceof AsyncLocalStreamEnvironment)) {
+    		throw new IllegalStateException("StreamExecutionEnvironment must be AsyncLocalStreamEnvironment for async execution");
+    	}
+    	
+    	AsyncLocalStreamEnvironment env = (AsyncLocalStreamEnvironment)_env;
+    	return env.isRunning(_jobID);
     }
     
     public void stop() throws Exception {
@@ -117,7 +131,7 @@ public class CrawlTopology {
     	}
     	
     	AsyncLocalStreamEnvironment env = (AsyncLocalStreamEnvironment)_env;
-    	env.stop();
+    	env.stop(_jobID);
     }
     
     public static class CrawlTopologyBuilder {
@@ -132,8 +146,7 @@ public class CrawlTopology {
         private StreamExecutionEnvironment _env;
         private String _jobName = "flink-crawler";
         private int _parallelism = DEFAULT_PARALLELISM;
-        private long _maxDuration = TicklerSource.NO_MAX_DURATION;
-        private long _maxWaitTime = 5000;
+        private long _maxQuietTime = TicklerSource.NO_QUIET_TIME;
         private long _forceCrawlDelay = CrawlTool.DO_NOT_FORCE_CRAWL_DELAY;
         private long _defaultCrawlDelay = 10_000L;
         
@@ -141,6 +154,7 @@ public class CrawlTopology {
         private FetchQueue _fetchQueue = new FetchQueue(10_000);
         private BaseCrawlDB _crawlDB = new InMemoryCrawlDB();
         
+        private int _maxFetcherPoolSize = FetchUrlsFunction.DEFAULT_THREAD_COUNT;
         private BaseHttpFetcherBuilder _robotsFetcherBuilder = new SimpleHttpFetcherBuilder(INVALID_USER_AGENT);
         private SimpleRobotRulesParser _robotsParser = new SimpleRobotRulesParser();
 
@@ -155,7 +169,6 @@ public class CrawlTopology {
         private BasePageParser _pageParser = new SimplePageParser();
 		private BasePageParser _siteMapParser = new SimpleSiteMapParser();
 
-
         public CrawlTopologyBuilder(StreamExecutionEnvironment env) {
             _env = env;
         }
@@ -165,8 +178,8 @@ public class CrawlTopology {
             return this;
         }
 
-        public CrawlTopologyBuilder setMaxWaitTime(long maxWaitTime) {
-        	_maxWaitTime = maxWaitTime;
+        public CrawlTopologyBuilder setMaxQuietTime(long maxQuietTime) {
+        	_maxQuietTime = maxQuietTime;
             return this;
         }
 
@@ -183,6 +196,11 @@ public class CrawlTopology {
         public CrawlTopologyBuilder setUrlSource(BaseUrlSource urlSource) {
             _urlSource = urlSource;
             return this;
+        }
+        
+        public CrawlTopologyBuilder setMaxFetcherPoolSize(int maxPoolSize) {
+        	_maxFetcherPoolSize = maxPoolSize;
+        	return this;
         }
 
         public CrawlTopologyBuilder setUrlLengthener(BaseUrlLengthener lengthener) {
@@ -273,12 +291,6 @@ public class CrawlTopology {
             return this;
         }
 
-		public CrawlTopologyBuilder setMaxDuration(int maxDuration) {
-			_maxDuration = maxDuration;
-			
-			return this;
-		}
-
         @SuppressWarnings("serial")
         public CrawlTopology build() {
             if (_parallelism != DEFAULT_PARALLELISM) {
@@ -291,6 +303,12 @@ public class CrawlTopology {
             	throw new IllegalArgumentException("You must define your own UserAgent!");
             }
             
+            // Max quiet time relies on a static that is accessible by all code running
+            // in one JVM, which means it better be the local stream environment.
+            if ((_maxQuietTime != TicklerSource.NO_QUIET_TIME) && !(_env instanceof LocalStreamEnvironment)) {
+            	throw new IllegalArgumentException("Max quiet time is only valid during testing!");
+            }
+            
             // The Headers class in http-fetcher uses an unmodifiable list, which Kryo can't handle
             // unless we register a special serializer provided by the "kryo-serializers" project.
             _env.registerTypeWithKryoSerializer(Collections.unmodifiableList(new ArrayList<>()).getClass(), UnmodifiableCollectionsSerializer.class);
@@ -298,20 +316,14 @@ public class CrawlTopology {
             DataStream<RawUrl> seedUrls = _env.addSource(_urlSource).name("Seed urls source");
             DataStream<CrawlStateUrl> cleanedUrls = cleanUrls(seedUrls);
             
-            DataStream<TicklerTuple> tickler = _env.addSource(new TicklerSource(_maxDuration)).name("Tickler source");
-            
             // Update the Crawl DB, then run URLs it emits through robots filtering.
-            
-            // FUTURE use something like double the fetch timeout here? or add fetch timeout to parse timeout? Maybe we
-            // need to be able to ask each operation how long it might take, and use that. Note that we'd also need to
-            // worry about a CrawlDB full merge causing us to time out, unless that's run as a background thread.
-            IterativeStream<CrawlStateUrl> crawlDbIteration = cleanedUrls.iterate(_maxWaitTime);
-            KeyedStream<FetchUrl, String> preRobotsUrls = crawlDbIteration
-            		.keyBy(new PldKeySelector<CrawlStateUrl>())
-            		.connect(tickler)
+            IterativeStream<CrawlStateUrl> crawlDbIteration = cleanedUrls.iterate(TicklerSource.TICKLE_INTERVAL * 5);
+            DataStream<FetchUrl> preRobotsUrls = crawlDbIteration
+            		.partitionCustom(new HashPartitioner(), new PldKeySelector<CrawlStateUrl>())
             		.flatMap(new CrawlDBFunction(_crawlDB, new DefaultCrawlDBMerger(), _fetchQueue))
             		.name("CrawlDBFunction")
-            		.keyBy(new PldKeySelector<FetchUrl>());
+            		// TODO still use KeyedStream here?
+            		.partitionCustom(new HashPartitioner(), new PldKeySelector<FetchUrl>());
             
             DataStream<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> postRobotsUrls =
             		AsyncDataStream.unorderedWait(preRobotsUrls,
@@ -343,7 +355,7 @@ public class CrawlTopology {
             
             // Split off the sitemap urls and fetch and later parse them using the sitemap fetcher
             // and parser to generate outlinks
-            KeyedStream<FetchUrl, String> sitemapUrlsToFetch = blockedOrPassedOrSitemapUrls.select("sitemap")
+            KeyedStream<FetchUrl, Integer> sitemapUrlsToFetch = blockedOrPassedOrSitemapUrls.select("sitemap")
             		.map(new MapFunction<Tuple3<CrawlStateUrl,FetchUrl, FetchUrl>, FetchUrl>() {
 
 						@Override
@@ -357,7 +369,7 @@ public class CrawlTopology {
 
             DataStream<Tuple2<CrawlStateUrl, FetchedUrl>> sitemapUrls = 
             		// TODO get capacity from fetcher builder.
-            		AsyncDataStream.unorderedWait(sitemapUrlsToFetch, new FetchUrlsFunction(_siteMapFetcherBuilder), _siteMapFetcherBuilder.getTimeoutInSeconds(), TimeUnit.SECONDS, 10000)
+            		AsyncDataStream.unorderedWait(sitemapUrlsToFetch, new FetchUrlsFunction(_siteMapFetcherBuilder, _maxFetcherPoolSize), _siteMapFetcherBuilder.getTimeoutInSeconds(), TimeUnit.SECONDS, 10000)
 					.name("FetchUrlsFunction for sitemap"); // FUTURE Have a separate FetchSiteMapUrlFunction that extends FetchUrlsFunction
            
             // Run the failed urls into a custom function to log it and then to a DiscardingSink.
@@ -390,7 +402,7 @@ public class CrawlTopology {
 					.name("Select blocked URLs");
             
             // Fetch the URLs that passed our robots filter
-            KeyedStream<FetchUrl, String> urlsToFetch = blockedOrPassedOrSitemapUrls.select("passed")
+            KeyedStream<FetchUrl, Integer> urlsToFetch = blockedOrPassedOrSitemapUrls.select("passed")
             		.map(new MapFunction<Tuple3<CrawlStateUrl,FetchUrl, FetchUrl>, FetchUrl>() {
 
 						@Override
@@ -404,7 +416,7 @@ public class CrawlTopology {
             		
             DataStream<Tuple2<CrawlStateUrl, FetchedUrl>> fetchedUrls = 
             		// TODO get capacity from fetcher builder.
-            		AsyncDataStream.unorderedWait(urlsToFetch, new FetchUrlsFunction(_pageFetcherBuilder), _pageFetcherBuilder.getTimeoutInSeconds(), TimeUnit.SECONDS, 10000)
+            		AsyncDataStream.unorderedWait(urlsToFetch, new FetchUrlsFunction(_pageFetcherBuilder, _maxFetcherPoolSize), _pageFetcherBuilder.getTimeoutInSeconds(), TimeUnit.SECONDS, 10000)
                     .name("FetchUrlsFunction");
             
             SplitStream<Tuple2<CrawlStateUrl, FetchedUrl>> fetchAttemptedUrls = splitFetchedUrlsStream(fetchedUrls);
@@ -428,7 +440,10 @@ public class CrawlTopology {
 
             // We need to merge robotBlockedUrls with the "status" stream from fetchAttemptedUrls and status 
             // stream of the siteMapFetchAttemptedUrls and all of the new URLs from outlinks and sitemaps.
-            crawlDbIteration.closeWith(robotBlockedUrls.union(fetchStatusUrls, newUrls));
+            // We also merge in tickler URLs, which keep the crawlDB alive.
+            DataStream<CrawlStateUrl> tickler = _env.addSource(new TicklerSource(_maxQuietTime))
+            		.name("Tickler source");
+            crawlDbIteration.closeWith(robotBlockedUrls.union(fetchStatusUrls, newUrls, tickler));
             
             // Save off parsed page content. So just extract the parsed content piece of the Tuple3, and
             // then pass it on to the provided content sink function.
@@ -482,8 +497,7 @@ public class CrawlTopology {
 			return AsyncDataStream.unorderedWait(	rawUrls,
 													new LengthenUrlsFunction(_urlLengthener),
 												    _urlLengthener.getTimeoutInSeconds(),
-												    TimeUnit.SECONDS,
-												    LengthenUrlsFunction.QUEUE_SIZE)
+												    TimeUnit.SECONDS)
 					.name("LengthenUrlsFunction")
 					.flatMap(new NormalizeUrlsFunction(_urlNormalizer))
 					.name("NormalizeUrlsFunction")
@@ -573,6 +587,27 @@ public class CrawlTopology {
 			return new RawUrl("http://www.scaleunlimited.com/");
 		} catch (MalformedURLException e) {
 			throw new RuntimeException("URL should parse just fine?");
+		}
+	}
+
+	/**
+	 * Trigger async execution, and then monitor the job. Fail if it the job is
+	 * still running after <maxDurationMS> milliseconds.
+	 * 
+	 * @param maxDurationMS Maximum allowable execution time.
+	 * @throws Exception
+	 */
+	public void execute(int maxDurationMS) throws Exception {
+		executeAsync();
+		
+		long endTime = System.currentTimeMillis() + maxDurationMS;
+		while (isRunning() && (System.currentTimeMillis() < endTime)) {
+			Thread.sleep(100L);
+		}
+		
+		if (isRunning()) {
+			stop();
+			throw new RuntimeException("Job did not terminate in time");
 		}
 	}
 

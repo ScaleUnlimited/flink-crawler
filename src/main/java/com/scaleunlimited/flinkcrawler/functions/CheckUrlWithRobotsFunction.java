@@ -6,10 +6,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.flink.api.java.tuple.Tuple3;
@@ -26,6 +23,7 @@ import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ValidUrl;
 import com.scaleunlimited.flinkcrawler.tools.CrawlTool;
+import com.scaleunlimited.flinkcrawler.utils.ThreadedExecutor;
 import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
 import crawlercommons.fetcher.FetchedResult;
@@ -49,26 +47,28 @@ import crawlercommons.robots.SimpleRobotRulesParser;
 public class CheckUrlWithRobotsFunction extends RichAsyncFunction<FetchUrl, Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> {
     static final Logger LOGGER = LoggerFactory.getLogger(CheckUrlWithRobotsFunction.class);
 
-	// TODO pick good time for this
+	// FUTURE pick good time for this.
+    // See https://github.com/ScaleUnlimited/flink-crawler/issues/53
 	protected static final long DEFAULT_RETRY_INTERVAL_MS = 100_000 * 1000L;
 
-	private static final int MAX_QUEUED_URLS = 1000;
-	
-	private static final int MIN_THREAD_COUNT = 10;
-	private static final int MAX_THREAD_COUNT = 100;
+	// Make this controllable from the command line
+	private static final int THREAD_COUNT = 100;
 
 	private BaseHttpFetcherBuilder _fetcherBuilder;
 	private SimpleRobotRulesParser _parser;
 	private long _forceCrawlDelay;
 	private long _defaultCrawlDelay;
 	
-	private transient ThreadPoolExecutor _executor;
+	private transient ThreadedExecutor _executor;
 	private transient BaseHttpFetcher _fetcher;
 
 	// TODO we need a map from domain to sitemap & refresh time, maintained here.
 	
 	// FUTURE checkpoint the rules.
+	// See https://github.com/ScaleUnlimited/flink-crawler/issues/55
+	
 	// FUTURE expire the rules.
+	// See https://github.com/ScaleUnlimited/flink-crawler/issues/54
 	private transient Map<String, BaseRobotRules> _rules;
 	
 	public CheckUrlWithRobotsFunction(BaseHttpFetcherBuilder fetcherBuider, SimpleRobotRulesParser parser, long forceCrawlDelay, long defaultCrawlDelay) {
@@ -84,102 +84,68 @@ public class CheckUrlWithRobotsFunction extends RichAsyncFunction<FetchUrl, Tupl
 		
 		_fetcher = _fetcherBuilder.build();
 		_rules = new ConcurrentHashMap<>();
-		
-		BlockingQueue<Runnable> workQueue = new ArrayBlockingQueue<>(MAX_QUEUED_URLS);
-		_executor = new ThreadPoolExecutor(MIN_THREAD_COUNT, MAX_THREAD_COUNT, 1L, TimeUnit.SECONDS, workQueue, new ThreadPoolExecutor.CallerRunsPolicy());
+		_executor = new ThreadedExecutor(THREAD_COUNT);
 	}
 	
 	@Override
 	public void close() throws Exception {
-		_executor.shutdown();
-		
-		if (!_executor.awaitTermination(_fetcherBuilder.getTimeoutInSeconds(), TimeUnit.SECONDS)) {
-			// TODO handle timeout.
-		}
+		_executor.terminate(_fetcherBuilder.getTimeoutInSeconds(), TimeUnit.SECONDS);
 		
 		super.close();
 	}
 	
-	private Collection<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> processUrl(BaseRobotRules rules, FetchUrl url) {
-		if (rules.isAllowed(url.getUrl())) {
-			// Add the crawl delay to the url, so that it can be used to do delay limiting in the fetcher
-			long crawlDelay = _forceCrawlDelay;
-			if (_forceCrawlDelay == CrawlTool.DO_NOT_FORCE_CRAWL_DELAY) {
-				crawlDelay = rules.getCrawlDelay();
-				if (crawlDelay == BaseRobotRules.UNSET_CRAWL_DELAY) {
-					crawlDelay = _defaultCrawlDelay;
-				}
-			}			
-			url.setCrawlDelay(crawlDelay);
-			return Collections.singleton(new Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>(null, url, null));
-		} else {
-			// FUTURE use time when robot rules expire to set the refetch time.
-			long now = System.currentTimeMillis();
-			CrawlStateUrl crawlStateUrl = new CrawlStateUrl(url,
-															rules.isDeferVisits() ? FetchStatus.SKIPPED_DEFERRED : FetchStatus.SKIPPED_BLOCKED, 
-															now,
-															url.getScore(), 
-															now + DEFAULT_RETRY_INTERVAL_MS);
-			return Collections.singleton(new Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>(crawlStateUrl, null, null));
-		}
-	}
-
-	private String makeRobotsKey(FetchUrl url) {
-		int port = url.getPort();
-		if (port == -1) {
-			return String.format("%s://%s/robots.txt", url.getProtocol(), url.getHostname());
-		} else {
-			return String.format("%s://%s:%d/robots.txt", url.getProtocol(), url.getHostname(), port);
-		}
-	}
-
 	@Override
 	public void asyncInvoke(FetchUrl url, AsyncCollector<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> collector) throws Exception {
 		UrlLogger.record(this.getClass(), url);
-		
+
 		final String robotsUrl = makeRobotsKey(url);
-			BaseRobotRules rules = _rules.get(robotsUrl);
-			if (rules != null) {
-				collector.collect(processUrl(rules, url));
-				return;
-			}
-		
+		BaseRobotRules rules = _rules.get(robotsUrl);
+		if (rules != null) {
+			collector.collect(processUrl(rules, url));
+			return;
+		}
+
 		// We don't have robots yet, so queue up the URL for fetching code
 		_executor.execute(new Runnable() {
-			
+
 			@Override
 			public void run() {
 				// We might, in the thread, get a URL that we've already processed because multiple were queued up.
 				// So do the check again, then fetch if needed. We might also have multiple threads processing URLs
 				// for the same domain, but for now let's not worry about that case (just slightly less efficient).
-				long robotFetchRetryTime = System.currentTimeMillis();
 				BaseRobotRules rules = _rules.get(robotsUrl);
 				if (rules != null) {
 					collector.collect(processUrl(rules, url));
 					return;
 				}
-				
+
+				long robotFetchRetryTime = System.currentTimeMillis();
 				try {
 					FetchedResult result = _fetcher.get(robotsUrl);
+					LOGGER.debug(String.format("CheckUrlWithRobotsFunction fetched URL %s with status %d", robotsUrl, result.getStatusCode()));
 					if (result.getStatusCode() != HttpStatus.SC_OK) {
 						rules = _parser.failedFetch(result.getStatusCode());
-						// TODO set different retry interval for missing.
+						// FUTURE set different retry interval for missing.
+						// See https://github.com/ScaleUnlimited/flink-crawler/issues/54
 						robotFetchRetryTime += 24L * 60 * 60 * 1000;
 					} else {
 						rules = _parser.parseContent(robotsUrl, result.getContent(), result.getContentType(), _fetcher.getUserAgent().getAgentName());
 					}
 				} catch (Exception e) {
 					rules = _parser.failedFetch(HttpStatus.SC_INTERNAL_SERVER_ERROR);
-					// TODO set retry interval for failure.
+					// FUTURE set different rery interval for failure.
+					// See https://github.com/ScaleUnlimited/flink-crawler/issues/54
 					robotFetchRetryTime += 24L * 60 * 60 * 1000;
 				}
-				
+
+				// FUTURE set re-fetch time for robots.
+				// See https://github.com/ScaleUnlimited/flink-crawler/issues/54
 				_rules.put(robotsUrl, rules);
-				
+
 				List<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> result = new ArrayList<>();
 				result.addAll(processUrl(rules, url));
-				
-				// If we have 
+
+				// If we have sitemaps, process them now.
 				List<String> sitemaps = rules.getSitemaps();
 				if ((sitemaps != null) && !sitemaps.isEmpty()) {
 
@@ -192,10 +158,44 @@ public class CheckUrlWithRobotsFunction extends RichAsyncFunction<FetchUrl, Tupl
 						}
 					}
 				}
-				
+
 				collector.collect(result);
 			}
 		});
 	}
+
+	private Collection<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> processUrl(BaseRobotRules rules, FetchUrl url) {
+		if (rules.isAllowed(url.getUrl())) {
+			// Add the crawl delay to the url, so that it can be used to do delay limiting in the fetcher
+			long crawlDelay = _forceCrawlDelay;
+			if (_forceCrawlDelay == CrawlTool.DO_NOT_FORCE_CRAWL_DELAY) {
+				crawlDelay = rules.getCrawlDelay();
+				if (crawlDelay == BaseRobotRules.UNSET_CRAWL_DELAY) {
+					crawlDelay = _defaultCrawlDelay;
+				}
+			}
+			
+			url.setCrawlDelay(crawlDelay);
+			return Collections.singleton(new Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>(null, url, null));
+		} else {
+			// FUTURE use time when robot rules expire to set the refetch time. If it's a
+			// skipped-deferred (couldn't fetch robots.txt due to server error) then that robots
+			// refetch time should be much shorter. Note that we want to make this refetch time
+			// a bit longer than the robots.txt reload/retry time, so that it can be reloaded.
+			// See https://github.com/ScaleUnlimited/flink-crawler/issues/53
+			long now = System.currentTimeMillis();
+			CrawlStateUrl crawlStateUrl = new CrawlStateUrl(url,
+															rules.isDeferVisits() ? FetchStatus.SKIPPED_DEFERRED : FetchStatus.SKIPPED_BLOCKED, 
+															now,
+															url.getScore(), 
+															now + DEFAULT_RETRY_INTERVAL_MS);
+			return Collections.singleton(new Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>(crawlStateUrl, null, null));
+		}
+	}
+
+	private String makeRobotsKey(FetchUrl url) {
+		return String.format("%s/robots.txt", url.getUrlWithoutPath());
+	}
+
 
 }

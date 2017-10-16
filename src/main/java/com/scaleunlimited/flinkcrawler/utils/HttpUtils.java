@@ -4,6 +4,9 @@ import org.apache.tika.mime.MediaType;
 
 public class HttpUtils {
     
+    public final static String CONTENT_LANGUAGE = "Content-Language";
+    public final static String CONTENT_LOCATION = "Content-Location";
+
     private HttpUtils() {
         // Enforce class isn't instantiated
     }

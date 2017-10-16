@@ -13,6 +13,7 @@ import org.kohsuke.args4j.Option;
 import com.scaleunlimited.flinkcrawler.fetcher.BaseHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.fetcher.SimpleHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.fetcher.commoncrawl.CommonCrawlFetcherBuilder;
+import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
 import com.scaleunlimited.flinkcrawler.tools.CrawlTopology.CrawlTopologyBuilder;
@@ -39,7 +40,7 @@ public class CrawlTool {
         private long _forceCrawlDelay = CrawlTool.DO_NOT_FORCE_CRAWL_DELAY;
         private long _defaultCrawlDelay = 10 * 1000L;
         private int _maxContentSize = SimpleHttpFetcher.DEFAULT_MAX_CONTENT_SIZE;
-        private long _maxWaitTime = 5000;
+        private int _maxFetcherPoolSize = FetchUrlsFunction.DEFAULT_THREAD_COUNT;
         private int _maxThreads = 1;
         private int _parallelism = CrawlTopologyBuilder.DEFAULT_PARALLELISM;
         private String _outputFile = null;
@@ -72,11 +73,6 @@ public class CrawlTool {
 			_maxContentSize = maxContentSize;
 	    }
 		
-		@Option(name = "-maxwaittime", usage = "maximum idle time (ms) before flink job terminates", required = false)
-	    public void setMaxWaitTime(long maxWaitTime) {
-			_maxWaitTime = maxWaitTime;
-	    }
-		
 		@Option(name = "-commoncrawl", usage = "crawl id for CommonCrawl.org dataset", required = false)
 	    public void setCommonCrawlId(String commonCrawlId) {
 			_commonCrawlId = commonCrawlId;
@@ -85,6 +81,11 @@ public class CrawlTool {
 		@Option(name = "-cachedir", usage = "cache location for CommonCrawl.org secondary index", required = false)
 	    public void setCommonCrawlCacheDir(String cacheDir) {
 			_cacheDir = cacheDir;
+	    }
+		
+		@Option(name = "-maxfetchers", usage = "max fetcher pool size", required = false)
+	    public void setMaxFetcherPoolSize(int maxFetcherPoolSize) {
+			_maxFetcherPoolSize = maxFetcherPoolSize;
 	    }
 		
 		@Option(name = "-maxthreads", usage = "max threads per fetcher", required = false)
@@ -127,10 +128,6 @@ public class CrawlTool {
 			return _maxContentSize;
 		}
 		
-		public long getMaxWaitTime() {
-			return _maxWaitTime;
-		}
-		
 		public boolean isCommonCrawl() {
 			return _commonCrawlId != null;
 		}
@@ -141,6 +138,10 @@ public class CrawlTool {
 		
 		public String getCommonCrawlCacheDir() {
 			return _cacheDir;
+		}
+		
+		public int getMaxFetcherPoolSize() {
+			return _maxFetcherPoolSize;
 		}
 		
 		public int getMaxThreads() {
@@ -255,13 +256,13 @@ public class CrawlTool {
 			CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
 //				.setMaxWaitTime(100000)
 				.setUrlSource(new SeedUrlSource(options.getSeedUrlsFilename(), RawUrl.DEFAULT_SCORE))
+				.setMaxFetcherPoolSize(options.getMaxFetcherPoolSize())
 				.setRobotsFetcherBuilder(robotsFetcherBuilder)
 				.setUrlFilter(urlValidator)
 				.setSiteMapFetcherBuilder(siteMapFetcherBuilder)
 				.setPageFetcherBuilder(pageFetcherBuilder)
 				.setForceCrawlDelay(options.getForceCrawlDelay())
 				.setDefaultCrawlDelay(options.getDefaultCrawlDelay())
-				.setMaxWaitTime(options.getMaxWaitTime())
 				.setParallelism(options.getParallelism());
 			
 			if (options.getOutputFile() != null) {
