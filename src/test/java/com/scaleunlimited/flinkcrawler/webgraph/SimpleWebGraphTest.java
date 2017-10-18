@@ -29,7 +29,7 @@ public class SimpleWebGraphTest {
 		
 		BaseUrlNormalizer normalizer = new SimpleUrlNormalizer();
 		BaseWebGraph webGraph = new SimpleWebGraph(normalizer, Arrays.asList(graph));
-		assertNull(webGraph.getChildren("bogus"));
+		assertFalse(webGraph.hasPage("bogus"));
 		
 		Iterator<String> children = webGraph.getChildren(normalizer.normalize("domain1.com"));
 		assertNotNull(children);

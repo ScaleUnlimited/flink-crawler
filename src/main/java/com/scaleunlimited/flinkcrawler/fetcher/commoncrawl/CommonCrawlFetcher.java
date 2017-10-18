@@ -110,13 +110,16 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
             // Don't bother reporting that we bailed because the mime-type
             // wasn't one that we wanted.
             if (e.getAbortReason() != AbortedFetchReason.INVALID_MIMETYPE) {
-                LOGGER.debug("Exception fetching {} {}", url, e.getMessage());
+                LOGGER.debug("Exception fetching {}: {}", url, e.getMessage());
             }
             
             throw e;
         } catch (BaseFetchException e) {
-            LOGGER.debug("Exception fetching {} {}", url, e.getMessage());
+            LOGGER.debug("Exception fetching {}: {}", url, e.getMessage());
             throw e;
+		} catch (Exception e) {
+            LOGGER.debug("AWS exception loading data for {}: {}", url, e.getMessage());
+            throw new UrlFetchException(url, e.getMessage());
 		}
 	}
 

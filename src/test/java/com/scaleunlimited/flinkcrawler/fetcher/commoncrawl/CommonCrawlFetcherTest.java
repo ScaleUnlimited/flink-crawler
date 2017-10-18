@@ -1,15 +1,15 @@
 package com.scaleunlimited.flinkcrawler.fetcher.commoncrawl;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.*;
 
 import org.apache.http.HttpStatus;
 import org.junit.Test;
 
-import crawlercommons.fetcher.BaseFetchException;
+import com.scaleunlimited.flinkcrawler.urls.SimpleUrlNormalizer;
+
 import crawlercommons.fetcher.FetchedResult;
 import crawlercommons.fetcher.http.BaseHttpFetcher;
 import crawlercommons.fetcher.http.UserAgent;
-import crawlercommons.util.Headers;
 
 public class CommonCrawlFetcherTest {
 
@@ -58,18 +58,15 @@ public class CommonCrawlFetcherTest {
 				.prepCache();
 		BaseHttpFetcher fetcher = builder.build();
 		
-		// TODO need to deal with URL normalization, since no trailing / means we don't find
-		// any of these pages.
-		final String[] urlsToFetch = new String[] {
-				"http://cloudera.com/",
+		final String[] urlsToFetch = normalize("http://cloudera.com/",
 				"http://cnn.com/",
 				"http://uspto.gov/",
 				"http://www.google.com/",
 				"http://www.scaleunlimited.com/",
 				"http://www.linkedin.com/",
 				"http://www.pinterest.com/",
-				"http://www.instagram.com/"
-		};
+				"http://www.instagram.com/");
+		
 		
 		final Thread[] threads = new Thread[urlsToFetch.length];
 		final FetchedResult[] results = new FetchedResult[urlsToFetch.length];
@@ -83,9 +80,8 @@ public class CommonCrawlFetcherTest {
 	                String url = urlsToFetch[index];
 	                try {
 	                	results[index] = fetcher.get(url);
-	                } catch (BaseFetchException e) {
+	                } catch (Exception e) {
 	                    System.out.println("Exception fetching url: " + e.getMessage());
-	                    results[index] = new FetchedResult(url, url, System.currentTimeMillis(), new Headers(), null, null, 0, null, url, 0, null, HttpStatus.SC_INTERNAL_SERVER_ERROR, e.getMessage());
 	                }
 	            }
 	        });
@@ -96,23 +92,37 @@ public class CommonCrawlFetcherTest {
 	        threads[i].start();
 		}
 		
-		// TODO decide how to validate results. Make sure we have all results?
 		boolean allDone = false;
 		while (!allDone) {
 			Thread.sleep(100L);
 			
 			allDone = true;
 			for (int i = 0; i < results.length; i++) {
-				if (results[i] == null) {
+				if (threads[i].isAlive()) {
 					allDone = false;
 					break;
 				}
 			}
 		}
 		
-		for (FetchedResult result : results) {
+		for (int i = 0; i < results.length; i++) {
+			FetchedResult result = results[i];
+			assertNotNull("Failed to fetch URL " + urlsToFetch[i], result);
 			assertEquals("Error fetching " + result.getBaseUrl(), HttpStatus.SC_OK, result.getStatusCode());
 		}
 	}
+	
+	private String[] normalize(String...urls) {
+		SimpleUrlNormalizer normalizer = new SimpleUrlNormalizer();
+
+		String[] result = new String[urls.length];
+		for (int i = 0; i < urls.length; i++) {
+			result[i] = normalizer.normalize(urls[i]);
+		}
+		
+		return result;
+	}
+
+
 
 }
