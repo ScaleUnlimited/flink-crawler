@@ -2,6 +2,7 @@ package com.scaleunlimited.flinkcrawler.functions;
 
 import org.apache.flink.api.common.functions.RuntimeContext;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.metrics.Gauge;
 import org.apache.flink.streaming.api.functions.ProcessFunction;
 import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
@@ -36,6 +37,8 @@ public class CrawlDBFunction extends ProcessFunction<CrawlStateUrl, FetchUrl> {
 
 	private static final int URLS_PER_TIMER = 1000;
 
+    private static final String GAUGE_URLS_IN_FETCH_QUEUE = "URLsInFetchQueue";
+
 	private BaseCrawlDB _crawlDB;
 	private BaseCrawlDBMerger _merger;
 	
@@ -56,6 +59,15 @@ public class CrawlDBFunction extends ProcessFunction<CrawlStateUrl, FetchUrl> {
 		super.open(parameters);
 		
 		RuntimeContext context = getRuntimeContext();
+		
+		context.getMetricGroup().gauge(GAUGE_URLS_IN_FETCH_QUEUE, new Gauge<Integer>() {
+			@Override
+			public Integer getValue() {
+				return _fetchQueue.size();
+			}
+		});
+
+		
 		_parallelism = context.getNumberOfParallelSubtasks();
 		_index = context.getIndexOfThisSubtask();
 		

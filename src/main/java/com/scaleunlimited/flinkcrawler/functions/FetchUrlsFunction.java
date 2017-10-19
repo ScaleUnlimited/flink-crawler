@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.metrics.Gauge;
 import org.apache.flink.streaming.api.functions.ProcessFunction;
 import org.apache.flink.util.Collector;
 import org.apache.http.HttpStatus;
@@ -33,6 +34,8 @@ import crawlercommons.fetcher.http.BaseHttpFetcher;
 @SuppressWarnings("serial")
 public class FetchUrlsFunction extends ProcessFunction<FetchUrl, Tuple2<CrawlStateUrl, FetchedUrl>> {
     static final Logger LOGGER = LoggerFactory.getLogger(FetchUrlsFunction.class);
+    
+    private static final String GAUGE_URLS_CURRENTLY_BEING_FETCHED = "URLsCurrentlyBeingFetched";
     
 	private static final int MIN_THREAD_COUNT = 10;
 	private static final int MAX_THREAD_COUNT = 100;
@@ -64,6 +67,16 @@ public class FetchUrlsFunction extends ProcessFunction<FetchUrl, Tuple2<CrawlSta
 	public void open(Configuration parameters) throws Exception {
 		super.open(parameters);
 		
+		getRuntimeContext().getMetricGroup().gauge(GAUGE_URLS_CURRENTLY_BEING_FETCHED, new Gauge<Integer>() {
+					@Override
+					public Integer getValue() {
+						if (_executor != null) {
+							return _executor.getActiveCount();
+						}
+						return 0;
+					}
+				});
+		 
 		_fetcher = _fetcherBuilder.build();
 		_nextFetch = new ConcurrentHashMap<>();
 		_output = new ConcurrentLinkedQueue<>();
