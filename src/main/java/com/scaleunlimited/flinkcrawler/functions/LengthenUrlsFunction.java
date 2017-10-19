@@ -1,35 +1,30 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ThreadPoolExecutor;
+import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.streaming.api.functions.ProcessFunction;
-import org.apache.flink.util.Collector;
+import org.apache.flink.streaming.api.functions.async.RichAsyncFunction;
+import org.apache.flink.streaming.api.functions.async.collector.AsyncCollector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlLengthener;
+import com.scaleunlimited.flinkcrawler.utils.ThreadedExecutor;
 import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
 @SuppressWarnings({ "serial" })
-public class LengthenUrlsFunction extends ProcessFunction<RawUrl, RawUrl> {
+public class LengthenUrlsFunction extends RichAsyncFunction<RawUrl, RawUrl> {
 	static final Logger LOGGER = LoggerFactory.getLogger(LengthenUrlsFunction.class);
 	
-	private static final int MIN_THREAD_COUNT = 10;
-	private static final int MAX_THREAD_COUNT = 100;
-	
-	private static final int MAX_QUEUED_URLS = 1000;
-	private static final long QUEUE_CHECK_DELAY = 10;
+	// FUTURE make this settable from command line
+	// See https://github.com/ScaleUnlimited/flink-crawler/issues/50
+	private static final int THREAD_COUNT = 100;
 	
 	private BaseUrlLengthener _lengthener;
 	
-	private transient ConcurrentLinkedQueue<RawUrl> _output;
-	private transient ThreadPoolExecutor _executor;
+	private transient ThreadedExecutor _executor;
 	
 	public LengthenUrlsFunction(BaseUrlLengthener lengthener) {
 		_lengthener = lengthener;
@@ -39,51 +34,28 @@ public class LengthenUrlsFunction extends ProcessFunction<RawUrl, RawUrl> {
 	public void open(Configuration parameters) throws Exception {
 		super.open(parameters);
 		
-		_output = new ConcurrentLinkedQueue<>();
-		
-		BlockingQueue<Runnable> workQueue = new ArrayBlockingQueue<>(MAX_QUEUED_URLS);
-		_executor = new ThreadPoolExecutor(MIN_THREAD_COUNT, MAX_THREAD_COUNT, 1L, TimeUnit.SECONDS, workQueue, new ThreadPoolExecutor.CallerRunsPolicy());
+		_executor = new ThreadedExecutor(THREAD_COUNT);
 	}
 	
 	@Override
 	public void close() throws Exception {
-		_executor.shutdown();
-		
-		// TODO get timeout from lengthener service
-		if (!_executor.awaitTermination(1, TimeUnit.SECONDS)) {
-			// TODO handle timeout.
-		}
+		_executor.terminate(_lengthener.getTimeoutInSeconds(), TimeUnit.SECONDS);
 		
 		super.close();
 	}
 	
 	@Override
-	public void processElement(final RawUrl url, Context context, Collector<RawUrl> collector) throws Exception {
+	public void asyncInvoke(final RawUrl url, AsyncCollector<RawUrl> collector) throws Exception {
 		UrlLogger.record(this.getClass(), url);
 
 		_executor.execute(new Runnable() {
 			
 			@Override
 			public void run() {
-				LOGGER.debug("Lengthening " + url);
-				_output.add(_lengthener.lengthen(url));
+				RawUrl lengthenedUrl = _lengthener.lengthen(url);
+				collector.collect(Collections.singleton(lengthenedUrl));
 			}
 		});
-		
-		// Every time we get called, we'll set up a new timer that fires
-		context.timerService().registerProcessingTimeTimer(context.timerService().currentProcessingTime() + QUEUE_CHECK_DELAY);
-	}
-	
-	@Override
-	public void onTimer(long time, OnTimerContext context, Collector<RawUrl> collector) throws Exception {
-		// TODO use a loop?
-		if (!_output.isEmpty()) {
-			RawUrl lengthenedUrl = _output.remove();
-			LOGGER.debug("Removing URL from lengthening queue: " + lengthenedUrl);
-			collector.collect(lengthenedUrl);
-		}
-		
-		context.timerService().registerProcessingTimeTimer(context.timerService().currentProcessingTime() + QUEUE_CHECK_DELAY);
 	}
 
 }

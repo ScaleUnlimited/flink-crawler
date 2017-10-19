@@ -21,7 +21,7 @@ public class ValidUrl extends BaseUrl implements IPayload {
 	private String _query;
 	
 	public ValidUrl() {
-		// Constructor so it's a valid POJO
+		super();
 	}
 	
 	public ValidUrl(String urlAsString) throws MalformedURLException {
@@ -55,6 +55,10 @@ public class ValidUrl extends BaseUrl implements IPayload {
 			_protocol = url.getProtocol();
 			_hostname = url.getHost();
 			_port = url.getPort();
+			if (_port == url.getDefaultPort()) {
+				_port = -1;
+			}
+			
 			_path = url.getPath();
 			_query = url.getQuery();
 
@@ -74,6 +78,12 @@ public class ValidUrl extends BaseUrl implements IPayload {
 		return _pld;
 	}
 
+	// By default we partition by the hash of the pld, but this
+	// can be overridden (e.g. by CrawlStateUrl, for special URLs).
+	public Integer getPartitionKey() {
+		return _pld.hashCode();
+	}
+	
 	public int getPort() {
 		return _port;
 	}
@@ -86,6 +96,18 @@ public class ValidUrl extends BaseUrl implements IPayload {
 		return _query;
 	}
 
+	/**
+	 * @return Portion of URL with protocol, domain, and any non-standard port
+	 */
+	public String getUrlWithoutPath() {
+		int port = getPort();
+		if (port == -1) {
+			return String.format("%s://%s", getProtocol(), getHostname());
+		} else {
+			return String.format("%s://%s:%d", getProtocol(), getHostname(), port);
+		}
+	}
+	
 	@Override
 	public void write(DataOutput out) throws IOException {
 		out.writeUTF(_protocol);

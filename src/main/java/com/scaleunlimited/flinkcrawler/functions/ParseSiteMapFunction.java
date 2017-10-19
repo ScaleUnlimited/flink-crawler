@@ -26,7 +26,6 @@ public class ParseSiteMapFunction extends RichFlatMapFunction<FetchedUrl, Tuple3
 
 	@Override
 	public void flatMap(FetchedUrl fetchedUrl, Collector<Tuple3<ExtractedUrl, ParsedUrl, String>> collector) throws Exception {
-			
 		UrlLogger.record(this.getClass(), fetchedUrl);
 		
 		try {

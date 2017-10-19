@@ -11,12 +11,12 @@ public abstract class BaseUrl implements Serializable {
 		// Constructor so it's a valid POJO
 	}
 	
-	public BaseUrl(String urlAsString) {
-		_url = urlAsString;
+	public BaseUrl(BaseUrl base) {
+		this(base.getUrl());
 	}
 	
-	public BaseUrl(BaseUrl base) {
-		_url = base.getUrl();
+	public BaseUrl(String urlAsString) {
+		_url = urlAsString;
 	}
 	
 	public void setUrlAsString(String urlAsString) {
@@ -60,6 +60,7 @@ public abstract class BaseUrl implements Serializable {
 			return false;
 		return true;
 	}
+
 
 	
 }

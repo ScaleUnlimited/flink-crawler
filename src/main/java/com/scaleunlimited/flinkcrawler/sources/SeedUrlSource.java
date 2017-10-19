@@ -142,7 +142,7 @@ public class SeedUrlSource extends BaseUrlSource {
 			} else {
 				if ((_seedUrlIndex % _parallelism) == _index) {
 					RawUrl url = _urls[_seedUrlIndex];
-					LOGGER.debug(String.format("Emitting %s for %d of %d", url, _index, _parallelism));
+					LOGGER.debug(String.format("Emitting %s for partition %d of %d", url, _index, _parallelism));
 					context.collect(url);
 				}
 				
