@@ -42,6 +42,7 @@ public class TicklerSource extends RichParallelSourceFunction<CrawlStateUrl> {
 		super.open(parameters);
 		
 		_index = getRuntimeContext().getIndexOfThisSubtask();
+		LOGGER.debug("Opening TicklerSource for partition " + _index);
 	}
 	
 	@Override
@@ -53,6 +54,8 @@ public class TicklerSource extends RichParallelSourceFunction<CrawlStateUrl> {
 	public void run(SourceContext<CrawlStateUrl> context) throws Exception {
 		
 		while (_keepRunning) {
+			LOGGER.debug("Emitting tickler URL for partition " + _index);
+
 			context.collect(CrawlStateUrl.makeTicklerUrl(_index));
 			Thread.sleep(TICKLE_INTERVAL);
 			
@@ -67,6 +70,8 @@ public class TicklerSource extends RichParallelSourceFunction<CrawlStateUrl> {
 				}
 			}
 		}
+		
+		LOGGER.debug("Stopping TicklerSource for partition " + _index);
 		
 		// TODO once we terminate, start emitting termination URLs until our
 		// termination time interval is passed.
