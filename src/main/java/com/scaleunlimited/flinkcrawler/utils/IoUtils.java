@@ -6,13 +6,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.RandomAccessFile;
 
 import org.apache.flink.util.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.scaleunlimited.flinkcrawler.crawldb.DrumKVIterator;
 
 
 public class IoUtils {

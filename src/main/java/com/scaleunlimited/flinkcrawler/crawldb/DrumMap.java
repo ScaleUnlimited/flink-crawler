@@ -5,7 +5,6 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.io.FileUtils;
@@ -20,7 +19,6 @@ import com.scaleunlimited.flinkcrawler.utils.ByteUtils;
 import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
 import com.scaleunlimited.flinkcrawler.utils.FetchQueue.UrlState;
 import com.scaleunlimited.flinkcrawler.utils.IoUtils;
-import com.scaleunlimited.flinkcrawler.utils.OpenFilesUtils;
 
 /**
  * A DrumMap implements a form of DRUM storage system as described by the IRLBot paper
@@ -120,7 +118,9 @@ public class DrumMap implements Closeable {
 	
 	private AtomicBoolean _lock;
 	
-	private OpenFilesUtils _lsof = null; // new OpenFilesUtils();
+	// We sometimes need to debug where files are being opened, in which case
+	// we want to use _lsof.
+	// private OpenFilesUtils _lsof = new OpenFilesUtils();
 	
 	public DrumMap(int maxEntries, int averageValueLength, File dataDir, BaseCrawlDBMerger merger) throws FileNotFoundException, IOException {
 		_maxEntries = maxEntries;
@@ -331,6 +331,8 @@ public class DrumMap implements Closeable {
 		}
 	}
 
+	/*
+	 * Utility to display our recorded set of open files.
 	private void displayOpenFiles(String header) {
 		List<String> openFiles = _lsof.logOpenFiles(_dataDir);
 		LOGGER.debug(header + ": open files");
@@ -338,7 +340,8 @@ public class DrumMap implements Closeable {
 			LOGGER.debug(filepath);
 		}
 	}
-
+	 */
+	
 	private File getWorkingDir() {
 		return new File(_dataDir, WORKING_SUBDIR_NAME);
 	}

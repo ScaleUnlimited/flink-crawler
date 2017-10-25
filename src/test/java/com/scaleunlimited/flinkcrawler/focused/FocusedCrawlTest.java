@@ -4,7 +4,7 @@ import java.io.File;
 import java.util.Map;
 
 import org.apache.flink.api.java.tuple.Tuple3;
-import org.apache.flink.streaming.api.environment.AsyncLocalStreamEnvironment;
+import org.apache.flink.streaming.api.environment.LocalStreamEnvironmentWithAsyncExecution;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.util.FileUtils;
@@ -42,7 +42,7 @@ public class FocusedCrawlTest {
 	public void test() throws Exception {
 		UrlLogger.clear();
 
-		LocalStreamEnvironment env = new AsyncLocalStreamEnvironment();
+		LocalStreamEnvironment env = new LocalStreamEnvironmentWithAsyncExecution();
 
 		final float minFetchScore = 0.75f;
 		SimpleUrlNormalizer normalizer = new SimpleUrlNormalizer();

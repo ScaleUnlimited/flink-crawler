@@ -1,7 +1,6 @@
 package com.scaleunlimited.flinkcrawler.webgraph;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Iterator;
 
 @SuppressWarnings("serial")
@@ -11,7 +10,12 @@ public abstract class BaseWebGraph implements Serializable {
 		
 		@Override
 		public Iterator<String> getChildren(String parent) {
-			return new ArrayList<String>().iterator();
+			throw new RuntimeException("Can't call getChildren on missing page");
+		}
+
+		@Override
+		public boolean hasPage(String url) {
+			return false;
 		}
 	};
 	
@@ -23,6 +27,8 @@ public abstract class BaseWebGraph implements Serializable {
 	 */
 	public abstract Iterator<String> getChildren(String parent);
 
+	public abstract boolean hasPage(String url);
+	
 	public float getScore(String urlToFetch) {
 		return 1.0f;
 	}
