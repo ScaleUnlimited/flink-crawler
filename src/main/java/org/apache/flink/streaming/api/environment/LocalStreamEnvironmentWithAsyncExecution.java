@@ -10,32 +10,46 @@ import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobStatus;
 import org.apache.flink.runtime.messages.JobManagerMessages;
 import org.apache.flink.runtime.messages.JobManagerMessages.CancellationFailure;
-import org.apache.flink.runtime.messages.JobManagerMessages.CancellationResponse;
 import org.apache.flink.runtime.messages.JobManagerMessages.CancellationSuccess;
 import org.apache.flink.runtime.messages.JobManagerMessages.CurrentJobStatus;
 import org.apache.flink.runtime.messages.JobManagerMessages.JobNotFound;
-import org.apache.flink.runtime.messages.JobManagerMessages.JobStatusResponse;
 import org.apache.flink.runtime.minicluster.LocalFlinkMiniCluster;
 import org.apache.flink.streaming.api.graph.StreamGraph;
 
 import scala.concurrent.Await;
 import scala.concurrent.Future;
 
-public class AsyncLocalStreamEnvironment extends LocalStreamEnvironment {
+/**
+ * A modified version of LocalStreamEnvironment that supports executing a job
+ * asynchronously.
+ * 
+ * FUTURE - better would be start()/stop() calls to start & stop the execution engine
+ * (LocalFlinkMiniCluster), and then executeAsync() fails if it's not started,
+ * and stop(job id) just stops the job.
+ *
+ */
+public class LocalStreamEnvironmentWithAsyncExecution extends LocalStreamEnvironment {
 
 	private Configuration _conf;
 	private LocalFlinkMiniCluster _exec;
 	
-	public AsyncLocalStreamEnvironment() {
+	public LocalStreamEnvironmentWithAsyncExecution() {
 		this(new Configuration());
 	}
 
-	public AsyncLocalStreamEnvironment(Configuration config) {
+	public LocalStreamEnvironmentWithAsyncExecution(Configuration config) {
 		super(config);
 		
 		_conf = config;
 	}
 	
+	/**
+	 * This method lets you start a job and immediately return.
+	 * 
+	 * @param jobName
+	 * @return
+	 * @throws Exception
+	 */
 	public JobSubmissionResult executeAsync(String jobName) throws Exception {
 		// transform the streaming program into a JobGraph
 		StreamGraph streamGraph = getStreamGraph();
@@ -53,12 +67,22 @@ public class AsyncLocalStreamEnvironment extends LocalStreamEnvironment {
 		configuration.addAll(_conf);
 
 		_exec = new LocalFlinkMiniCluster(configuration, true);
-
-		_exec.start();
-		JobSubmissionResult result = _exec.submitJobDetached(jobGraph);
-		return result;
+		_exec.start(true);
+		
+		// The above code is all basically the same as Flink's LocalStreamEnvironment.
+		// The change is that here we call submitJobDetached vs. submitJobAndWait.
+		// We assume that eventually someone calls stop(job id), which then terminates
+		// the LocalFlinkMinimCluster.
+		return _exec.submitJobDetached(jobGraph);
 	}
 	
+	/**
+	 * Return whether <jobID> is currently running.
+	 * 
+	 * @param jobID
+	 * @return true if running.
+	 * @throws Exception
+	 */
 	public boolean isRunning(JobID jobID) throws Exception {
 		ActorGateway leader = _exec.getLeaderGateway(_exec.timeout());
 		Future<Object> response = leader.ask(new JobManagerMessages.RequestJobStatus(jobID), _exec.timeout());
@@ -73,6 +97,13 @@ public class AsyncLocalStreamEnvironment extends LocalStreamEnvironment {
 		}
 	}
 	
+	/**
+	 * Stop the <jobID> job. This should be called even if isRunning() returns false,
+	 * so that the LocalFlinkMiniCluster will be terminated.
+	 * 
+	 * @param jobID
+	 * @throws Exception
+	 */
 	public void stop(JobID jobID) throws Exception {
 		try {
 			// Try to cancel the job.

@@ -57,9 +57,7 @@ public class WebGraphFetcher extends BaseHttpFetcher {
 	
 	@Override
 	public FetchedResult get(String urlToFetch, Payload payload) throws BaseFetchException {
-		Iterator<String> outlinksIter = _graph.getChildren(urlToFetch);
-		
-		if (outlinksIter == null) {
+		if (!_graph.hasPage(urlToFetch)) {
             return new FetchedResult(
 					urlToFetch, 
 					urlToFetch, 
@@ -79,6 +77,7 @@ public class WebGraphFetcher extends BaseHttpFetcher {
 		} else {
 			int outlinkIndex = 1;
 			StringBuilder linksList = new StringBuilder();
+			Iterator<String> outlinksIter = _graph.getChildren(urlToFetch);
 			while (outlinksIter.hasNext()) {
 				String outlink = outlinksIter.next();
 				if (!outlink.startsWith("http")) {
@@ -106,7 +105,6 @@ public class WebGraphFetcher extends BaseHttpFetcher {
 		}
 	}
 
-	// TODO -
 	private boolean isValidMimeType(String htmlMimeType) {
 		return _validMimeTypes.isEmpty() || _validMimeTypes.contains(htmlMimeType);
 	}

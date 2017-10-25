@@ -23,7 +23,7 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.IterativeStream;
 import org.apache.flink.streaming.api.datastream.KeyedStream;
 import org.apache.flink.streaming.api.datastream.SplitStream;
-import org.apache.flink.streaming.api.environment.AsyncLocalStreamEnvironment;
+import org.apache.flink.streaming.api.environment.LocalStreamEnvironmentWithAsyncExecution;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
@@ -106,31 +106,31 @@ public class CrawlTopology {
     }
 
     public JobSubmissionResult executeAsync() throws Exception {
-    	if (!(_env instanceof AsyncLocalStreamEnvironment)) {
-    		throw new IllegalStateException("StreamExecutionEnvironment must be AsyncLocalStreamEnvironment for async execution");
+    	if (!(_env instanceof LocalStreamEnvironmentWithAsyncExecution)) {
+    		throw new IllegalStateException("StreamExecutionEnvironment must be LocalStreamEnvironmentWithAsyncExecution for async execution");
     	}
     	
-    	AsyncLocalStreamEnvironment env = (AsyncLocalStreamEnvironment)_env;
+    	LocalStreamEnvironmentWithAsyncExecution env = (LocalStreamEnvironmentWithAsyncExecution)_env;
     	JobSubmissionResult result = env.executeAsync(_jobName);
     	_jobID = result.getJobID();
     	return result;
     }
     
     public boolean isRunning() throws Exception {
-    	if (!(_env instanceof AsyncLocalStreamEnvironment)) {
-    		throw new IllegalStateException("StreamExecutionEnvironment must be AsyncLocalStreamEnvironment for async execution");
+    	if (!(_env instanceof LocalStreamEnvironmentWithAsyncExecution)) {
+    		throw new IllegalStateException("StreamExecutionEnvironment must be LocalStreamEnvironmentWithAsyncExecution for async execution");
     	}
     	
-    	AsyncLocalStreamEnvironment env = (AsyncLocalStreamEnvironment)_env;
+    	LocalStreamEnvironmentWithAsyncExecution env = (LocalStreamEnvironmentWithAsyncExecution)_env;
     	return env.isRunning(_jobID);
     }
     
     public void stop() throws Exception {
-    	if (!(_env instanceof AsyncLocalStreamEnvironment)) {
-    		throw new IllegalStateException("StreamExecutionEnvironment must be AsyncLocalStreamEnvironment for async execution");
+    	if (!(_env instanceof LocalStreamEnvironmentWithAsyncExecution)) {
+    		throw new IllegalStateException("StreamExecutionEnvironment must be LocalStreamEnvironmentWithAsyncExecution for async execution");
     	}
     	
-    	AsyncLocalStreamEnvironment env = (AsyncLocalStreamEnvironment)_env;
+    	LocalStreamEnvironmentWithAsyncExecution env = (LocalStreamEnvironmentWithAsyncExecution)_env;
     	env.stop(_jobID);
     }
     

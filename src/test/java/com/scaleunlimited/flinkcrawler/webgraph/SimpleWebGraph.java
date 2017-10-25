@@ -77,22 +77,16 @@ public class SimpleWebGraph extends BaseWebGraph {
 
 	@Override
 	public Iterator<String> getChildren(String parent) {
-		// TODO we have a webgraph with entries that don't have a protocol. So if we can't
-		// find an entry for parent, and it starts with http, then strip that off and
-		// try again.
-		
-		// Hmm, we also have the issue of domain.com/ vs. domain.com, since our
-		// normalizer adds that. Might want to put normalized entries in the the graph.
 		List<String> children = _graph.get(parent);
-		if ((children == null) && parent.startsWith("http")) {
-			children = _graph.get(parent.replaceFirst("(http|https)://", ""));
+		if (children == null) {
+			throw new RuntimeException("Can't call getChildren on missing page");
 		}
 		
-		if (children == null) {
-			return null;
-		} else {
-			return children.iterator();
-		}
+		return children.iterator();
 	}
-
+	
+	@Override
+	public boolean hasPage(String url) {
+		return _graph.containsKey(url);
+	}
 }

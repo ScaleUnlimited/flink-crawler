@@ -3,7 +3,6 @@ package com.scaleunlimited.flinkcrawler.webgraph;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
 
 import java.util.Arrays;
 import java.util.Iterator;
@@ -29,7 +28,7 @@ public class SimpleWebGraphTest {
 		
 		BaseUrlNormalizer normalizer = new SimpleUrlNormalizer();
 		BaseWebGraph webGraph = new SimpleWebGraph(normalizer, Arrays.asList(graph));
-		assertNull(webGraph.getChildren("bogus"));
+		assertFalse(webGraph.hasPage("bogus"));
 		
 		Iterator<String> children = webGraph.getChildren(normalizer.normalize("domain1.com"));
 		assertNotNull(children);

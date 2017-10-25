@@ -6,7 +6,7 @@ import java.util.Map;
 
 import org.apache.flink.api.common.JobSubmissionResult;
 import org.apache.flink.api.java.tuple.Tuple3;
-import org.apache.flink.streaming.api.environment.AsyncLocalStreamEnvironment;
+import org.apache.flink.streaming.api.environment.LocalStreamEnvironmentWithAsyncExecution;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.util.FileUtils;
 import org.junit.Test;
@@ -47,7 +47,7 @@ public class CrawlTopologyTest {
 	public void test() throws Exception {
 		UrlLogger.clear();
 		
-		AsyncLocalStreamEnvironment env = new AsyncLocalStreamEnvironment();
+		LocalStreamEnvironmentWithAsyncExecution env = new LocalStreamEnvironmentWithAsyncExecution();
 
 		SimpleUrlNormalizer normalizer = new SimpleUrlNormalizer();
 		SimpleWebGraph graph = new SimpleWebGraph(normalizer)

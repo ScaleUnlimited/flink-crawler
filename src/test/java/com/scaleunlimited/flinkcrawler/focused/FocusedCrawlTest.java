@@ -4,7 +4,7 @@ import java.io.File;
 import java.util.Map;
 
 import org.apache.flink.api.java.tuple.Tuple3;
-import org.apache.flink.streaming.api.environment.AsyncLocalStreamEnvironment;
+import org.apache.flink.streaming.api.environment.LocalStreamEnvironmentWithAsyncExecution;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.util.FileUtils;
@@ -42,7 +42,7 @@ public class FocusedCrawlTest {
 	public void test() throws Exception {
 		UrlLogger.clear();
 
-		LocalStreamEnvironment env = new AsyncLocalStreamEnvironment();
+		LocalStreamEnvironment env = new LocalStreamEnvironmentWithAsyncExecution();
 
 		final float minFetchScore = 0.75f;
 		SimpleUrlNormalizer normalizer = new SimpleUrlNormalizer();
@@ -91,9 +91,10 @@ public class FocusedCrawlTest {
 			.setUrlFilter(new SimpleUrlValidator())
 			.setSiteMapFetcherBuilder(new SiteMapGraphFetcher.SiteMapGraphFetcherBuilder(new SiteMapGraphFetcher(BaseWebGraph.EMPTY_GRAPH)))
 			.setSiteMapParser(new SimpleSiteMapParser())
-			// You can increase this value from 1000 to say 100000 if you need to set breakpoints and don't
-			// want the cluster to terminate.
-			.setMaxQuietTime(1000L)
+			// You can increase this value from 3_000 to say 100_000 if you need to set breakpoints and don't
+			// want the cluster to terminate.  We need 5 seconds to avoid terminating early on slow machines
+			// like Schmed's.
+			.setMaxQuietTime(5_000L)
 			.setDefaultCrawlDelay(0)
 			// Explicitly set parallelism so that it doesn't vary based on # of cores
 			.setParallelism(2)
