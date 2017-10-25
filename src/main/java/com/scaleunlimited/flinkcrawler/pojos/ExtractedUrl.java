@@ -43,8 +43,7 @@ public class ExtractedUrl extends BaseUrl {
 
     @Override
     public String toString() {
-        // TODO add more fields
-        return super.toString();
+    	return String.format("[%s](%s) - %.2f", _anchorText, getUrl(), _score);
     }
 
 	public float getScore() {
