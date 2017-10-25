@@ -13,25 +13,21 @@ import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.pojos.BaseUrl;
 
-public class UrlLoggerImpl implements IUrlLogger {
-	static final Logger LOGGER = LoggerFactory.getLogger(UrlLoggerImpl.class);
+public class TestUrlLogger implements IUrlLogger {
+	static final Logger LOGGER = LoggerFactory.getLogger(TestUrlLogger.class);
 	
 	private static final Map<String, String> EMPTY_METADATA_MAP = new HashMap<>();
 	
 	private Map<Class<?>, List<String>> _byClass;
 	private List<Tuple3<Class<?>, String, Map<String, String>>> _log;
 	
-	public UrlLoggerImpl() {
+	public TestUrlLogger() {
 		_byClass = new HashMap<>();
 		_log = new ArrayList<>();
 	}
 	
 	public void record(Class<?> clazz, BaseUrl url, String... metaData) {
-		record(clazz, url, makeMetaDataMap(metaData));
-	}
-	
-	public void record(Class<?> clazz, BaseUrl url, Map<String, String> metaData) {
-		LOGGER.debug(String.format("%s: %s", clazz.getSimpleName(), url));
+		Map<String, String> metadataMap = makeMetaDataMap(metaData);
 		
 		List<String> urls = _byClass.get(clazz);
 		if (urls == null) {
@@ -42,7 +38,7 @@ public class UrlLoggerImpl implements IUrlLogger {
 		String urlAsString = url.getUrl();
 		urls.add(urlAsString);
 		
-		_log.add(new Tuple3<Class<?>, String, Map<String, String>>(clazz, urlAsString, metaData));
+		_log.add(new Tuple3<Class<?>, String, Map<String, String>>(clazz, urlAsString, metadataMap));
 	}
 	
 	public List<Tuple3<Class<?>, String, Map<String, String>>> getLog() {

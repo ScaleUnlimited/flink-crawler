@@ -9,11 +9,9 @@ import com.scaleunlimited.flinkcrawler.pojos.BaseUrl;
 
 public interface IUrlLogger {
 
-	public void record(Class<?> clazz, BaseUrl url, String... metaData);
-	
-	public void record(Class<?> clazz, BaseUrl url, Map<String, String> metaData);
-
 	public void clear();
+
+	public void record(Class<?> clazz, BaseUrl url, String... metaData);
 	
 	public List<Tuple3<Class<?>, String, Map<String, String>>> getLog();
 

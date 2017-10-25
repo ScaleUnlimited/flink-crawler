@@ -31,19 +31,33 @@ public class CrawlStateUrl extends ValidUrl {
 
 	private static final float MAX_FRACTIONAL_SCORE = (float)((short)0x0FFF);
 	
-	// all bits set in 4.12 format
+	// all bits set in 4.12 format for scores.
 	private static final float MAX_SCORE = 15.99975586f;
 			
 	// Data needed in-memory for CrawlDB merging
-	private FetchStatus _status;		// TODO make this an enum ?
+	private FetchStatus _status;
 	private long _statusTime;
 	private float _score;
 	private long _nextFetchTime;
-
+	
+	// What type of URL we've got. URLs in the crawlDB will only be
+	// of type validated, others are transient state.
+	private UrlType _urlType;
+	private int _id;
+	
 	// Payload has all of the above fields, plus the URL.
 	
+	public static CrawlStateUrl makeTicklerUrl(int id) {
+		return new CrawlStateUrl(UrlType.TICKLER, id);
+	}
+
 	public CrawlStateUrl() {
 		// For creating from payload
+	}
+	
+	public CrawlStateUrl(UrlType urlType, int id) {
+		_urlType = urlType;
+		_id = id;
 	}
 	
 	public CrawlStateUrl(FetchUrl url, FetchStatus status, long nextFetchTime) {
@@ -57,15 +71,33 @@ public class CrawlStateUrl extends ValidUrl {
 		_score = score;
 		_statusTime = statusTime;
 		_nextFetchTime = nextFetchTime;
+		
+		_urlType = UrlType.REGULAR;
 	}
 
 	public long makeKey() {
 		return HashUtils.longHash(getUrl());
 	}
 
+	/* (non-Javadoc)
+	 * @see com.scaleunlimited.flinkcrawler.pojos.ValidUrl#getPartitionKey()
+	 * 
+	 * For special URLs, we have to return the the id, so that we can ensure
+	 * every CrawlDBFunction gets a regular tickler.
+	 */
+	@Override
+	public Integer getPartitionKey() {
+		if (_urlType == UrlType.REGULAR) {
+			return super.getPartitionKey();
+		} else {
+			return _id;
+		}
+	}
+	
 	public FetchStatus getStatus() {
 		return _status;
 	}
+	
 	public void setStatus(FetchStatus status) {
 		_status = status;
 	}
@@ -94,6 +126,10 @@ public class CrawlStateUrl extends ValidUrl {
 		_nextFetchTime = nextFetchTime;
 	}
 
+	public UrlType getUrlType() {
+		return _urlType;
+	}
+	
 	/**
 	 * We have an array of bytes (with first byte = length) that
 	 * is coming from the result of merging entries in the CrawlDB.
@@ -106,6 +142,9 @@ public class CrawlStateUrl extends ValidUrl {
 		_statusTime = getStatusTime(value);
 		_score = getScore(value);
 		_nextFetchTime = getFetchTime(value);
+		
+		// A persisted URL is always validated.
+		// setUrlType(UrlType.VALIDATED);
 	}
 	
 	// TODO move into ByteUtils?
@@ -146,7 +185,11 @@ public class CrawlStateUrl extends ValidUrl {
 	@Override
 	public String toString() {
 		// TODO add more fields to the response.
-		return String.format("%s (%s)", getUrl(), _status);
+		if (_urlType == UrlType.REGULAR) {
+			return String.format("%s (%s)", getUrl(), _status);
+		} else {
+			return String.format("%s (%d)", _urlType, _id);
+		}
 	}
 
 	/**

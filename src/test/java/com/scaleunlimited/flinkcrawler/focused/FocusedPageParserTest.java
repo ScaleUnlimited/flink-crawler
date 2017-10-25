@@ -27,6 +27,7 @@ public class FocusedPageParserTest {
 		assertEquals(0.75f, result.getParsedUrl().getScore(), 0.0001f);
 	}
 	
+	@SuppressWarnings("serial")
 	private static class TestPageScorer extends BasePageScorer {
 		
 		@Override

@@ -4,10 +4,9 @@ import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.flink.api.common.JobExecutionResult;
+import org.apache.flink.api.common.JobSubmissionResult;
 import org.apache.flink.api.java.tuple.Tuple3;
-import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
-import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.environment.AsyncLocalStreamEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.util.FileUtils;
 import org.junit.Test;
@@ -33,8 +32,8 @@ import com.scaleunlimited.flinkcrawler.urls.SimpleUrlLengthener;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlValidator;
 import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
+import com.scaleunlimited.flinkcrawler.utils.TestUrlLogger.UrlLoggerResults;
 import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
-import com.scaleunlimited.flinkcrawler.utils.UrlLoggerImpl.UrlLoggerResults;
 import com.scaleunlimited.flinkcrawler.webgraph.SimpleWebGraph;
 
 import crawlercommons.robots.SimpleRobotRulesParser;
@@ -48,7 +47,7 @@ public class CrawlTopologyTest {
 	public void test() throws Exception {
 		UrlLogger.clear();
 		
-		LocalStreamEnvironment env = StreamExecutionEnvironment.createLocalEnvironment();
+		AsyncLocalStreamEnvironment env = new AsyncLocalStreamEnvironment();
 
 		SimpleUrlNormalizer normalizer = new SimpleUrlNormalizer();
 		SimpleWebGraph graph = new SimpleWebGraph(normalizer)
@@ -95,6 +94,7 @@ public class CrawlTopologyTest {
 			// .setCrawlDB(new InMemoryCrawlDB())
 			.setFetchQueue(new FetchQueue(1_000))
 			// .setCrawlDB(new InMemoryCrawlDB())
+			.setMaxFetcherPoolSize(2)
 			.setRobotsFetcherBuilder(new MockRobotsFetcher.MockRobotsFetcherBuilder(new MockRobotsFetcher(robotPages)))
 			.setRobotsParser(new SimpleRobotRulesParser())
 			.setPageParser(new SimplePageParser())
@@ -105,9 +105,10 @@ public class CrawlTopologyTest {
 			// Create MockSitemapFetcher - that will return a valid sitemap
 			.setSiteMapFetcherBuilder(new SiteMapGraphFetcher.SiteMapGraphFetcherBuilder(new SiteMapGraphFetcher(sitemapGraph)))
 			.setSiteMapParser(new SimpleSiteMapParser())
-			// You can increase this value from 5000 to say 100000 if you need time inside of a threaded
+			// You can increase this value from 1500 to say 100000 if you need time inside of a threaded
 			// executor before the cluster terminates.
-			.setMaxWaitTime(5000)
+			// TODO figure out why sometimes we have no activity for > 500ms
+			.setMaxQuietTime(1000L)
 			.setDefaultCrawlDelay(0)
 			// Explicitly set parallelism so that it doesn't vary based on # of cores
 			.setParallelism(2)
@@ -118,9 +119,8 @@ public class CrawlTopologyTest {
 		File dotFile = new File(testDir, "topology.dot");
 		ct.printDotFile(dotFile);
 		
-		JobExecutionResult jobExecutionResult = ct.execute();
-		
-		Map<String, Object> accumulatorResults = jobExecutionResult.getAllAccumulatorResults();
+		JobSubmissionResult jobSubmissionResult = ct.execute(20_000);
+		Map<String, Object> accumulatorResults = jobSubmissionResult.getJobExecutionResult().getAllAccumulatorResults();
 		for (String key : accumulatorResults.keySet()) {
 			System.out.println(key + ":\t" + accumulatorResults.get(key));
 		}
