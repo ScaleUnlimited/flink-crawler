@@ -12,16 +12,15 @@ public class FlinkUtils {
 	private static class FlinkPlanEdge {
 		private int id;
 		private String ship_strategy;
+		@SuppressWarnings("unused")
 		private String side;
 		
 		public int getId() {
 			return id;
 		}
+		
 		public String getShip_strategy() {
 			return ship_strategy;
-		}
-		public String getSide() {
-			return side;
 		}
 	}
 	
@@ -30,6 +29,7 @@ public class FlinkUtils {
 		
 		private int id;
 		private String type;
+		@SuppressWarnings("unused")
 		private String pact;
 		private String contents;
 		private int parallelism;
@@ -38,18 +38,19 @@ public class FlinkUtils {
 		public int getId() {
 			return id;
 		}
+		
 		public String getType() {
 			return type;
 		}
-		public String getPact() {
-			return pact;
-		}
+		
 		public String getContents() {
 			return contents;
 		}
+		
 		public int getParallelism() {
 			return parallelism;
 		}
+		
 		public FlinkPlanEdge[] getPredecessors() {
 			if (predecessors == null) {
 				return NO_EDGES;

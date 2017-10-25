@@ -16,10 +16,6 @@ import crawlercommons.util.Headers;
 @SuppressWarnings("serial")
 public abstract class BasePageParser implements Serializable {
 
-	// TODO VMa - move these into a common http headers file ?
-    public final static String CONTENT_LANGUAGE = "Content-Language";
-    public final static String CONTENT_LOCATION = "Content-Location";
-
     private ParserPolicy _policy;
     
     public BasePageParser(ParserPolicy policy) {
@@ -53,7 +49,7 @@ public abstract class BasePageParser implements Serializable {
      * @return first language in response headers, or null
      */
     protected String getLanguage(FetchedUrl fetchedUrl, String charset) {
-        return getFirst(fetchedUrl.getHeaders(), CONTENT_LANGUAGE);
+        return getFirst(fetchedUrl.getHeaders(), HttpUtils.CONTENT_LANGUAGE);
     }
 
     /**
@@ -68,7 +64,7 @@ public abstract class BasePageParser implements Serializable {
         
         // See if we have a content location from the HTTP headers that we should use as
         // the base for resolving relative URLs in the document.
-        String clUrl = getFirst(fetchedUrl.getHeaders(), CONTENT_LOCATION);
+        String clUrl = getFirst(fetchedUrl.getHeaders(), HttpUtils.CONTENT_LOCATION);
         if (clUrl != null) {
             // FUTURE KKr - should we try to keep processing if this step fails, but
             // refuse to resolve relative links?

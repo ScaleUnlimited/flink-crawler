@@ -1,7 +1,5 @@
 package com.scaleunlimited.flinkcrawler.pojos;
 
-import org.apache.tika.metadata.Metadata;
-
 import crawlercommons.util.Headers;
 
 

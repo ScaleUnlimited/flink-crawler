@@ -9,4 +9,6 @@ public abstract class BaseUrlLengthener implements Serializable {
 
 	public abstract RawUrl lengthen(RawUrl url);
 
+	public abstract int getTimeoutInSeconds();
+	
 }
