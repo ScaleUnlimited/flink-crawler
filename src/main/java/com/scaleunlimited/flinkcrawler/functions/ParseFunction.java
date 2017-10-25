@@ -42,6 +42,11 @@ public class ParseFunction extends RichFlatMapFunction<FetchedUrl, Tuple3<Extrac
 		
 		// Output the links
 		for (ExtractedUrl outlink : result.getExtractedUrls()) {
+			String message =
+				String.format(	"Extracted '%s' from '%s'",
+								outlink.getUrl(),
+								fetchedUrl.getUrl());
+			LOGGER.debug(message);
 			collector.collect(new Tuple3<ExtractedUrl, ParsedUrl, String>(outlink, null, null));
 		}
 		
