@@ -421,12 +421,9 @@ public class DrumMapTest {
 		return new CrawlStateUrl(new FetchUrl(new ValidUrl(urlAsString)), status, statusTime, score, nextFetchTime);
 	}
 	
-
 	private static class LongPayload implements IPayload {
 
 		private Long _payload;
-		
-		public LongPayload() {}
 		
 		public LongPayload(long payload) {
 			_payload = payload;
@@ -440,10 +437,6 @@ public class DrumMapTest {
 		@Override
 		public void readFields(DataInput in) throws IOException {
 			_payload = in.readLong();
-		}
-		
-		public Long getPayload() {
-			return _payload;
 		}
 	}
 

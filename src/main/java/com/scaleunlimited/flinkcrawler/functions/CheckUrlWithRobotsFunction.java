@@ -61,15 +61,12 @@ public class CheckUrlWithRobotsFunction extends RichAsyncFunction<FetchUrl, Tupl
 	
 	private transient ThreadedExecutor _executor;
 	private transient BaseHttpFetcher _fetcher;
-
-	// TODO we need a map from domain to sitemap & refresh time, maintained here.
 	
 	// FUTURE checkpoint the rules.
 	// See https://github.com/ScaleUnlimited/flink-crawler/issues/55
 	
-	// FUTURE expire the rules.
-	// See https://github.com/ScaleUnlimited/flink-crawler/issues/54
 	private transient Map<String, BaseRobotRules> _rules;
+	private transient Map<String, Long> _ruleExpirations;
 	
 	public CheckUrlWithRobotsFunction(BaseHttpFetcherBuilder fetcherBuider, SimpleRobotRulesParser parser, long forceCrawlDelay, long defaultCrawlDelay) {
 		_fetcherBuilder = fetcherBuider;
@@ -84,6 +81,7 @@ public class CheckUrlWithRobotsFunction extends RichAsyncFunction<FetchUrl, Tupl
 		
 		_fetcher = _fetcherBuilder.build();
 		_rules = new ConcurrentHashMap<>();
+		_ruleExpirations = new ConcurrentHashMap<>();
 		_executor = new ThreadedExecutor(THREAD_COUNT);
 	}
 	
@@ -101,8 +99,14 @@ public class CheckUrlWithRobotsFunction extends RichAsyncFunction<FetchUrl, Tupl
 		final String robotsUrl = makeRobotsKey(url);
 		BaseRobotRules rules = _rules.get(robotsUrl);
 		if (rules != null) {
-			collector.collect(processUrl(rules, url));
-			return;
+			// See if the rule should be expired.
+			if (System.currentTimeMillis() >= _ruleExpirations.get(robotsUrl)) {
+				_rules.remove(robotsUrl);
+				_ruleExpirations.remove(robotsUrl);
+			} else {
+				collector.collect(processUrl(rules, url));
+				return;
+			}
 		}
 
 		// We don't have robots yet, so queue up the URL for fetching code
@@ -119,29 +123,26 @@ public class CheckUrlWithRobotsFunction extends RichAsyncFunction<FetchUrl, Tupl
 					return;
 				}
 
-				long robotFetchRetryTime = System.currentTimeMillis();
+				long robotsFetchRetryDelay;
 				try {
 					FetchedResult result = _fetcher.get(robotsUrl);
 					LOGGER.debug(String.format("CheckUrlWithRobotsFunction fetched URL %s with status %d", robotsUrl, result.getStatusCode()));
+					robotsFetchRetryDelay = calcRobotsFetchRetryDelay(result.getStatusCode());
 					if (result.getStatusCode() != HttpStatus.SC_OK) {
 						rules = _parser.failedFetch(result.getStatusCode());
-						// FUTURE set different retry interval for missing.
-						// See https://github.com/ScaleUnlimited/flink-crawler/issues/54
-						robotFetchRetryTime += 24L * 60 * 60 * 1000;
 					} else {
 						rules = _parser.parseContent(robotsUrl, result.getContent(), result.getContentType(), _fetcher.getUserAgent().getAgentName());
 					}
 				} catch (Exception e) {
+					robotsFetchRetryDelay = calcRobotsFetchRetryDelay(HttpStatus.SC_INTERNAL_SERVER_ERROR);
 					rules = _parser.failedFetch(HttpStatus.SC_INTERNAL_SERVER_ERROR);
-					// FUTURE set different rery interval for failure.
-					// See https://github.com/ScaleUnlimited/flink-crawler/issues/54
-					robotFetchRetryTime += 24L * 60 * 60 * 1000;
 				}
 
-				// FUTURE set re-fetch time for robots.
-				// See https://github.com/ScaleUnlimited/flink-crawler/issues/54
+				// Set re-fetch time for robots. Note that we put the expiration first, so that
+				// by the time someone checks _rules, the expiration entry exists.
+				_ruleExpirations.put(robotsUrl, System.currentTimeMillis() + robotsFetchRetryDelay);
 				_rules.put(robotsUrl, rules);
-
+				
 				List<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> result = new ArrayList<>();
 				result.addAll(processUrl(rules, url));
 
@@ -161,7 +162,30 @@ public class CheckUrlWithRobotsFunction extends RichAsyncFunction<FetchUrl, Tupl
 
 				collector.collect(result);
 			}
+
 		});
+	}
+
+	/**
+	 * Given the result of trying to fetch the robots.txt file, decide how long until we
+	 * retry (or refetch) it again.
+	 * 
+	 * @param statusCode
+	 * @return interval to wait, in milliseconds.
+	 */
+	private long calcRobotsFetchRetryDelay(int statusCode) {
+		if (statusCode == HttpStatus.SC_OK) {
+			return 12L * 60 * 60 * 1000;
+		} else if (statusCode == HttpStatus.SC_NOT_FOUND) {
+			return 24L * 60 * 60 * 1000;
+		} else if (statusCode == HttpStatus.SC_INTERNAL_SERVER_ERROR) {
+			return 1L * 60 * 60 * 1000;
+		} else {
+			// Other errors usually indicate that the server is miss-configured,
+			// and we really want to treat it as a "not found" (even though we
+			// don't currently).
+			return 24L * 60 * 60 * 1000;
+		}
 	}
 
 	private Collection<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> processUrl(BaseRobotRules rules, FetchUrl url) {

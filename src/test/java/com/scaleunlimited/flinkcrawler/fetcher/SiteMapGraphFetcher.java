@@ -4,7 +4,6 @@ import java.nio.charset.Charset;
 import java.util.Iterator;
 
 import org.apache.http.HttpStatus;
-import org.apache.tika.metadata.Metadata;
 
 import com.scaleunlimited.flinkcrawler.webgraph.BaseWebGraph;
 
@@ -101,7 +100,6 @@ public class SiteMapGraphFetcher extends BaseHttpFetcher {
 		}
 	}
 
-	// TODO -
 	private boolean isValidMimeType(String htmlMimeType) {
 		return _validMimeTypes.isEmpty() || _validMimeTypes.contains(htmlMimeType);
 	}

@@ -9,7 +9,6 @@ import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.LinkedHashMap;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -46,11 +45,6 @@ import crawlercommons.util.Headers;
  * to "fetch" documents that were previously fetched by the Common Crawl fetcher and
  * stored in S3.
  * 
- * TODO:
- *  Aborting fetches.
- *  Validate domain reversal code against "standard" implementation.
- *  Add unit test for cache
- *
  */
 
 @SuppressWarnings("serial")
@@ -123,6 +117,16 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 		}
 	}
 
+	/**
+	 * Recursive mthod for attempting to fetch <redirectUrl>.
+	 * 
+	 * @param originalUrl
+	 * @param redirectUrl
+	 * @param payload
+	 * @param numRedirects
+	 * @return
+	 * @throws BaseFetchException
+	 */
 	private FetchedResult fetch(URL originalUrl, URL redirectUrl, Payload payload, int numRedirects) throws BaseFetchException {
 		if (numRedirects > getMaxRedirects()) {
 			throw new RedirectFetchException(originalUrl.toString(), redirectUrl.toString(), RedirectExceptionReason.TOO_MANY_REDIRECTS);
@@ -152,7 +156,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 		String warcFile = jsonObj.get("filename").getAsString();
 		long length = jsonObj.get("length").getAsLong();
 		long offset = jsonObj.get("offset").getAsLong();
-		long timestamp = System.currentTimeMillis(); // TODO add timestamp to JSON, then jsonObj.get("timestamp").getAsLong();
+		long timestamp = jsonObj.get("timestamp").getAsLong();
 
 		// We have the data required to fetch the WARC entry and return that as a result.
 		GetObjectRequest warcRequest = new GetObjectRequest(S3Utils.getBucket(), warcFile);
@@ -249,7 +253,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 					URL newRedirectUrl = new URL(newRedirectUrlAsStr);
 					return fetch(originalUrl, newRedirectUrl, payload, numRedirects + 1);
 				} else {
-					// TODO log this? We should just keep going and return the data as is.
+					LOGGER.warn("Got redirect status but no page record HTTP header == Location");
 				}
 			}
 			
@@ -314,8 +318,9 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 					// See if the URL in the JsonObject matches what we're looking for.
 					String newUrl = newResult.get("url").getAsString();
 					if (newUrl.equals(urlAsStr)) {
-						// TODO should we check the timestamp to pick the last one?
+						// FUTURE should we check the timestamp to pick the last one?
 						result = newResult;
+						result.addProperty("timestamp", new Long(Long.parseLong(m.group(2))));
 					}
 				} else if (sort < 0) {
 					// We're past where it could be.
@@ -330,7 +335,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 	}
 
 	/**
-	 * Fetch (if needed) and cache the segment data for <indexEntry>
+	 * Fetch (if needed) and cache the segment data for <indexEntry>.
 	 * 
 	 * @param url Used for propagating exception if needed.
 	 * @param indexEntry Segment entry we need
@@ -430,7 +435,6 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
         return false;
     }
 
-	// TODO Add unit tests
 	// TODO Find domain normalization code used in other projects
     protected static String reverseDomain(URL url) {
 		StringBuilder reversedUrl = new StringBuilder();
@@ -469,40 +473,4 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 		return reversedUrl.toString();
     }
     
-	private static class SegmentCache {
-		private static final int AVERAGE_SEGMENT_SIZE = 190_000;
-		
-		private LinkedHashMap<Integer, byte[]> _cache;
-		private final int _maxCacheSize;
-		
-		public SegmentCache(int maxCacheSize) {
-			_maxCacheSize = maxCacheSize;
-			int targetEntries = Math.max(1, maxCacheSize / AVERAGE_SEGMENT_SIZE);
-			_cache = new LinkedHashMap<Integer, byte[]>(targetEntries, 0.75f, true) {
-				
-				@Override
-				protected boolean removeEldestEntry(java.util.Map.Entry<Integer, byte[]> eldest) {
-					return calcCacheSize() > _maxCacheSize;
-				}
-				
-				private int calcCacheSize() {
-					int curSize = 0;
-					for (byte[] data : values()) {
-						curSize += data.length;
-					}
-					
-					return curSize;
-				}
-			};
-		}
-
-		public void put(int segmentId, byte[] data) {
-			_cache.put(segmentId, data);
-		}
-
-		public byte[] get(int segmentId) {
-			return _cache.get(segmentId);
-		}
-	}
-
 }
