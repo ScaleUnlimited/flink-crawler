@@ -67,7 +67,7 @@ public class LocalStreamEnvironmentWithAsyncExecution extends LocalStreamEnviron
 		configuration.addAll(_conf);
 
 		_exec = new LocalFlinkMiniCluster(configuration, true);
-		_exec.start();
+		_exec.start(true);
 		
 		// The above code is all basically the same as Flink's LocalStreamEnvironment.
 		// The change is that here we call submitJobDetached vs. submitJobAndWait.
