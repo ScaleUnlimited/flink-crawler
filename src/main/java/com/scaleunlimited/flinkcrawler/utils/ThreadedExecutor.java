@@ -25,7 +25,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
- * A wrapper for ThreadPoolExecutor that implements a specific behavior we need in Bixo.
+ * A wrapper for ThreadPoolExecutor that implements a specific behavior we need.
  * When execute() is called, it succeeds unless all of the threads are busy and the
  * specified timeout is exceeded (no threads finish up in that amount of time).
  *
