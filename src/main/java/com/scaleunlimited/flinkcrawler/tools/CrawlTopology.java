@@ -28,6 +28,7 @@ import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
+import org.junit.Assert;
 
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDB;
 import com.scaleunlimited.flinkcrawler.crawldb.DefaultCrawlDBMerger;
@@ -67,6 +68,7 @@ import com.scaleunlimited.flinkcrawler.urls.SimpleUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlValidator;
 import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
 import com.scaleunlimited.flinkcrawler.utils.FlinkUtils;
+import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
 import crawlercommons.fetcher.http.UserAgent;
 import crawlercommons.robots.SimpleRobotRulesParser;
@@ -132,6 +134,9 @@ public class CrawlTopology {
     	
     	LocalStreamEnvironmentWithAsyncExecution env = (LocalStreamEnvironmentWithAsyncExecution)_env;
     	env.stop(_jobID);
+    	
+    	// Stop the job execution environment.
+    	env.stop();
     }
     
     public static class CrawlTopologyBuilder {
@@ -146,7 +151,6 @@ public class CrawlTopology {
         private StreamExecutionEnvironment _env;
         private String _jobName = "flink-crawler";
         private int _parallelism = DEFAULT_PARALLELISM;
-        private long _maxQuietTime = TicklerSource.NO_QUIET_TIME;
         private long _forceCrawlDelay = CrawlTool.DO_NOT_FORCE_CRAWL_DELAY;
         private long _defaultCrawlDelay = 10_000L;
         
@@ -175,11 +179,6 @@ public class CrawlTopology {
 
         public CrawlTopologyBuilder setJobName(String jobName) {
             _jobName = jobName;
-            return this;
-        }
-
-        public CrawlTopologyBuilder setMaxQuietTime(long maxQuietTime) {
-        	_maxQuietTime = maxQuietTime;
             return this;
         }
 
@@ -303,12 +302,6 @@ public class CrawlTopology {
             	throw new IllegalArgumentException("You must define your own UserAgent!");
             }
             
-            // Max quiet time relies on a static that is accessible by all code running
-            // in one JVM, which means it better be the local stream environment.
-            if ((_maxQuietTime != TicklerSource.NO_QUIET_TIME) && !(_env instanceof LocalStreamEnvironment)) {
-            	throw new IllegalArgumentException("Max quiet time is only valid during testing!");
-            }
-            
             // The Headers class in http-fetcher uses an unmodifiable list, which Kryo can't handle
             // unless we register a special serializer provided by the "kryo-serializers" project.
             _env.registerTypeWithKryoSerializer(Collections.unmodifiableList(new ArrayList<>()).getClass(), UnmodifiableCollectionsSerializer.class);
@@ -317,7 +310,7 @@ public class CrawlTopology {
             DataStream<CrawlStateUrl> cleanedUrls = cleanUrls(seedUrls);
             
             // Update the Crawl DB, then run URLs it emits through robots filtering.
-            IterativeStream<CrawlStateUrl> crawlDbIteration = cleanedUrls.iterate(TicklerSource.TICKLE_INTERVAL * 5);
+            IterativeStream<CrawlStateUrl> crawlDbIteration = cleanedUrls.iterate(/* TicklerSource.TICKLE_INTERVAL * 5 */);
             DataStream<FetchUrl> preRobotsUrls = crawlDbIteration
             		.partitionCustom(new HashPartitioner(), new PldKeySelector<CrawlStateUrl>())
             		.flatMap(new CrawlDBFunction(_crawlDB, new DefaultCrawlDBMerger(), _fetchQueue))
@@ -441,7 +434,7 @@ public class CrawlTopology {
             // We need to merge robotBlockedUrls with the "status" stream from fetchAttemptedUrls and status 
             // stream of the siteMapFetchAttemptedUrls and all of the new URLs from outlinks and sitemaps.
             // We also merge in tickler URLs, which keep the crawlDB alive.
-            DataStream<CrawlStateUrl> tickler = _env.addSource(new TicklerSource(_maxQuietTime))
+            DataStream<CrawlStateUrl> tickler = _env.addSource(new TicklerSource())
             		.name("Tickler source");
             crawlDbIteration.closeWith(robotBlockedUrls.union(fetchStatusUrls, newUrls, tickler));
             
@@ -578,8 +571,6 @@ public class CrawlTopology {
                     });
 			return outlinksOrContent;
 		}
-
-
     }
     
 	private static RawUrl makeDefaultSeedUrl() {
@@ -595,22 +586,33 @@ public class CrawlTopology {
 	 * still running after <maxDurationMS> milliseconds.
 	 * 
 	 * @param maxDurationMS Maximum allowable execution time.
+	 * @param maxQuietTimeMS Length of time w/no recorded activity after which we'll terminate.
 	 * @return JobSubmissionResult 
 	 * @throws Exception
 	 */
-	public JobSubmissionResult execute(int maxDurationMS) throws Exception {
+	public JobSubmissionResult execute(int maxDurationMS, int maxQuietTimeMS) throws Exception {
 		JobSubmissionResult jobSubmissionResult = executeAsync();
 		
+		boolean terminated = false;
 		long endTime = System.currentTimeMillis() + maxDurationMS;
-		while (isRunning() && (System.currentTimeMillis() < endTime)) {
+		while (System.currentTimeMillis() < endTime) {
+			long lastActivityTime = UrlLogger.getLastActivityTime();
+			if (lastActivityTime != UrlLogger.NO_ACTIVITY_TIME) {
+				long curTime = System.currentTimeMillis();
+				if ((curTime - lastActivityTime) > maxQuietTimeMS) {
+					stop();
+					terminated = true;
+					break;
+				}
+			}
+
 			Thread.sleep(100L);
 		}
 		
-		if (isRunning()) {
+		if (!terminated) {
 			stop();
 			throw new RuntimeException("Job did not terminate in time");
 		}
 		return jobSubmissionResult;
 	}
-
 }

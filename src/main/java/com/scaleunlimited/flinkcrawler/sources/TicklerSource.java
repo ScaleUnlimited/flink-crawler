@@ -24,17 +24,12 @@ public class TicklerSource extends RichParallelSourceFunction<CrawlStateUrl> {
 	private static final Logger LOGGER = LoggerFactory.getLogger(TicklerSource.class);
 
 	public static final long TICKLE_INTERVAL = 100L;
-
-	// Quiet time that implies no check for lack of activity.
-	public static final long NO_QUIET_TIME = -1;
 	
 	private volatile boolean _keepRunning = true;
-	private long _maxQuietTime;
 	
 	private transient int _index;
 	
-	public TicklerSource(long maxQuietTime) {
-		_maxQuietTime = maxQuietTime;
+	public TicklerSource() {
 	}
 
 	@Override
@@ -42,6 +37,7 @@ public class TicklerSource extends RichParallelSourceFunction<CrawlStateUrl> {
 		super.open(parameters);
 		
 		_index = getRuntimeContext().getIndexOfThisSubtask();
+		LOGGER.debug("Opening TicklerSource for partition " + _index);
 	}
 	
 	@Override
@@ -53,20 +49,13 @@ public class TicklerSource extends RichParallelSourceFunction<CrawlStateUrl> {
 	public void run(SourceContext<CrawlStateUrl> context) throws Exception {
 		
 		while (_keepRunning) {
+			LOGGER.debug("Emitting tickler URL for partition " + _index);
+
 			context.collect(CrawlStateUrl.makeTicklerUrl(_index));
 			Thread.sleep(TICKLE_INTERVAL);
-			
-			// Now check quiet time, but only if it's set. Note that this only
-			// is going to work in a single JVM (test) environment.
-			long lastActivityTime = UrlLogger.getLastActivityTime();
-			if ((_maxQuietTime != NO_QUIET_TIME) && (lastActivityTime != UrlLogger.NO_ACTIVITY_TIME)) {
-				long curTime = System.currentTimeMillis();
-				if ((curTime - lastActivityTime) > _maxQuietTime) {
-					LOGGER.info("It's been too quiet, terminating");
-					_keepRunning = false;
-				}
-			}
 		}
+		
+		LOGGER.debug("Stopping TicklerSource for partition " + _index);
 		
 		// TODO once we terminate, start emitting termination URLs until our
 		// termination time interval is passed.

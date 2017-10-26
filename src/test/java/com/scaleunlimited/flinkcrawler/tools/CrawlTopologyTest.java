@@ -9,6 +9,7 @@ import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironmentWithAsyncExecution;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.util.FileUtils;
+import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -105,10 +106,6 @@ public class CrawlTopologyTest {
 			// Create MockSitemapFetcher - that will return a valid sitemap
 			.setSiteMapFetcherBuilder(new SiteMapGraphFetcher.SiteMapGraphFetcherBuilder(new SiteMapGraphFetcher(sitemapGraph)))
 			.setSiteMapParser(new SimpleSiteMapParser())
-			// You can increase this value from 1500 to say 100000 if you need time inside of a threaded
-			// executor before the cluster terminates.
-			// TODO figure out why sometimes we have no activity for > 500ms
-			.setMaxQuietTime(1000L)
 			.setDefaultCrawlDelay(0)
 			// Explicitly set parallelism so that it doesn't vary based on # of cores
 			.setParallelism(2)
@@ -119,7 +116,9 @@ public class CrawlTopologyTest {
 		File dotFile = new File(testDir, "topology.dot");
 		ct.printDotFile(dotFile);
 		
-		JobSubmissionResult jobSubmissionResult = ct.execute(20_000);
+		// Execute for a maximum of 20 seconds, but terminate (successfully)
+		// if there's no activity for 5 seconds.
+		JobSubmissionResult jobSubmissionResult = ct.execute(20_000, 5_000);
 		Map<String, Object> accumulatorResults = jobSubmissionResult.getJobExecutionResult().getAllAccumulatorResults();
 		for (String key : accumulatorResults.keySet()) {
 			System.out.println(key + ":\t" + accumulatorResults.get(key));
