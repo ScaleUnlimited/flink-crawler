@@ -169,7 +169,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 			long startTime = System.currentTimeMillis();
 			WarcRecordReader warcReader = new WarcRecordReader(dis);
 			WarcRecord pageRecord = warcReader.readNextRecord();
-			long deltaTime = System.currentTimeMillis() - startTime;
+			long deltaTime = Math.max(1L, System.currentTimeMillis() - startTime);
 			int bytesRead = warcReader.getBytesRead();
 			double responseRateExact = (double)bytesRead / deltaTime;
 			// Response rate is bytes/second, not bytes/millisecond
