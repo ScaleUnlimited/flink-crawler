@@ -2,7 +2,6 @@ package com.scaleunlimited.flinkcrawler.functions;
 
 import java.net.MalformedURLException;
 
-import org.apache.flink.api.common.functions.RichFlatMapFunction;
 import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,10 +11,9 @@ import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ValidUrl;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlValidator;
-import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
 @SuppressWarnings("serial")
-public class ValidUrlsFilter extends RichFlatMapFunction<RawUrl, CrawlStateUrl> {
+public class ValidUrlsFilter extends BaseFlatMapFunction<RawUrl, CrawlStateUrl> {
 	static final Logger LOGGER = LoggerFactory.getLogger(ValidUrlsFilter.class);
 	
 	private BaseUrlValidator _urlValidator;
@@ -26,7 +24,7 @@ public class ValidUrlsFilter extends RichFlatMapFunction<RawUrl, CrawlStateUrl> 
 
 	@Override
 	public void flatMap(RawUrl url, Collector<CrawlStateUrl> collector) throws Exception {
-		UrlLogger.record(this.getClass(), url);
+		record(this.getClass(), url);
 		
 		String urlAsString = url.getUrl();
 		if (_urlValidator.isValid(urlAsString)) {

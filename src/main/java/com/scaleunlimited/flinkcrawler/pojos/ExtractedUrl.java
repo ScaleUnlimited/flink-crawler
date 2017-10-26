@@ -20,7 +20,8 @@ public class ExtractedUrl extends BaseUrl {
     public ExtractedUrl(String url, String anchorText, String relAttributes, float score) {
     	super(url);
     	
-        _anchorText = anchorText;
+    	// Often comes in with extra spaces/returns before the actual text.
+        _anchorText = anchorText.trim();
         _relAttributes = relAttributes;
         _score = score;
     }

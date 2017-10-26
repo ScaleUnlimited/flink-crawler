@@ -49,7 +49,7 @@ public class TicklerSource extends RichParallelSourceFunction<CrawlStateUrl> {
 	public void run(SourceContext<CrawlStateUrl> context) throws Exception {
 		
 		while (_keepRunning) {
-			LOGGER.debug("Emitting tickler URL for partition " + _index);
+			LOGGER.trace("Emitting tickler URL for partition " + _index);
 
 			context.collect(CrawlStateUrl.makeTicklerUrl(_index));
 			Thread.sleep(TICKLE_INTERVAL);
