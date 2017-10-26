@@ -6,7 +6,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
-import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
 /**
  * Generate special CrawlStateUrl values (ticklers) that keep the iteration
