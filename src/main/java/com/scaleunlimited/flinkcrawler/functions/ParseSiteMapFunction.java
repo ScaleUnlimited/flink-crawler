@@ -31,11 +31,12 @@ public class ParseSiteMapFunction extends BaseFlatMapFunction<FetchedUrl, Tuple3
 			
 			if (parserResult != null) {
 				for (ExtractedUrl extractedUrl : parserResult.getExtractedUrls()) {
+					LOGGER.debug("Emitting sitemap URL " + extractedUrl);
 					collector.collect(new Tuple3<ExtractedUrl, ParsedUrl, String>(extractedUrl, null, null));
 				}
 			} 
 		} catch (Throwable t ) {
-			LOGGER.info(String.format("Error while parsing sitemap url %s : %s", fetchedUrl.getFetchedUrl(), t.getMessage()));
+			LOGGER.info(String.format("Error while parsing sitemap url %s : %s", fetchedUrl.getFetchedUrl(), t.getMessage()), t);
 		}
 	}
 

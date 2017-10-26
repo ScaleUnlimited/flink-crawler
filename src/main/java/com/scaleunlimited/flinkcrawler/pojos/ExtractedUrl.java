@@ -21,7 +21,8 @@ public class ExtractedUrl extends BaseUrl {
     	super(url);
     	
     	// Often comes in with extra spaces/returns before the actual text.
-        _anchorText = anchorText.trim();
+    	// But sometimes they're actually null
+        _anchorText = anchorText == null ? "" : anchorText.trim();
         _relAttributes = relAttributes;
         _score = score;
     }
