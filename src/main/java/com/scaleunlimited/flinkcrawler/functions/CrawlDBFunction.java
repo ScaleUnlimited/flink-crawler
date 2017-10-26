@@ -84,7 +84,7 @@ public class CrawlDBFunction extends RichFlatMapFunction<CrawlStateUrl, FetchUrl
 				FetchUrl fetchUrl = _fetchQueue.poll();
 
 				if (fetchUrl != null) {
-					LOGGER.debug(String.format("CrawlDBFunction emitting URL %s to fetch (partition %d of %d)", url, _partition, _parallelism));
+					LOGGER.debug(String.format("CrawlDBFunction emitting URL %s to fetch (partition %d of %d)", fetchUrl, _partition, _parallelism));
 					collector.collect(fetchUrl);
 				} else {
 					needMerge = true;
@@ -100,7 +100,7 @@ public class CrawlDBFunction extends RichFlatMapFunction<CrawlStateUrl, FetchUrl
 		if (needMerge && _addSinceMerge.get()) {
 			// We don't have any active URLs left.
 			// Call the CrawlDB to trigger a merge.
-			LOGGER.debug("CrawlDBFunction merging crawlDB");
+			LOGGER.debug(String.format("CrawlDBFunction merging crawlDB (partition %d of %d)", _partition, _parallelism));
 			_crawlDB.merge();
 			_addSinceMerge.set(false);
 		}
