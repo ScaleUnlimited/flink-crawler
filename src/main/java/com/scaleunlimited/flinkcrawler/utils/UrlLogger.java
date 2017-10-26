@@ -36,9 +36,9 @@ public class UrlLogger {
 	public static void record(Class<?> clazz, BaseUrl url, String... metaData) {
 		if (LOGGER.isDebugEnabled()) {
 			StringBuilder msg = new StringBuilder();
-			msg.append(String.format("%s: %s (", clazz.getSimpleName(), url));
+			msg.append(String.format("%s: %s", clazz.getSimpleName(), url));
 			if (metaData.length > 0) {
-				msg.append('(');
+				msg.append(" (");
 				for (int i = 0; i < metaData.length; i += 2) {
 					if (i > 0) {
 						msg.append(", ");

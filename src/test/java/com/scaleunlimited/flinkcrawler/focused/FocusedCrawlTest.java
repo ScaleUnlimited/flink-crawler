@@ -91,10 +91,6 @@ public class FocusedCrawlTest {
 			.setUrlFilter(new SimpleUrlValidator())
 			.setSiteMapFetcherBuilder(new SiteMapGraphFetcher.SiteMapGraphFetcherBuilder(new SiteMapGraphFetcher(BaseWebGraph.EMPTY_GRAPH)))
 			.setSiteMapParser(new SimpleSiteMapParser())
-			// You can increase this value from 3_000 to say 100_000 if you need to set breakpoints and don't
-			// want the cluster to terminate.  We need 5 seconds to avoid terminating early on slow machines
-			// like Schmed's.
-			.setMaxQuietTime(5_000L)
 			.setDefaultCrawlDelay(0)
 			// Explicitly set parallelism so that it doesn't vary based on # of cores
 			.setParallelism(2)
@@ -107,7 +103,9 @@ public class FocusedCrawlTest {
 		File dotFile = new File(testDir, "topology.dot");
 		ct.printDotFile(dotFile);
 		
-		ct.execute(20_000);
+		// Execute for a maximum of 20 seconds, but terminate (successfully)
+		// if there's no activity for 5 seconds.
+		ct.execute(20_000, 5_000);
 		
 		for (Tuple3<Class<?>, String, Map<String, String>> entry : UrlLogger.getLog()) {
 			LOGGER.info(String.format("%s: %s", entry.f0, entry.f1));

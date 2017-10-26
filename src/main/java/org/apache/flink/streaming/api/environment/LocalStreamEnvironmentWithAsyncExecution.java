@@ -23,10 +23,6 @@ import scala.concurrent.Future;
  * A modified version of LocalStreamEnvironment that supports executing a job
  * asynchronously.
  * 
- * FUTURE - better would be start()/stop() calls to start & stop the execution engine
- * (LocalFlinkMiniCluster), and then executeAsync() fails if it's not started,
- * and stop(job id) just stops the job.
- *
  */
 public class LocalStreamEnvironmentWithAsyncExecution extends LocalStreamEnvironment {
 
@@ -105,24 +101,25 @@ public class LocalStreamEnvironmentWithAsyncExecution extends LocalStreamEnviron
 	 * @throws Exception
 	 */
 	public void stop(JobID jobID) throws Exception {
-		try {
-			// Try to cancel the job.
-			ActorGateway leader = _exec.getLeaderGateway(_exec.timeout());
-			Future<Object> response = leader.ask(new JobManagerMessages.CancelJob(jobID), _exec.timeout());
+		// Try to cancel the job.
+		ActorGateway leader = _exec.getLeaderGateway(_exec.timeout());
+		Future<Object> response = leader.ask(new JobManagerMessages.CancelJob(jobID), _exec.timeout());
 
-			Object result = Await.result(response, _exec.timeout());
-			if (result instanceof CancellationSuccess) {
-				// All good.
-			} else if (result instanceof CancellationFailure) {
-				CancellationFailure failure = (CancellationFailure)result;
-				throw new RuntimeException("Failure cancelling job", failure.cause());
-			} else {
-				throw new RuntimeException("Unexpected result of cancelling job: " + result);
-			}
-		} finally {
-			transformations.clear();
-			_exec.stop();
+		Object result = Await.result(response, _exec.timeout());
+		if (result instanceof CancellationSuccess) {
+			// All good.
+		} else if (result instanceof CancellationFailure) {
+			CancellationFailure failure = (CancellationFailure)result;
+			throw new RuntimeException("Failure cancelling job", failure.cause());
+		} else {
+			throw new RuntimeException("Unexpected result of cancelling job: " + result);
 		}
+	}
+	
+	public void stop() throws Exception {
+		transformations.clear();
+		_exec.stop();
+		_exec = null;
 	}
 
 }
