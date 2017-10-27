@@ -35,7 +35,7 @@ under the License.
 		<slf4j.version>1.7.21</slf4j.version>
 		<tika.version>1.13</tika.version>
 		<log4j.version>1.2.17</log4j.version>
-		<crawlercommons.version>0.8</crawlercommons.version>
+		<crawlercommons.version>0.9</crawlercommons.version>
 		<http-fetcher.version>0.1-SNAPSHOT</http-fetcher.version>
 		<aws-java-sdk.version>1.11.86</aws-java-sdk.version>
 		
@@ -59,7 +59,7 @@ under the License.
 	    <repository>
 	      <id>crawler-commons</id>
 	      <name>Sonatype release candidate for crawler-commons 0.8</name>
-	      <url>https://oss.sonatype.org/content/repositories/comgithubcrawler-commons-1004/</url>
+	      <url>https://oss.sonatype.org/content/repositories/comgithubcrawler-commons-1005/</url>
 	    </repository>
 	    
 		<repository>
