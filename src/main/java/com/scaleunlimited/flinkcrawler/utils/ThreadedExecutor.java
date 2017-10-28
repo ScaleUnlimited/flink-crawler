@@ -24,6 +24,9 @@ import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * A wrapper for ThreadPoolExecutor that implements a specific behavior we need.
  * When execute() is called, it succeeds unless all of the threads are busy and the
@@ -31,7 +34,8 @@ import java.util.concurrent.TimeUnit;
  *
  */
 public class ThreadedExecutor {
-    
+	private static final Logger LOGGER = LoggerFactory.getLogger(ThreadedExecutor.class);
+
     /**
      * Always wait for some time when offer() is called. This gives any
      * active threads that much time to complete, before a RejectedExectionException
@@ -108,6 +112,7 @@ public class ThreadedExecutor {
         
         // First just wait for threads to terminate naturally.
         _pool.shutdown();
+        LOGGER.info("Waiting for pool termination ({} {})", duration, timeUnit);
         if (_pool.awaitTermination(duration, timeUnit)) {
             return true;
         }

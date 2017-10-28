@@ -64,6 +64,10 @@ public class UrlLogger {
 		LAST_ACTIVITY_TIME.set(activityTime);
 	}
 
+	public static void resetActivityTime() {
+		LAST_ACTIVITY_TIME.set(NO_ACTIVITY_TIME);
+	}
+	
 	/**
 	 * @return time of last URL activity that was logged.
 	 */
