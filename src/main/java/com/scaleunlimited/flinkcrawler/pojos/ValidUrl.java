@@ -6,13 +6,17 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.scaleunlimited.flinkcrawler.crawldb.IPayload;
 
-import crawlercommons.domains.PaidLevelDomain;
+import crawlercommons.domains.EffectiveTldFinder;
 
 @SuppressWarnings("serial")
 public class ValidUrl extends BaseUrl implements IPayload {
-	
+	private static final Logger LOGGER = LoggerFactory.getLogger(ValidUrl.class);
+
 	private String _protocol;
 	private String _hostname;
 	private String _pld;
@@ -62,7 +66,7 @@ public class ValidUrl extends BaseUrl implements IPayload {
 			_path = url.getPath();
 			_query = url.getQuery();
 
-			_pld = PaidLevelDomain.getPLD(_hostname);
+			_pld = extractPld(_hostname);
 		}
 	}
 	
@@ -210,5 +214,15 @@ public class ValidUrl extends BaseUrl implements IPayload {
 		return true;
 	}
 
+	private static String extractPld(String hostname) {
+        // Use support in EffectiveTldFinder
+        String result = EffectiveTldFinder.getAssignedDomain(hostname, true);
+        if (result == null) {
+        	LOGGER.debug("Hostname {} isn't a valid FQDN", hostname);
+        	return hostname;
+        } else {
+        	return result;
+        }
+    }
 	
 }

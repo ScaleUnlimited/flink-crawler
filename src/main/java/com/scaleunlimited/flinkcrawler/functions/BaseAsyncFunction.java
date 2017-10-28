@@ -39,8 +39,14 @@ public abstract class BaseAsyncFunction<IN, OUT> extends RichAsyncFunction<IN, O
 	
 	@Override
 	public void close() throws Exception {
-		_executor.terminate(_timeoutInSeconds, TimeUnit.SECONDS);
-
+		try {
+			_executor.terminate(_timeoutInSeconds, TimeUnit.SECONDS);
+		} catch (InterruptedException e) {
+			// TODO we have an issue where the TaskManager thread that's
+			// calling us gets interrupted right away, and that in turn
+			// triggers this exception.
+		}
+		
 		super.close();
 	}
 	
