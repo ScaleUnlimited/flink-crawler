@@ -7,11 +7,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.streaming.api.functions.async.RichAsyncFunction;
 import org.apache.flink.streaming.api.functions.async.collector.AsyncCollector;
 import org.apache.http.HttpStatus;
 import org.slf4j.Logger;
@@ -23,8 +21,6 @@ import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ValidUrl;
 import com.scaleunlimited.flinkcrawler.tools.CrawlTool;
-import com.scaleunlimited.flinkcrawler.utils.ThreadedExecutor;
-import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
 import crawlercommons.fetcher.FetchedResult;
 import crawlercommons.fetcher.http.BaseHttpFetcher;
@@ -44,7 +40,7 @@ import crawlercommons.robots.SimpleRobotRulesParser;
  *
  */
 @SuppressWarnings("serial")
-public class CheckUrlWithRobotsFunction extends RichAsyncFunction<FetchUrl, Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> {
+public class CheckUrlWithRobotsFunction extends BaseAsyncFunction<FetchUrl, Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> {
     static final Logger LOGGER = LoggerFactory.getLogger(CheckUrlWithRobotsFunction.class);
 
 	// FUTURE pick good time for this.
@@ -59,7 +55,6 @@ public class CheckUrlWithRobotsFunction extends RichAsyncFunction<FetchUrl, Tupl
 	private long _forceCrawlDelay;
 	private long _defaultCrawlDelay;
 	
-	private transient ThreadedExecutor _executor;
 	private transient BaseHttpFetcher _fetcher;
 	
 	// FUTURE checkpoint the rules.
@@ -68,8 +63,10 @@ public class CheckUrlWithRobotsFunction extends RichAsyncFunction<FetchUrl, Tupl
 	private transient Map<String, BaseRobotRules> _rules;
 	private transient Map<String, Long> _ruleExpirations;
 	
-	public CheckUrlWithRobotsFunction(BaseHttpFetcherBuilder fetcherBuider, SimpleRobotRulesParser parser, long forceCrawlDelay, long defaultCrawlDelay) {
-		_fetcherBuilder = fetcherBuider;
+	public CheckUrlWithRobotsFunction(BaseHttpFetcherBuilder fetcherBuilder, SimpleRobotRulesParser parser, long forceCrawlDelay, long defaultCrawlDelay) {
+		super(THREAD_COUNT, fetcherBuilder.getTimeoutInSeconds());
+		
+		_fetcherBuilder = fetcherBuilder;
 		_parser = parser;
 		_forceCrawlDelay = forceCrawlDelay;
 		_defaultCrawlDelay = defaultCrawlDelay;
@@ -82,19 +79,11 @@ public class CheckUrlWithRobotsFunction extends RichAsyncFunction<FetchUrl, Tupl
 		_fetcher = _fetcherBuilder.build();
 		_rules = new ConcurrentHashMap<>();
 		_ruleExpirations = new ConcurrentHashMap<>();
-		_executor = new ThreadedExecutor(THREAD_COUNT);
-	}
-	
-	@Override
-	public void close() throws Exception {
-		_executor.terminate(_fetcherBuilder.getTimeoutInSeconds(), TimeUnit.SECONDS);
-		
-		super.close();
 	}
 	
 	@Override
 	public void asyncInvoke(FetchUrl url, AsyncCollector<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> collector) throws Exception {
-		UrlLogger.record(this.getClass(), url);
+		record(this.getClass(), url);
 
 		final String robotsUrl = makeRobotsKey(url);
 		BaseRobotRules rules = _rules.get(robotsUrl);

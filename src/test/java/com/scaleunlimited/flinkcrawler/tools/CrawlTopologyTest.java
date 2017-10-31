@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.flink.api.common.JobExecutionResult;
+import org.apache.flink.api.common.JobSubmissionResult;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironmentWithAsyncExecution;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
@@ -136,7 +137,7 @@ public class CrawlTopologyTest {
 			}
 		}
 		for (Tuple3<Class<?>, String, Map<String, String>> entry : UrlLogger.getLog()) {
-			LOGGER.info(String.format("%s: %s", entry.f0, entry.f1));
+			LOGGER.debug(String.format("%s: %s", entry.f0, entry.f1));
 		}
 		
 		String domain1page1 = normalizer.normalize("domain1.com/page1");

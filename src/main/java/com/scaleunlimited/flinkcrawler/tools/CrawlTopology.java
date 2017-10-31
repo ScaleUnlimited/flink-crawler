@@ -27,6 +27,8 @@ import org.apache.flink.streaming.api.environment.LocalStreamEnvironmentWithAsyn
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDB;
 import com.scaleunlimited.flinkcrawler.crawldb.DefaultCrawlDBMerger;
@@ -86,6 +88,7 @@ import de.javakaffee.kryoserializers.UnmodifiableCollectionsSerializer;
  * 
  */
 public class CrawlTopology {
+	private static final Logger LOGGER = LoggerFactory.getLogger(CrawlTopology.class);
 
     private StreamExecutionEnvironment _env;
     private String _jobName;
@@ -132,6 +135,12 @@ public class CrawlTopology {
     	
     	LocalStreamEnvironmentWithAsyncExecution env = (LocalStreamEnvironmentWithAsyncExecution)_env;
     	env.stop(_jobID);
+    	
+    	// Wait for 5 seconds for the job to terminate.
+    	long endTime = System.currentTimeMillis() + 5_000L;
+    	while (env.isRunning(_jobID) && (System.currentTimeMillis() < endTime)) {
+    		Thread.sleep(100L);
+    	}
     	
     	// Stop the job execution environment.
     	env.stop();
@@ -589,6 +598,11 @@ public class CrawlTopology {
 	 * @throws Exception
 	 */
 	public JobSubmissionResult execute(int maxDurationMS, int maxQuietTimeMS) throws Exception {
+		LOGGER.info("Starting async job {}", _jobName);
+		
+		// Reset time, since this is a static that can keep its value from a previous
+		// test run.
+		UrlLogger.resetActivityTime();
 		JobSubmissionResult jobSubmissionResult = executeAsync();
 		
 		boolean terminated = false;
@@ -598,6 +612,8 @@ public class CrawlTopology {
 			if (lastActivityTime != UrlLogger.NO_ACTIVITY_TIME) {
 				long curTime = System.currentTimeMillis();
 				if ((curTime - lastActivityTime) > maxQuietTimeMS) {
+					LOGGER.info("Stopping async job {} due to lack of activity", _jobName);
+
 					stop();
 					terminated = true;
 					break;
@@ -608,6 +624,7 @@ public class CrawlTopology {
 		}
 		
 		if (!terminated) {
+			LOGGER.info("Stopping async job {} due to timeout", _jobName);
 			stop();
 			throw new RuntimeException("Job did not terminate in time");
 		}

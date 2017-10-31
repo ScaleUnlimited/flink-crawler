@@ -1,6 +1,5 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
-import org.apache.flink.api.common.functions.RichFlatMapFunction;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
@@ -11,10 +10,9 @@ import com.scaleunlimited.flinkcrawler.parser.ParserResult;
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
-import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
 @SuppressWarnings("serial")
-public class ParseFunction extends RichFlatMapFunction<FetchedUrl, Tuple3<ExtractedUrl, ParsedUrl, String>> {
+public class ParseFunction extends BaseFlatMapFunction<FetchedUrl, Tuple3<ExtractedUrl, ParsedUrl, String>> {
     private static final Logger LOGGER = LoggerFactory.getLogger(ParseFunction.class);
 
     private static final String TABS_AND_RETURNS_PATTERN = "[\t\r\n]";
@@ -26,8 +24,7 @@ public class ParseFunction extends RichFlatMapFunction<FetchedUrl, Tuple3<Extrac
 
 	@Override
 	public void flatMap(FetchedUrl fetchedUrl, Collector<Tuple3<ExtractedUrl, ParsedUrl, String>> collector) throws Exception {
-			
-		UrlLogger.record(this.getClass(), fetchedUrl);
+		record(this.getClass(), fetchedUrl);
 		
 		ParserResult result;
 		try {
@@ -46,7 +43,7 @@ public class ParseFunction extends RichFlatMapFunction<FetchedUrl, Tuple3<Extrac
 				String.format(	"Extracted '%s' from '%s'",
 								outlink.getUrl(),
 								fetchedUrl.getUrl());
-			LOGGER.debug(message);
+			LOGGER.trace(message);
 			collector.collect(new Tuple3<ExtractedUrl, ParsedUrl, String>(outlink, null, null));
 		}
 		

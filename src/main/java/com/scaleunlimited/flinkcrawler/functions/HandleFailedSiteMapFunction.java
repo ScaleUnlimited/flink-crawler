@@ -12,6 +12,7 @@ public class HandleFailedSiteMapFunction extends RichFilterFunction<CrawlStateUr
 	static final Logger LOGGER = LoggerFactory.getLogger(HandleFailedSiteMapFunction.class);
 	
 	public HandleFailedSiteMapFunction() {
+		super();
 	}
 
 	@Override
@@ -21,6 +22,7 @@ public class HandleFailedSiteMapFunction extends RichFilterFunction<CrawlStateUr
 		if (status != FetchStatus.FETCHED) {
 			LOGGER.info(String.format("Failed fetching sitemap url '%s' due to '%s'", crawlStateUrl.getUrl(), crawlStateUrl.getStatus()));
 		}
+		
 		return true;
 	}
 }

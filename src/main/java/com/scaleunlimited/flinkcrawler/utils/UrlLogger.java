@@ -29,14 +29,14 @@ public class UrlLogger {
 		}
 	}
 	
-	public static void record(Class<?> clazz, BaseUrl url) {
-		record(clazz, url, NO_METADATA);
+	public static void record(Class<?> clazz, int partition, int parallelism, BaseUrl url) {
+		record(clazz, partition, parallelism, url, NO_METADATA);
 	}
 	
-	public static void record(Class<?> clazz, BaseUrl url, String... metaData) {
+	public static void record(Class<?> clazz, int partition, int parallelism, BaseUrl url, String... metaData) {
 		if (LOGGER.isDebugEnabled()) {
 			StringBuilder msg = new StringBuilder();
-			msg.append(String.format("%s: %s", clazz.getSimpleName(), url));
+			msg.append(String.format("%s (%d/%d): %s", clazz.getSimpleName(), partition, parallelism, url));
 			if (metaData.length > 0) {
 				msg.append(" (");
 				for (int i = 0; i < metaData.length; i += 2) {
@@ -64,6 +64,10 @@ public class UrlLogger {
 		LAST_ACTIVITY_TIME.set(activityTime);
 	}
 
+	public static void resetActivityTime() {
+		LAST_ACTIVITY_TIME.set(NO_ACTIVITY_TIME);
+	}
+	
 	/**
 	 * @return time of last URL activity that was logged.
 	 */

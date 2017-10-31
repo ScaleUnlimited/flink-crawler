@@ -4,12 +4,10 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.metrics.Gauge;
-import org.apache.flink.streaming.api.functions.async.RichAsyncFunction;
 import org.apache.flink.streaming.api.functions.async.collector.AsyncCollector;
 import org.apache.http.HttpStatus;
 import org.slf4j.Logger;
@@ -21,8 +19,6 @@ import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.utils.ExceptionUtils;
-import com.scaleunlimited.flinkcrawler.utils.ThreadedExecutor;
-import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
 import crawlercommons.fetcher.BaseFetchException;
 import crawlercommons.fetcher.FetchedResult;
@@ -30,17 +26,14 @@ import crawlercommons.fetcher.http.BaseHttpFetcher;
 
 
 @SuppressWarnings("serial")
-public class FetchUrlsFunction extends RichAsyncFunction<FetchUrl, Tuple2<CrawlStateUrl, FetchedUrl>> {
+public class FetchUrlsFunction extends BaseAsyncFunction<FetchUrl, Tuple2<CrawlStateUrl, FetchedUrl>> {
     static final Logger LOGGER = LoggerFactory.getLogger(FetchUrlsFunction.class);
     
 private static final String GAUGE_URLS_CURRENTLY_BEING_FETCHED = "URLsCurrentlyBeingFetched";
 	public static final int DEFAULT_THREAD_COUNT = 100;
 	
-	private int _threadCount;
 	private BaseHttpFetcherBuilder _fetcherBuilder;
 	private BaseHttpFetcher _fetcher;
-	
-	private transient ThreadedExecutor _executor;
 	
 	// TODO use native String->long map
 	private transient Map<String, Long> _nextFetch;
@@ -54,10 +47,10 @@ private static final String GAUGE_URLS_CURRENTLY_BEING_FETCHED = "URLsCurrentlyB
 		this(fetcherBuilder, DEFAULT_THREAD_COUNT);
 	}
 
-	public FetchUrlsFunction(	BaseHttpFetcherBuilder fetcherBuilder,
-								int threadCount) {
+	public FetchUrlsFunction(BaseHttpFetcherBuilder fetcherBuilder, int threadCount) {
+		super(threadCount, fetcherBuilder.getTimeoutInSeconds());
+		
 		_fetcherBuilder = fetcherBuilder;
-		_threadCount = threadCount;
 	}
 
 	@Override
@@ -76,19 +69,11 @@ private static final String GAUGE_URLS_CURRENTLY_BEING_FETCHED = "URLsCurrentlyB
 		 
 		_fetcher = _fetcherBuilder.build();
 		_nextFetch = new HashMap<>();
-		_executor = new ThreadedExecutor(_threadCount);
-	}
-	
-	@Override
-	public void close() throws Exception {
-		_executor.terminate(_fetcherBuilder.getTimeoutInSeconds(), TimeUnit.SECONDS);
-		
-		super.close();
 	}
 	
 	@Override
 	public void asyncInvoke(FetchUrl url, AsyncCollector<Tuple2<CrawlStateUrl, FetchedUrl>> collector) throws Exception {
-		UrlLogger.record(this.getClass(), url);
+		record(this.getClass(), url);
 		
 		final String domainKey = url.getUrlWithoutPath();
 		synchronized (_nextFetch) {
@@ -117,7 +102,7 @@ private static final String GAUGE_URLS_CURRENTLY_BEING_FETCHED = "URLsCurrentlyB
 														result.getContent(), result.getContentType(),
 														result.getResponseRate());
 					
-					LOGGER.info("Fetched " + result);
+					LOGGER.debug("Fetched " + result);
 					
 					// If we got an error, put null in for fetchedUrl so we don't try to process it downstream.
 					if (result.getStatusCode() != HttpStatus.SC_OK) {
