@@ -28,6 +28,12 @@ public class ValidUrlTest {
 		
 		url = new ValidUrl("http://wwww.domain.co.jp/path/to/file?query");
 		assertEquals("domain.co.jp", url.getPld());
+		
+		url = new ValidUrl("http://1.2.3.4");
+		assertEquals("1.2.3.4", url.getPld());
+		
+		url = new ValidUrl("http://www.fi.com");
+		assertEquals("fi.com", url.getPld());
 	}
 	
 }
