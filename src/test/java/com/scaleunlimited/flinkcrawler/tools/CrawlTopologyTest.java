@@ -4,7 +4,7 @@ import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.flink.api.common.JobSubmissionResult;
+import org.apache.flink.api.common.JobExecutionResult;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironmentWithAsyncExecution;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
@@ -44,7 +44,16 @@ public class CrawlTopologyTest {
     private static final String CRLF = "\r\n";
 
 	@Test
-	public void test() throws Exception {
+	public void testAsync() throws Exception {
+		runtest(true);
+	}
+	
+	@Test
+	public void testCounters() throws Exception {
+		runtest(false);
+	}
+
+	private void runtest(boolean async) throws Exception {
 		UrlLogger.clear();
 		
 		LocalStreamEnvironmentWithAsyncExecution env = new LocalStreamEnvironmentWithAsyncExecution();
@@ -115,14 +124,17 @@ public class CrawlTopologyTest {
 		File dotFile = new File(testDir, "topology.dot");
 		ct.printDotFile(dotFile);
 		
-		// Execute for a maximum of 20 seconds, but terminate (successfully)
-		// if there's no activity for 5 seconds.
-		JobSubmissionResult jobSubmissionResult = ct.execute(20_000, 5_000);
-		Map<String, Object> accumulatorResults = jobSubmissionResult.getJobExecutionResult().getAllAccumulatorResults();
-		for (String key : accumulatorResults.keySet()) {
-			System.out.println(key + ":\t" + accumulatorResults.get(key));
+		if (async) {
+			// Execute for a maximum of 20 seconds, but terminate (successfully)
+			// if there's no activity for 5 seconds.
+			ct.execute(20_000, 5_000);
+		} else {
+			JobExecutionResult jobExecutionResult = ct.execute();
+			Map<String, Object> accumulatorResults = jobExecutionResult.getAllAccumulatorResults();
+			for (String key : accumulatorResults.keySet()) {
+				System.out.println(key + ":\t" + accumulatorResults.get(key));
+			}
 		}
-		
 		for (Tuple3<Class<?>, String, Map<String, String>> entry : UrlLogger.getLog()) {
 			LOGGER.info(String.format("%s: %s", entry.f0, entry.f1));
 		}
