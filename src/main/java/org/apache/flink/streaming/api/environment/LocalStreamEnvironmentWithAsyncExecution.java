@@ -1,5 +1,6 @@
 package org.apache.flink.streaming.api.environment;
 
+import org.apache.flink.api.common.JobExecutionResult;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobSubmissionResult;
 import org.apache.flink.configuration.ConfigConstants;
@@ -72,6 +73,65 @@ public class LocalStreamEnvironmentWithAsyncExecution extends LocalStreamEnviron
 		return _exec.submitJobDetached(jobGraph);
 	}
 	
+	/**
+	 * Executes the JobGraph of the on a mini cluster of CLusterUtil with a user
+	 * specified name.
+	 *
+	 * @param jobName
+	 *            name of the job
+	 * @return The result of the job execution, containing elapsed time and accumulators.
+	 */
+	@Override
+	public JobExecutionResult execute(String jobName) throws Exception {
+		// transform the streaming program into a JobGraph
+		StreamGraph streamGraph = getStreamGraph();
+		streamGraph.setJobName(jobName);
+
+		JobGraph jobGraph = streamGraph.getJobGraph();
+
+		Configuration configuration = new Configuration();
+		configuration.addAll(jobGraph.getJobConfiguration());
+
+		configuration.setLong(TaskManagerOptions.MANAGED_MEMORY_SIZE, -1L);
+		configuration.setInteger(ConfigConstants.TASK_MANAGER_NUM_TASK_SLOTS, jobGraph.getMaximumParallelism());
+
+		// add (and override) the settings with what the user defined
+		configuration.addAll(_conf);
+
+		_exec = new LocalFlinkMiniCluster(configuration, true);
+		
+		try {
+			_exec.start();
+			return _exec.submitJobAndWait(jobGraph, getConfig().isSysoutLoggingEnabled());
+		} finally {
+			transformations.clear();
+			_exec.stop();
+			_exec = null;
+		}
+	}
+	
+	/**
+	 * Return the active JobID, or null if no job is running.
+	 * 
+	 * @return
+	 */
+	public JobID getActiveJobID() {
+		JobID result = null;
+		if (_exec.running()) {
+			scala.collection.Iterator<JobID> iter = _exec.currentlyRunningJobs().toIterator();
+			while (iter.hasNext()) {
+				JobID id = iter.next();
+				if (result != null) {
+					throw new RuntimeException("Multiple jobs running in LocalFlinkMiniCluster!");
+				} else {
+					result = id;
+				}
+			}
+		}
+		
+		return result;
+	}
+
 	/**
 	 * Return whether <jobID> is currently running.
 	 * 
