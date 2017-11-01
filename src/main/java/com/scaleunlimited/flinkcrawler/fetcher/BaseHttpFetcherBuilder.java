@@ -14,8 +14,6 @@ import crawlercommons.fetcher.http.UserAgent;
 @SuppressWarnings("serial")
 public abstract class BaseHttpFetcherBuilder implements Serializable {
 	
-	// FUTURE set timeout explicitly.
-	// See https://github.com/ScaleUnlimited/flink-crawler/issues/52
 	private static final int DEFAULT_FETCH_TIMEOUT = 100;
 	
 	// From BaseFetcher:
@@ -25,6 +23,7 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
 
     // From BaseHttpFetcher:
     protected int _maxThreads;
+    protected int _timeoutInSeconds;
     protected UserAgent _userAgent;
     protected int _maxRedirects = BaseHttpFetcher.DEFAULT_MAX_REDIRECTS;
     protected int _maxConnectionsPerHost = BaseHttpFetcher.DEFAULT_MAX_CONNECTIONS_PER_HOST;
@@ -32,11 +31,13 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
     protected String _acceptLanguage = BaseHttpFetcher.DEFAULT_ACCEPT_LANGUAGE;
     protected RedirectMode _redirectMode = BaseHttpFetcher.DEFAULT_REDIRECT_MODE;
 
+
     public BaseHttpFetcherBuilder(int maxThreads, UserAgent userAgent) {
     	super();
         
         _maxThreads = maxThreads;
         _userAgent = userAgent;
+        _timeoutInSeconds = DEFAULT_FETCH_TIMEOUT;
     }
     
 	// From BaseFetcher:
@@ -89,8 +90,12 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
      */
     public abstract BaseHttpFetcher build() throws Exception;
     
+    public void setTimeoutInSeconds(int timeoutInSeconds) {
+    	_timeoutInSeconds = timeoutInSeconds;
+    }
+    
     public int getTimeoutInSeconds() {
-    	return DEFAULT_FETCH_TIMEOUT;
+    	return _timeoutInSeconds;
     }
 
     public UserAgent getUserAgent() {
