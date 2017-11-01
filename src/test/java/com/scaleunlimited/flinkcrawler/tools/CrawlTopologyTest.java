@@ -5,7 +5,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.flink.api.common.JobExecutionResult;
-import org.apache.flink.api.common.JobSubmissionResult;
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironmentWithAsyncExecution;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
@@ -130,11 +130,7 @@ public class CrawlTopologyTest {
 			// if there's no activity for 5 seconds.
 			ct.execute(20_000, 5_000);
 		} else {
-			JobExecutionResult jobExecutionResult = ct.execute();
-			Map<String, Object> accumulatorResults = jobExecutionResult.getAllAccumulatorResults();
-			for (String key : accumulatorResults.keySet()) {
-				System.out.println(key + ":\t" + accumulatorResults.get(key));
-			}
+			executeSync(env, ct, 20_000);
 		}
 		for (Tuple3<Class<?>, String, Map<String, String>> entry : UrlLogger.getLog()) {
 			LOGGER.debug(String.format("%s: %s", entry.f0, entry.f1));
@@ -190,4 +186,47 @@ public class CrawlTopologyTest {
 
 			;
 	}
+
+	private void executeSync(LocalStreamEnvironmentWithAsyncExecution env,
+			CrawlTopology ct, int maxDurationMS) throws Exception {
+		Thread t = new Thread() {
+			public void run() {
+				try {
+					JobExecutionResult jobExecutionResult = ct.execute();
+					
+					Map<String, Object> accumulatorResults = jobExecutionResult
+							.getAllAccumulatorResults();
+					for (String key : accumulatorResults.keySet()) {
+						System.out.println(key + ":\t"
+								+ accumulatorResults.get(key));
+					}
+
+				} catch (Exception e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+		};
+		t.start();
+
+		Thread.sleep(5000);
+		JobID activeJobID = env.getActiveJobID();
+		long endTime = System.currentTimeMillis() + maxDurationMS;
+		while (System.currentTimeMillis() < endTime) {
+			if (!env.isRunning(activeJobID)) {
+				break;
+			}
+			try {
+				Thread.sleep(100);
+			} catch (InterruptedException e) {
+
+			}
+		}
+		if (env.isRunning(activeJobID)) {
+//			t.stop();
+			env.stop(activeJobID);
+		}		
+		
+	}
+
 }
