@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.fetcher.BaseHttpFetcherBuilder;
+import com.scaleunlimited.flinkcrawler.metrics.CrawlerMetrics;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
@@ -29,7 +30,6 @@ import crawlercommons.fetcher.http.BaseHttpFetcher;
 public class FetchUrlsFunction extends BaseAsyncFunction<FetchUrl, Tuple2<CrawlStateUrl, FetchedUrl>> {
     static final Logger LOGGER = LoggerFactory.getLogger(FetchUrlsFunction.class);
     
-private static final String GAUGE_URLS_CURRENTLY_BEING_FETCHED = "URLsCurrentlyBeingFetched";
 	public static final int DEFAULT_THREAD_COUNT = 100;
 	
 	private BaseHttpFetcherBuilder _fetcherBuilder;
@@ -57,7 +57,9 @@ private static final String GAUGE_URLS_CURRENTLY_BEING_FETCHED = "URLsCurrentlyB
 	public void open(Configuration parameters) throws Exception {
 		super.open(parameters);
 		
-		getRuntimeContext().getMetricGroup().gauge(GAUGE_URLS_CURRENTLY_BEING_FETCHED, new Gauge<Integer>() {
+		getRuntimeContext().getMetricGroup().gauge(
+				CrawlerMetrics.GAUGE_URLS_CURRENTLY_BEING_FETCHED.toString(),
+				new Gauge<Integer>() {
 					@Override
 					public Integer getValue() {
 						if (_executor != null) {

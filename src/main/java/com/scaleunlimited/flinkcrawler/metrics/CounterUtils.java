@@ -1,4 +1,4 @@
-package com.scaleunlimited.flinkcrawler.utils;
+package com.scaleunlimited.flinkcrawler.metrics;
 
 import org.apache.flink.api.common.accumulators.LongCounter;
 import org.apache.flink.api.common.functions.RuntimeContext;

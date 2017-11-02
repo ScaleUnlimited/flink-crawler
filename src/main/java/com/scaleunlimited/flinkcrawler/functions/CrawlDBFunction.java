@@ -11,6 +11,8 @@ import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDB;
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDBMerger;
+import com.scaleunlimited.flinkcrawler.metrics.CounterUtils;
+import com.scaleunlimited.flinkcrawler.metrics.CrawlerMetrics;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
@@ -27,7 +29,6 @@ import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
 public class CrawlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> {
     static final Logger LOGGER = LoggerFactory.getLogger(CrawlDBFunction.class);
 
-    private static final String GAUGE_URLS_IN_FETCH_QUEUE = "URLsInFetchQueue";
     private static final int URLS_PER_TICKLE = 100;
 	private BaseCrawlDB _crawlDB;
 	private BaseCrawlDBMerger _merger;
@@ -50,12 +51,14 @@ public class CrawlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl
 		
 		RuntimeContext context = getRuntimeContext();
 		
-		context.getMetricGroup().gauge(GAUGE_URLS_IN_FETCH_QUEUE, new Gauge<Integer>() {
-			@Override
-			public Integer getValue() {
-				return _fetchQueue.size();
-			}
-		});
+		context.getMetricGroup().gauge(
+				CrawlerMetrics.GAUGE_URLS_IN_FETCH_QUEUE.toString(),
+				new Gauge<Integer>() {
+					@Override
+					public Integer getValue() {
+						return _fetchQueue.size();
+					}
+				});
 		_addSinceMerge = new AtomicBoolean(false);
 		
 		_fetchQueue.open();
@@ -74,6 +77,7 @@ public class CrawlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl
 		
 		boolean needMerge = false;
 		if (url.getUrlType() == UrlType.REGULAR) {
+			CounterUtils.increment(getRuntimeContext(), url.getStatus());
 			record(this.getClass(), url, FetchStatus.class.getSimpleName(), url.getStatus().toString());
 			needMerge = _crawlDB.add(url);
 			_addSinceMerge.set(true);

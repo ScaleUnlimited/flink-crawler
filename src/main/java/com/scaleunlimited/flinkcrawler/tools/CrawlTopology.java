@@ -594,16 +594,15 @@ public class CrawlTopology {
 	 * 
 	 * @param maxDurationMS Maximum allowable execution time.
 	 * @param maxQuietTimeMS Length of time w/no recorded activity after which we'll terminate.
-	 * @return JobSubmissionResult 
 	 * @throws Exception
 	 */
-	public JobSubmissionResult execute(int maxDurationMS, int maxQuietTimeMS) throws Exception {
+	public void execute(int maxDurationMS, int maxQuietTimeMS) throws Exception {
 		LOGGER.info("Starting async job {}", _jobName);
 		
 		// Reset time, since this is a static that can keep its value from a previous
 		// test run.
 		UrlLogger.resetActivityTime();
-		JobSubmissionResult jobSubmissionResult = executeAsync();
+		executeAsync();
 		
 		boolean terminated = false;
 		long endTime = System.currentTimeMillis() + maxDurationMS;
@@ -628,6 +627,5 @@ public class CrawlTopology {
 			stop();
 			throw new RuntimeException("Job did not terminate in time");
 		}
-		return jobSubmissionResult;
 	}
 }
