@@ -571,7 +571,7 @@ under the License.
 							<goal>shade</goal>
 						</goals>
 						<configuration>
-							<finalName>${project.artifactId}-app-${project.version}</finalName>
+							<finalName>${project.artifactId}-tool-${project.version}</finalName>
 							
 							<artifactSet>
 								<excludes>
