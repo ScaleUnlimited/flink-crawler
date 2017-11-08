@@ -37,6 +37,11 @@ under the License.
 		<log4j.version>1.2.17</log4j.version>
 		<crawlercommons.version>0.9</crawlercommons.version>
 		<http-fetcher.version>0.1-SNAPSHOT</http-fetcher.version>
+		
+		<!-- TODO We may need to update this version, since I'm getting
+		java.lang.NoClassDefFoundError: org/apache/http/conn/routing/HttpRoutePlanner
+		from AmazonHttpClient.java:147.
+		 -->
 		<aws-java-sdk.version>1.11.86</aws-java-sdk.version>
 		
 		<javac.src.version>1.8</javac.src.version>
@@ -102,13 +107,13 @@ under the License.
 			
 			<dependency>
 				<groupId>org.apache.flink</groupId>
-				<artifactId>flink-streaming-java_2.10</artifactId>
+				<artifactId>flink-streaming-java_2.11</artifactId>
 				<version>${flink.version}</version>
 			</dependency>
 			
 			<dependency>
 				<groupId>org.apache.flink</groupId>
-				<artifactId>flink-clients_2.10</artifactId>
+				<artifactId>flink-clients_2.11</artifactId>
 				<version>${flink.version}</version>
 			</dependency>
 			
@@ -133,7 +138,7 @@ under the License.
 	        <dependency>
 				<groupId>org.apache.httpcomponents</groupId>
 				<artifactId>httpclient</artifactId>
-				<version>4.5.2</version>
+				<version>4.5.3</version>
 			</dependency>
 			
 			<dependency>
@@ -265,7 +270,7 @@ under the License.
 			<dependency>
 				<groupId>org.scala-lang</groupId>
 				<artifactId>scala-library</artifactId>
-				<version>2.10.5</version>
+				<version>2.11.11</version>
 			</dependency>
 			
 			<dependency>
@@ -309,12 +314,12 @@ under the License.
 		
 		<dependency>
 			<groupId>org.apache.flink</groupId>
-			<artifactId>flink-streaming-java_2.10</artifactId>
+			<artifactId>flink-streaming-java_2.11</artifactId>
 		</dependency>
 		
 		<dependency>
 			<groupId>org.apache.flink</groupId>
-			<artifactId>flink-clients_2.10</artifactId>
+			<artifactId>flink-clients_2.11</artifactId>
 		</dependency>
 		
 		<dependency>
@@ -465,14 +470,14 @@ under the License.
 		TODO decide if we want to switch to Java 8, so we can use flinkspector.
 		<dependency>
 		    <groupId>org.flinkspector</groupId>
-		    <artifactId>flinkspector-dataset_2.10</artifactId>
+		    <artifactId>flinkspector-dataset_2.11</artifactId>
 		    <version>0.4</version>
 		    <scope>test</scope>
 		</dependency>
 		
 		<dependency>
 		    <groupId>org.flinkspector</groupId>
-		    <artifactId>flinkspector-datastream_2.10</artifactId>
+		    <artifactId>flinkspector-datastream_2.11</artifactId>
 		    <version>0.4</version>
 		    <scope>test</scope>
 		</dependency>	
@@ -503,13 +508,13 @@ under the License.
 				</dependency>
 				<dependency>
 					<groupId>org.apache.flink</groupId>
-					<artifactId>flink-streaming-java_2.10</artifactId>
+					<artifactId>flink-streaming-java_2.11</artifactId>
 					<version>${flink.version}</version>
 					<scope>provided</scope>
 				</dependency>
 				<dependency>
 					<groupId>org.apache.flink</groupId>
-					<artifactId>flink-clients_2.10</artifactId>
+					<artifactId>flink-clients_2.11</artifactId>
 					<version>${flink.version}</version>
 					<scope>provided</scope>
 				</dependency>
@@ -569,14 +574,14 @@ under the License.
 									<exclude>org.apache.flink:flink-shaded-curator-recipes</exclude>
 									<exclude>org.apache.flink:flink-core</exclude>
 									<exclude>org.apache.flink:flink-java</exclude>
-									<exclude>org.apache.flink:flink-scala_2.10</exclude>
-									<exclude>org.apache.flink:flink-runtime_2.10</exclude>
-									<exclude>org.apache.flink:flink-optimizer_2.10</exclude>
-									<exclude>org.apache.flink:flink-clients_2.10</exclude>
-									<exclude>org.apache.flink:flink-avro_2.10</exclude>
-									<exclude>org.apache.flink:flink-examples-batch_2.10</exclude>
-									<exclude>org.apache.flink:flink-examples-streaming_2.10</exclude>
-									<exclude>org.apache.flink:flink-streaming-java_2.10</exclude>
+									<exclude>org.apache.flink:flink-scala_2.11</exclude>
+									<exclude>org.apache.flink:flink-runtime_2.11</exclude>
+									<exclude>org.apache.flink:flink-optimizer_2.11</exclude>
+									<exclude>org.apache.flink:flink-clients_2.11</exclude>
+									<exclude>org.apache.flink:flink-avro_2.11</exclude>
+									<exclude>org.apache.flink:flink-examples-batch_2.11</exclude>
+									<exclude>org.apache.flink:flink-examples-streaming_2.11</exclude>
+									<exclude>org.apache.flink:flink-streaming-java_2.11</exclude>
 
 									<!-- Also exclude very big transitive dependencies of Flink
 
