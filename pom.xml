@@ -438,7 +438,6 @@ under the License.
 		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
-			<scope>test</scope>
 		</dependency>
 		
 		<dependency>
@@ -543,6 +542,20 @@ under the License.
 
 	<build>
 		<plugins>
+			<plugin>
+				<artifactId>maven-jar-plugin</artifactId>
+				<version>3.0.2</version>
+				<executions>
+					<execution>
+						<id>default-jar</id>
+						<phase>package</phase>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			
 			<!-- We use the maven-shade plugin to create a fat jar that contains all dependencies
 			except flink and it's transitive dependencies. The resulting fat-jar can be executed
 			on a cluster. Change the value of Program-Class if your program entry point changes. -->
@@ -558,6 +571,8 @@ under the License.
 							<goal>shade</goal>
 						</goals>
 						<configuration>
+							<finalName>${project.artifactId}-tool-${project.version}</finalName>
+							
 							<artifactSet>
 								<excludes>
 									<!-- This list contains all dependencies of flink-dist
