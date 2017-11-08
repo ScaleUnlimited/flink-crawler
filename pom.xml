@@ -406,6 +406,10 @@ under the License.
 	            	<groupId>com.googlecode.mp4parser</groupId>
 	            	<artifactId>isoparser</artifactId>
 	            </exclusion>
+	            <exclusion>
+	            	<groupId>edu.ucar</groupId>
+	            	<artifactId>httpservices</artifactId>
+	            </exclusion>
 			</exclusions>
 		</dependency>
 		
