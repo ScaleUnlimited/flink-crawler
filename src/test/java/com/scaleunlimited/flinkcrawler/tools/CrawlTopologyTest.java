@@ -43,7 +43,7 @@ public class CrawlTopologyTest {
     private static final String CRLF = "\r\n";
 
 	@Test
-	public void test() throws Exception {
+	public void testAsync() throws Exception {
 		UrlLogger.clear();
 		
 		LocalStreamEnvironmentWithAsyncExecution env = new LocalStreamEnvironmentWithAsyncExecution();
@@ -117,7 +117,8 @@ public class CrawlTopologyTest {
 		// Execute for a maximum of 20 seconds, but terminate (successfully)
 		// if there's no activity for 5 seconds.
 		ct.execute(20_000, 5_000);
-		
+	
+
 		for (Tuple3<Class<?>, String, Map<String, String>> entry : UrlLogger.getLog()) {
 			LOGGER.debug(String.format("%s: %s", entry.f0, entry.f1));
 		}
@@ -172,4 +173,5 @@ public class CrawlTopologyTest {
 
 			;
 	}
+
 }

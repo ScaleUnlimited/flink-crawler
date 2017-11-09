@@ -54,6 +54,10 @@ public class FetchQueue implements Serializable {
 		return _fetchQueue.poll();
 	}
 
+	public int size() {
+		return _fetchQueue.size();
+	}
+	
 	@Override
 	public int hashCode() {
 		final int prime = 31;

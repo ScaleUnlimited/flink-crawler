@@ -7,12 +7,14 @@ import java.util.Map;
 
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.metrics.Gauge;
 import org.apache.flink.streaming.api.functions.async.collector.AsyncCollector;
 import org.apache.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.fetcher.BaseHttpFetcherBuilder;
+import com.scaleunlimited.flinkcrawler.metrics.CrawlerMetrics;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
@@ -55,6 +57,18 @@ public class FetchUrlsFunction extends BaseAsyncFunction<FetchUrl, Tuple2<CrawlS
 	public void open(Configuration parameters) throws Exception {
 		super.open(parameters);
 		
+		getRuntimeContext().getMetricGroup().gauge(
+				CrawlerMetrics.GAUGE_URLS_CURRENTLY_BEING_FETCHED.toString(),
+				new Gauge<Integer>() {
+					@Override
+					public Integer getValue() {
+						if (_executor != null) {
+							return _executor.getActiveCount();
+						}
+						return 0;
+					}
+				});
+		 
 		_fetcher = _fetcherBuilder.build();
 		_nextFetch = new HashMap<>();
 	}

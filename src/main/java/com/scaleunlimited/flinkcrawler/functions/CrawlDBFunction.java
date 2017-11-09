@@ -3,13 +3,17 @@ package com.scaleunlimited.flinkcrawler.functions;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.flink.api.common.functions.RuntimeContext;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.metrics.Gauge;
 import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDB;
 import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDBMerger;
+import com.scaleunlimited.flinkcrawler.metrics.CounterUtils;
+import com.scaleunlimited.flinkcrawler.metrics.CrawlerMetrics;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
@@ -27,7 +31,6 @@ public class CrawlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl
     static final Logger LOGGER = LoggerFactory.getLogger(CrawlDBFunction.class);
 
     private static final int URLS_PER_TICKLE = 10;
-    
     private static final int MAX_ACTIVE_URLS = URLS_PER_TICKLE * 2;
     
 	private BaseCrawlDB _crawlDB;
@@ -51,6 +54,16 @@ public class CrawlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl
 	public void open(Configuration parameters) throws Exception {
 		super.open(parameters);
 		
+		RuntimeContext context = getRuntimeContext();
+		
+		context.getMetricGroup().gauge(
+				CrawlerMetrics.GAUGE_URLS_IN_FETCH_QUEUE.toString(),
+				new Gauge<Integer>() {
+					@Override
+					public Integer getValue() {
+						return _fetchQueue.size();
+					}
+				});
 		_addSinceMerge = new AtomicBoolean(false);
 		_activeUrls = new AtomicInteger(0);
 		
@@ -70,6 +83,7 @@ public class CrawlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl
 		
 		boolean needMerge = false;
 		if (url.getUrlType() == UrlType.REGULAR) {
+			CounterUtils.increment(getRuntimeContext(), url.getStatus());
 			record(this.getClass(), url, FetchStatus.class.getSimpleName(), url.getStatus().toString());
 			needMerge = _crawlDB.add(url);
 			_addSinceMerge.set(true);
