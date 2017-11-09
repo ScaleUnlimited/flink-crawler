@@ -28,9 +28,11 @@ public class ParseFunction extends BaseFlatMapFunction<FetchedUrl, Tuple3<Extrac
 		
 		ParserResult result;
 		try {
+			long start = System.currentTimeMillis();
 			result = _parser.parse(fetchedUrl);
+			LOGGER.debug(String.format("Parsed '%s' in %dms", fetchedUrl, System.currentTimeMillis() - start));
 		} catch (Exception e) {
-			LOGGER.warn("Parsing exception", e);
+			LOGGER.warn("Parsing exception " + fetchedUrl, e);
 			return;
 		}
 		

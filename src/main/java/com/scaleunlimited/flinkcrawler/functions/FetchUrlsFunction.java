@@ -76,11 +76,11 @@ public class FetchUrlsFunction extends BaseAsyncFunction<FetchUrl, Tuple2<CrawlS
 			}
 		}
 		
-		LOGGER.debug("Queuing for fetch: " + url);
+		LOGGER.debug("Queueing for fetch: " + url);
 		_executor.execute(new Runnable() {
 			
 			@Override
-			public void run() {				
+			public void run() {
 				LOGGER.debug("Fetching " + url);
 				
 				try {
@@ -90,22 +90,30 @@ public class FetchUrlsFunction extends BaseAsyncFunction<FetchUrl, Tuple2<CrawlS
 														result.getContent(), result.getContentType(),
 														result.getResponseRate());
 					
-					LOGGER.debug("Fetched " + result);
 					
 					// If we got an error, put null in for fetchedUrl so we don't try to process it downstream.
 					if (result.getStatusCode() != HttpStatus.SC_OK) {
+						LOGGER.debug(String.format("Failed to fetch '%s' (%d)", result.getFetchedUrl(), result.getStatusCode()));
 						FetchStatus fetchStatus = ExceptionUtils.mapHttpStatusToFetchStatus(result.getStatusCode());
 						collector.collect(Collections.singleton(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url, fetchStatus, 0, System.currentTimeMillis(), 0L), null)));
+						LOGGER.debug(String.format("Forwarded failed URL to update status: '%s'", result.getFetchedUrl()));
 					} else {
+						LOGGER.debug(String.format("Fetched %d bytes from '%s'", result.getContentLength(), result.getFetchedUrl()));
 						collector.collect(Collections.singleton(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url, FetchStatus.FETCHED, 0, fetchedUrl.getFetchTime(), 0L), fetchedUrl)));
+						LOGGER.debug(String.format("Forwarded fetched URL to be parsed: '%s'", result.getFetchedUrl()));
 					}
 				} catch (Exception e) {
+					LOGGER.debug(String.format("Failed to fetch '%s' due to %s", url, e.getMessage()));
+					
 					if (e instanceof BaseFetchException) {
 						collector.collect(Collections.singleton(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url, ExceptionUtils.mapExceptionToFetchStatus(e), 0, System.currentTimeMillis(), 0L), null)));
+						LOGGER.debug(String.format("Forwarded exception URL to update status: '%s'", url));
 					} else {
 						throw new RuntimeException("Exception fetching " + url, e);
 					}
-
+				} catch (Throwable t) {
+					LOGGER.error(String.format("Serious error trying to fetch '%s' due to %s", url, t.getMessage()), t);
+					throw new RuntimeException(t);
 				}
 			}
 		});

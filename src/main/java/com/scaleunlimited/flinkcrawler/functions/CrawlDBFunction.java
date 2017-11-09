@@ -1,6 +1,7 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.Collector;
@@ -25,7 +26,9 @@ import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
 public class CrawlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> {
     static final Logger LOGGER = LoggerFactory.getLogger(CrawlDBFunction.class);
 
-    private static final int URLS_PER_TICKLE = 100;
+    private static final int URLS_PER_TICKLE = 10;
+    
+    private static final int MAX_ACTIVE_URLS = URLS_PER_TICKLE * 2;
     
 	private BaseCrawlDB _crawlDB;
 	private BaseCrawlDBMerger _merger;
@@ -35,6 +38,8 @@ public class CrawlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl
 	
 	// True if merging would do anything.
 	private transient AtomicBoolean _addSinceMerge;
+	
+	private transient AtomicInteger _activeUrls;
 	
 	public CrawlDBFunction(BaseCrawlDB crawlDB, BaseCrawlDBMerger merger, FetchQueue fetchQueue) {
 		_crawlDB = crawlDB;
@@ -47,6 +52,7 @@ public class CrawlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl
 		super.open(parameters);
 		
 		_addSinceMerge = new AtomicBoolean(false);
+		_activeUrls = new AtomicInteger(0);
 		
 		_fetchQueue.open();
 		
@@ -67,29 +73,48 @@ public class CrawlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl
 			record(this.getClass(), url, FetchStatus.class.getSimpleName(), url.getStatus().toString());
 			needMerge = _crawlDB.add(url);
 			_addSinceMerge.set(true);
+			
+			// If it's not an unfetched URL, we can decrement our active URLs
+			if (url.getStatus() != FetchStatus.UNFETCHED) {
+				if (_activeUrls.decrementAndGet() < 0) {
+					LOGGER.warn("Houston, we have a problem - negative active URLs");
+				}
+			}
 		} else if (url.getUrlType() == UrlType.TICKLER) {
+			LOGGER.debug(String.format("CrawlDBFunction (%d/%d) checking for URLs to emit", _partition, _parallelism));
+			
 			for (int i = 0; i < URLS_PER_TICKLE; i++) {
+				int activeUrls = _activeUrls.get();
+				if (activeUrls > MAX_ACTIVE_URLS) {
+					LOGGER.debug(String.format("CrawlDBFunction (%d/%d) skipping emit, too many active URLs (%d)", _partition, _parallelism, activeUrls));
+					return;
+				}
+				
 				FetchUrl fetchUrl = _fetchQueue.poll();
 
 				if (fetchUrl != null) {
-					LOGGER.debug(String.format("CrawlDBFunction (%d/%d) emitting URL %s to fetch", _partition, _parallelism, fetchUrl));
+					LOGGER.debug(String.format("CrawlDBFunction (%d/%d) emitting URL %s", _partition, _parallelism, fetchUrl));
 					collector.collect(fetchUrl);
+					int nowActive = _activeUrls.incrementAndGet();
+					LOGGER.debug(String.format("CrawlDBFunction (%d/%d) emitted URL %s (%d active)", _partition, _parallelism, fetchUrl, nowActive));
 				} else {
 					needMerge = true;
 					break;
 				}
 			}
 		} else if (url.getUrlType() == UrlType.TERMINATION) {
+			LOGGER.debug(String.format("CrawlDBFunction (%d/%d) terminating", _partition, _parallelism));
 			// TODO flush queue, set flag
 		} else {
 			throw new RuntimeException("Unknown URL type: " + url.getUrlType());
 		}
 		
 		if (needMerge && _addSinceMerge.get()) {
-			// We don't have any active URLs left.
-			// Call the CrawlDB to trigger a merge.
+			// We don't have any active URLs left. Call the CrawlDB to trigger a merge.
 			LOGGER.debug(String.format("CrawlDBFunction (%d/%d) merging crawlDB ", _partition, _parallelism));
+			long start = System.currentTimeMillis();
 			_crawlDB.merge();
+			LOGGER.debug(String.format("CrawlDBFunction (%d/%d) merged crawlDB in %dms", _partition, _parallelism, System.currentTimeMillis() - start));
 			_addSinceMerge.set(false);
 		}
 	}

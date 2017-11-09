@@ -16,7 +16,7 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
 	
 	// FUTURE set timeout explicitly.
 	// See https://github.com/ScaleUnlimited/flink-crawler/issues/52
-	private static final int DEFAULT_FETCH_TIMEOUT = 100;
+	private static final int DEFAULT_FETCH_TIMEOUT_SECONDS = 100;
 	
 	// From BaseFetcher:
     protected Map<String, Integer> _maxContentSizes = new HashMap<String, Integer>();
@@ -90,7 +90,7 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
     public abstract BaseHttpFetcher build() throws Exception;
     
     public int getTimeoutInSeconds() {
-    	return DEFAULT_FETCH_TIMEOUT;
+    	return DEFAULT_FETCH_TIMEOUT_SECONDS;
     }
 
     public UserAgent getUserAgent() {

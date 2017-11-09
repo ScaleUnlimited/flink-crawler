@@ -96,8 +96,9 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
                 throw new BadProtocolFetchException(url);
             }
             
-            
-            return fetch(realUrl, realUrl, payload, 0);
+            FetchedResult result = fetch(realUrl, realUrl, payload, 0);
+        	LOGGER.debug("Fetched " + url);
+            return result;
         } catch (MalformedURLException e) {
             throw new UrlFetchException(url, e.getMessage());
         } catch (AbortedFetchException e) {
@@ -128,6 +129,8 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 	 * @throws BaseFetchException
 	 */
 	private FetchedResult fetch(URL originalUrl, URL redirectUrl, Payload payload, int numRedirects) throws BaseFetchException {
+		LOGGER.debug(String.format("Fetching '%s' with %d redirects", redirectUrl, numRedirects));
+		
 		if (numRedirects > getMaxRedirects()) {
 			throw new RedirectFetchException(originalUrl.toString(), redirectUrl.toString(), RedirectExceptionReason.TOO_MANY_REDIRECTS);
 		}
@@ -174,12 +177,13 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 			double responseRateExact = (double)bytesRead / deltaTime;
 			// Response rate is bytes/second, not bytes/millisecond
 			int responseRate = (int)Math.round(responseRateExact * 1000.0);
-			LOGGER.debug(String.format(	"Read %,d bytes from page at %,d offset within %s in %,d seconds (%,d bytes/sec)",
+			LOGGER.debug(String.format(	"Read %,d bytes from page at %,d offset from '%s' in %,dms (%,d bytes/sec) for '%s'",
 										bytesRead,
 										offset,
 										warcFile,
-										deltaTime / 1000,
-										responseRate));
+										deltaTime,
+										responseRate,
+										redirectUrl));
 			Headers headers = new Headers();
 			for (String httpHeader : pageRecord.getHttpHeaders()) {
 				String[] keyValue = httpHeader.split(":", 2);
@@ -345,6 +349,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 	private byte[] getSegmentData(URL url, SecondaryIndex indexEntry) throws IOFetchException {
 		byte[] result = _cache.get(indexEntry.getSegmentId());
 		if (result != null) {
+			LOGGER.debug(String.format("Found data for segment #%d in our cache for '%s'", indexEntry.getSegmentId(), url));
 			return result;
 		}
 	
@@ -364,12 +369,14 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 			double responseRateExact = (double)length / deltaTime;
 			// Response rate is bytes/second, not bytes/millisecond
 			int responseRate = (int)Math.round(responseRateExact * 1000.0);
-			LOGGER.debug(String.format(	"Read %,d byte segment at %,d offset within %s in %,d seconds (%,d bytes/sec)",
+			LOGGER.debug(String.format(	"Read %,d byte segment #%d at %,d offset within %s in %,dms (%,d bytes/sec) for '%s'",
 										length,
+										indexEntry.getSegmentId(),
 										offset,
 										indexFilename,
-										deltaTime / 1000,
-										responseRate));
+										deltaTime,
+										responseRate,
+										url));
 			
 			_cache.put(indexEntry.getSegmentId(), result);
 			return result;

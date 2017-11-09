@@ -60,7 +60,7 @@ public class UrlLogger {
 		}
 		
 		long activityTime = System.currentTimeMillis();
-		LOGGER.debug("Setting last activity time to " + activityTime);
+		LOGGER.trace("Setting last activity time to " + activityTime);
 		LAST_ACTIVITY_TIME.set(activityTime);
 	}
 
