@@ -19,6 +19,9 @@ public class CommonCrawlFetcherTest {
 		assertEquals("com,domain)/path/to/file", reverseIt("http://domain.com/path/to/file"));
 		assertEquals("com,domain)/?q=x", reverseIt("http://domain.com?q=x"));
 		assertEquals("com,domain)/path/to/file?q=x", reverseIt("http://domain.com/path/to/file?q=x"));
+		
+		// Verify that hex-encoded values are lower-cased
+		assertEquals("com,domain)/%d8%ba%8e%Dx%E", reverseIt("http://domain.com/%D8%BA%8E%Dx%E"));
 	}
 
 	private String reverseIt(String url) throws MalformedURLException {
