@@ -29,7 +29,7 @@ public class ParseFunction extends BaseFlatMapFunction<FetchedUrl, Tuple3<Extrac
 	public void open(Configuration parameters) throws Exception {
 		super.open(parameters);
 		RuntimeContext context = getRuntimeContext();
-		_parser.open( new CrawlerAccumulator(context));
+		_parser.open(new CrawlerAccumulator(context));
 	}
 	
 	@Override

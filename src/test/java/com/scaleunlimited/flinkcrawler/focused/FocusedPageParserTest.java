@@ -1,10 +1,15 @@
 package com.scaleunlimited.flinkcrawler.focused;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doNothing;
 
 import java.nio.charset.StandardCharsets;
 
 import org.junit.Test;
+import org.mockito.Mockito;
 
 import com.scaleunlimited.flinkcrawler.metrics.CrawlerAccumulator;
 import com.scaleunlimited.flinkcrawler.parser.ParserResult;
@@ -19,7 +24,13 @@ public class FocusedPageParserTest {
 	public void test() throws Exception {
 		TestPageScorer pageScorer = new TestPageScorer();
 		FocusedPageParser parser = new FocusedPageParser(pageScorer);
-		parser.open(null);
+		
+		CrawlerAccumulator mockCrawlerAccumulator = Mockito.mock(CrawlerAccumulator.class);
+		doNothing().when(mockCrawlerAccumulator).increment(any(Enum.class));
+		doNothing().when(mockCrawlerAccumulator).increment(any(Enum.class), anyLong());
+		doNothing().when(mockCrawlerAccumulator).increment(anyString(), anyString(), anyLong());
+		
+		parser.open(mockCrawlerAccumulator);
 		ValidUrl url = new ValidUrl("http://domain.com/page.html");
 		Headers headers = new Headers();
 		byte[] content = "<html><head><title></title></head><body><p>0.75</p></body></html>".getBytes(StandardCharsets.UTF_8);
