@@ -95,12 +95,12 @@ public class CrawlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl
 				}
 			}
 		} else if (url.getUrlType() == UrlType.TICKLER) {
-			LOGGER.debug(String.format("CrawlDBFunction (%d/%d) checking for URLs to emit", _partition, _parallelism));
+			LOGGER.trace(String.format("CrawlDBFunction (%d/%d) checking for URLs to emit", _partition, _parallelism));
 			
 			for (int i = 0; i < URLS_PER_TICKLE; i++) {
 				int activeUrls = _activeUrls.get();
 				if (activeUrls > MAX_ACTIVE_URLS) {
-					LOGGER.debug(String.format("CrawlDBFunction (%d/%d) skipping emit, too many active URLs (%d)", _partition, _parallelism, activeUrls));
+					LOGGER.trace(String.format("CrawlDBFunction (%d/%d) skipping emit, too many active URLs (%d)", _partition, _parallelism, activeUrls));
 					return;
 				}
 				
@@ -117,7 +117,7 @@ public class CrawlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl
 				}
 			}
 		} else if (url.getUrlType() == UrlType.TERMINATION) {
-			LOGGER.debug(String.format("CrawlDBFunction (%d/%d) terminating", _partition, _parallelism));
+			LOGGER.info(String.format("CrawlDBFunction (%d/%d) terminating", _partition, _parallelism));
 			// TODO flush queue, set flag
 		} else {
 			throw new RuntimeException("Unknown URL type: " + url.getUrlType());

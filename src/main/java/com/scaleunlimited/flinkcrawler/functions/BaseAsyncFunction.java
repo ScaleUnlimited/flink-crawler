@@ -34,7 +34,8 @@ public abstract class BaseAsyncFunction<IN, OUT> extends RichAsyncFunction<IN, O
 		RuntimeContext context = getRuntimeContext();
 		_parallelism = context.getNumberOfParallelSubtasks();
 		_partition = context.getIndexOfThisSubtask();
-		_executor = new ThreadedExecutor(_threadCount);
+		
+		_executor = new ThreadedExecutor("Flink-crawler-" + context.getTaskName(), _threadCount);
 	}
 	
 	@Override

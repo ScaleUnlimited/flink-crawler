@@ -54,6 +54,8 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
     // 0,124,148,146)/index.php 20170429211342 {"url": "http://146.148.124.0/index.php", "mim....
     private static final Pattern CDX_LINE_PATTERN = Pattern.compile("(.+?)[ ]+(\\d+)[ ]+(\\{.+\\})");
     
+    private static final String ENCODED_CHARS = "0123456789abcdefABCDEF";
+    
     private static final Headers EMPTY_HEADERS = new Headers();
     private static final byte[] EMPTY_CONTENT = new byte[0];
 
@@ -299,10 +301,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 		JsonObject result = null;
 		String urlAsStr = url.toString();
 		
-		try {
-			InputStream lis = new GZIPInputStream(new ByteArrayInputStream(segmentData));
-			InputStreamReader isr = new InputStreamReader(lis, StandardCharsets.UTF_8);
-			BufferedReader lineReader = new BufferedReader(isr);
+		try (BufferedReader lineReader = new BufferedReader(new InputStreamReader(new GZIPInputStream(new ByteArrayInputStream(segmentData)), StandardCharsets.UTF_8))) {
 
 			String line;
 			while ((line = lineReader.readLine()) != null) {
@@ -327,7 +326,6 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 						result.addProperty("timestamp", new Long(Long.parseLong(m.group(2))));
 					}
 				} else if (sort < 0) {
-					// We're past where it could be.
 					return result;
 				}
 			}
@@ -467,7 +465,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 		reversedUrl.append(")");
 
 		if (!url.getPath().isEmpty()) {
-			reversedUrl.append(url.getPath());
+			reversedUrl.append(lowerCaseEncodedChars(url.getPath()));
 		} else {
 			reversedUrl.append('/');
 		}
@@ -479,5 +477,61 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 
 		return reversedUrl.toString();
     }
+
+	/**
+	 * If the path contains URL-encoded characters, we need to make sure A-F are
+	 * lowercased.
+	 * 
+	 * @param path
+	 * @return
+	 */
+	private static String lowerCaseEncodedChars(final String path) {
+		int offset = path.indexOf('%');
+		if (offset == -1) {
+			return path;
+		}
+		
+		boolean inPercent = true;
+		boolean inFirstDigit = false;
+		char savedFirstDigit = ' ';
+		
+		offset += 1;
+		StringBuilder result = new StringBuilder(path.substring(0, offset));
+		
+		for (; offset < path.length(); offset++) {
+			char c = path.charAt(offset);
+			if (!inPercent) {
+				result.append(c);
+				if (c == '%') {
+					inPercent = true;
+				}
+			} else if (!inFirstDigit) {
+				if (ENCODED_CHARS.indexOf(c) != -1) {
+					inFirstDigit = true;
+					savedFirstDigit = c;
+				} else {
+					inPercent = false;
+					result.append(c);
+				}
+			} else {
+				if (ENCODED_CHARS.indexOf(c) != -1) {
+					result.append(Character.toLowerCase(savedFirstDigit));
+					result.append(Character.toLowerCase(c));
+				} else {
+					result.append(savedFirstDigit);
+					result.append(c);
+				}
+				
+				inPercent = false;
+				inFirstDigit = false;
+			}
+		}
+		
+		if (inFirstDigit) {
+			result.append(savedFirstDigit);
+		}
+		
+		return result.toString();
+	}
     
 }
