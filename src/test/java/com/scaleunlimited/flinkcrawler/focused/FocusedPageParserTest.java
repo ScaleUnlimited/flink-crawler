@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 
 import org.junit.Test;
 
+import com.scaleunlimited.flinkcrawler.metrics.CrawlerAccumulator;
 import com.scaleunlimited.flinkcrawler.parser.ParserResult;
 import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ValidUrl;
@@ -18,7 +19,7 @@ public class FocusedPageParserTest {
 	public void test() throws Exception {
 		TestPageScorer pageScorer = new TestPageScorer();
 		FocusedPageParser parser = new FocusedPageParser(pageScorer);
-		
+		parser.open(null);
 		ValidUrl url = new ValidUrl("http://domain.com/page.html");
 		Headers headers = new Headers();
 		byte[] content = "<html><head><title></title></head><body><p>0.75</p></body></html>".getBytes(StandardCharsets.UTF_8);
@@ -33,6 +34,14 @@ public class FocusedPageParserTest {
 		@Override
 		public float score(ParserResult parse) {
 			return Float.parseFloat(parse.getParsedUrl().getParsedText());
+		}
+
+		@Override
+		public void open(CrawlerAccumulator crawlerAccumulator) throws Exception {
+		}
+
+		@Override
+		public void close() throws Exception {
 		}
 	}
 

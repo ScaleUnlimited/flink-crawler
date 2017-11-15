@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.config.ParserPolicy;
+import com.scaleunlimited.flinkcrawler.metrics.CrawlerAccumulator;
 import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.utils.IoUtils;
 
@@ -109,7 +110,16 @@ public class SimplePageParser extends BasePageParser {
         _parseContext = parseContext;
     }
 
-    protected synchronized void init() {
+    @Override
+	public void open(CrawlerAccumulator crawlerAccumulator) throws Exception {
+		setAccumulator(crawlerAccumulator);
+	}
+
+	@Override
+	public void close() throws Exception {
+	}
+
+	protected synchronized void init() {
         if (_parser == null) {
             _parser = new AutoDetectParser();
         }

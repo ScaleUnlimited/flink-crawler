@@ -1,5 +1,6 @@
 package com.scaleunlimited.flinkcrawler.focused;
 
+import com.scaleunlimited.flinkcrawler.metrics.CrawlerAccumulator;
 import com.scaleunlimited.flinkcrawler.parser.ParserResult;
 import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
@@ -15,6 +16,19 @@ public class FocusedPageParser extends SimplePageParser {
 		
 		_pageScorer = pageScorer;
 	}
+	
+	@Override
+	public void open(CrawlerAccumulator crawlerAccumulator) throws Exception {
+		super.open(crawlerAccumulator);
+		_pageScorer.open(crawlerAccumulator);
+	}
+	
+	@Override
+	public void close() throws Exception {
+		_pageScorer.close();
+		super.close();
+	}
+	
 	
 	@Override
 	public ParserResult parse(FetchedUrl fetchedUrl) throws Exception {

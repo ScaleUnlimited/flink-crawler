@@ -1,10 +1,13 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
+import org.apache.flink.api.common.functions.RuntimeContext;
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.scaleunlimited.flinkcrawler.metrics.CrawlerAccumulator;
 import com.scaleunlimited.flinkcrawler.parser.BasePageParser;
 import com.scaleunlimited.flinkcrawler.parser.ParserResult;
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
@@ -22,6 +25,13 @@ public class ParseFunction extends BaseFlatMapFunction<FetchedUrl, Tuple3<Extrac
         _parser = parser;
     }
 
+	@Override
+	public void open(Configuration parameters) throws Exception {
+		super.open(parameters);
+		RuntimeContext context = getRuntimeContext();
+		_parser.open( new CrawlerAccumulator(context));
+	}
+	
 	@Override
 	public void flatMap(FetchedUrl fetchedUrl, Collector<Tuple3<ExtractedUrl, ParsedUrl, String>> collector) throws Exception {
 		record(this.getClass(), fetchedUrl);

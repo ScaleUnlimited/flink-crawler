@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.config.ParserPolicy;
+import com.scaleunlimited.flinkcrawler.metrics.CrawlerAccumulator;
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 
@@ -29,6 +30,15 @@ public class SimpleSiteMapParser extends BasePageParser {
 
     public SimpleSiteMapParser(ParserPolicy policy) {
 		super(policy);
+	}
+
+	@Override
+	public void open(CrawlerAccumulator crawlerAccumulator) throws Exception {
+		setAccumulator(crawlerAccumulator);
+	}
+
+	@Override
+	public void close() throws Exception {
 	}
 
 	private void init() {
