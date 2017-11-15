@@ -38,7 +38,7 @@ public class CrawlTool {
 		private String _urlsFilename;
 	    private String _singleDomain;
         private long _forceCrawlDelay = CrawlTool.DO_NOT_FORCE_CRAWL_DELAY;
-        private long _defaultCrawlDelay = 10 * 1000L;
+        private long _defaultCrawlDelayMS = 10 * 1000L;
         private int _maxContentSize = SimpleHttpFetcher.DEFAULT_MAX_CONTENT_SIZE;
         private int _maxFetcherPoolSize = FetchUrlsFunction.DEFAULT_THREAD_COUNT;
         private int _maxThreads = 1;
@@ -54,8 +54,8 @@ public class CrawlTool {
 	    }
 		
 		@Option(name = "-singledomain", usage = "only fetch URLs within this domain (and its sub-domains)", required = false)
-	    public void setSingleDomain(String urlsFilename) {
-			_singleDomain = urlsFilename;
+	    public void setSingleDomain(String singleDomain) {
+			_singleDomain = singleDomain;
 	    }
 		
 		@Option(name = "-forcecrawldelay", usage = "use this crawl delay (ms) even if robots.txt provides something else", required = false)
@@ -64,8 +64,8 @@ public class CrawlTool {
 	    }
 		
 		@Option(name = "-defaultcrawldelay", usage = "use this crawl delay (ms) when robots.txt doesn't provide it", required = false)
-	    public void setDefaultCrawlDelay(long defaultCrawlDelay) {
-			_defaultCrawlDelay = defaultCrawlDelay;
+	    public void setDefaultCrawlDelayMS(long defaultCrawlDelayMS) {
+			_defaultCrawlDelayMS = defaultCrawlDelayMS;
 	    }
 		
 		@Option(name = "-maxcontentsize", usage = "maximum content size", required = false)
@@ -83,6 +83,7 @@ public class CrawlTool {
 			_cacheDir = cacheDir;
 	    }
 		
+		// TODO - MaxFetcherPoolSize and MaxThreads are now essentially the same thing.
 		@Option(name = "-maxfetchers", usage = "max fetcher pool size", required = false)
 	    public void setMaxFetcherPoolSize(int maxFetcherPoolSize) {
 			_maxFetcherPoolSize = maxFetcherPoolSize;
@@ -121,7 +122,7 @@ public class CrawlTool {
 		}
 
 		public long getDefaultCrawlDelay() {
-			return _defaultCrawlDelay;
+			return _defaultCrawlDelayMS;
 		}
 
 		public int getMaxContentSize() {
@@ -239,37 +240,7 @@ public class CrawlTool {
         
 		try {
 			StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-			
-			UserAgent userAgent = new UserAgent("flink-crawler", "flink-crawler@scaleunlimited.com", "https://github.com/ScaleUnlimited/flink-crawler/wiki/Crawler-Policy");
-			
-			SimpleUrlValidator urlValidator =
-				(	options.isSingleDomain() ?
-					new SingleDomainUrlValidator(options.getSingleDomain())
-				:	new SimpleUrlValidator());
-			
-			BaseHttpFetcherBuilder siteMapFetcherBuilder = getPageFetcherBuilder(options, userAgent)
-				.setDefaultMaxContentSize(SiteMapParser.MAX_BYTES_ALLOWED);
-			BaseHttpFetcherBuilder robotsFetcherBuilder = getRobotsFetcherBuilder(options, userAgent)
-				.setDefaultMaxContentSize(options.getMaxContentSize());
-			BaseHttpFetcherBuilder pageFetcherBuilder = getPageFetcherBuilder(options, userAgent)
-					.setDefaultMaxContentSize(options.getMaxContentSize());
-			CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
-//				.setMaxWaitTime(100000)
-				.setUrlSource(new SeedUrlSource(options.getSeedUrlsFilename(), RawUrl.DEFAULT_SCORE))
-				.setMaxFetcherPoolSize(options.getMaxFetcherPoolSize())
-				.setRobotsFetcherBuilder(robotsFetcherBuilder)
-				.setUrlFilter(urlValidator)
-				.setSiteMapFetcherBuilder(siteMapFetcherBuilder)
-				.setPageFetcherBuilder(pageFetcherBuilder)
-				.setForceCrawlDelay(options.getForceCrawlDelay())
-				.setDefaultCrawlDelay(options.getDefaultCrawlDelay())
-				.setParallelism(options.getParallelism());
-			
-			if (options.getOutputFile() != null) {
-				builder.setContentTextFile(options.getOutputFile());
-			}
-			
-			builder.build().execute();
+	        run(env, options);
 		} catch (Throwable t) {
 			System.err.println("Error running CrawlTool: " + t.getMessage());
 			t.printStackTrace(System.err);
@@ -277,6 +248,39 @@ public class CrawlTool {
 		}
 	}
 
+	public static void run(StreamExecutionEnvironment env, CrawlToolOptions options) throws Exception {
+		UserAgent userAgent = new UserAgent("flink-crawler", "flink-crawler@scaleunlimited.com", "https://github.com/ScaleUnlimited/flink-crawler/wiki/Crawler-Policy");
+		
+		SimpleUrlValidator urlValidator =
+			(	options.isSingleDomain() ?
+				new SingleDomainUrlValidator(options.getSingleDomain())
+			:	new SimpleUrlValidator());
+		
+		BaseHttpFetcherBuilder siteMapFetcherBuilder = getPageFetcherBuilder(options, userAgent)
+			.setDefaultMaxContentSize(SiteMapParser.MAX_BYTES_ALLOWED);
+		BaseHttpFetcherBuilder robotsFetcherBuilder = getRobotsFetcherBuilder(options, userAgent)
+			.setDefaultMaxContentSize(options.getMaxContentSize());
+		BaseHttpFetcherBuilder pageFetcherBuilder = getPageFetcherBuilder(options, userAgent)
+				.setDefaultMaxContentSize(options.getMaxContentSize());
+		CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
+//			.setMaxWaitTime(100000)
+			.setUrlSource(new SeedUrlSource(options.getSeedUrlsFilename(), RawUrl.DEFAULT_SCORE))
+			.setMaxFetcherPoolSize(options.getMaxFetcherPoolSize())
+			.setRobotsFetcherBuilder(robotsFetcherBuilder)
+			.setUrlFilter(urlValidator)
+			.setSiteMapFetcherBuilder(siteMapFetcherBuilder)
+			.setPageFetcherBuilder(pageFetcherBuilder)
+			.setForceCrawlDelay(options.getForceCrawlDelay())
+			.setDefaultCrawlDelay(options.getDefaultCrawlDelay())
+			.setParallelism(options.getParallelism());
+		
+		if (options.getOutputFile() != null) {
+			builder.setContentTextFile(options.getOutputFile());
+		}
+		
+		builder.build().execute();
+	}
+	
 	private static BaseHttpFetcherBuilder getPageFetcherBuilder(CrawlToolOptions options, UserAgent userAgent) throws IOException {
 		if (options.isCommonCrawl()) {
 			return new CommonCrawlFetcherBuilder(options.getMaxThreads(), userAgent)

@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -35,6 +36,8 @@ import org.slf4j.LoggerFactory;
  */
 public class ThreadedExecutor {
 	private static final Logger LOGGER = LoggerFactory.getLogger(ThreadedExecutor.class);
+	
+	private static final String DEFAULT_NAME = "Flink-crawler";
 
     /**
      * Always wait for some time when offer() is called. This gives any
@@ -61,7 +64,6 @@ public class ThreadedExecutor {
         }
     }
 
-
     private long _requestTimeout;
     private ThreadPoolExecutor _pool;
     
@@ -69,7 +71,15 @@ public class ThreadedExecutor {
     	this(numThreads, Long.MAX_VALUE);
     }
     
+    public ThreadedExecutor(String name, int numThreads) {
+    	this(name, numThreads, Long.MAX_VALUE);
+    }
+    
     public ThreadedExecutor(int numThreads, long requestTimeout) {
+    	this(DEFAULT_NAME, numThreads, requestTimeout);
+    }
+    
+    public ThreadedExecutor(String name, int numThreads, long requestTimeout) {
         _requestTimeout = requestTimeout;
         
         // With the "always offer with a timeout" queue, the maximumPoolSize should always
@@ -80,6 +90,16 @@ public class ThreadedExecutor {
         
         BlockingQueue<Runnable> queue = new MyBlockingQueue<Runnable>();
         _pool = new ThreadPoolExecutor(numThreads, numThreads, Long.MAX_VALUE, TimeUnit.MILLISECONDS, queue);
+        
+        // Give the threads used by this executor a consistent name.
+        final ThreadGroup group = new ThreadGroup(name);
+        _pool.setThreadFactory(new ThreadFactory() {
+			
+			@Override
+			public Thread newThread(Runnable r) {
+				return new Thread(group, r);
+			}
+		});
     }
     
     /**
