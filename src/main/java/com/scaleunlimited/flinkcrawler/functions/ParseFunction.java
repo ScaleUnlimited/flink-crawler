@@ -46,10 +46,12 @@ public class ParseFunction extends BaseFlatMapFunction<FetchedUrl, Tuple3<Extrac
 			return;
 		}
 		
-		// Output the content
-		collector.collect(new Tuple3<ExtractedUrl, ParsedUrl, String>(null, result.getParsedUrl(), null));
+		// Output the content only if we have a score that is greater than 0
+		if (result.getParsedUrl().getScore() > 0) {
+			collector.collect(new Tuple3<ExtractedUrl, ParsedUrl, String>(null, result.getParsedUrl(), null));
+		}
 		
-		// Output the links
+		// However, output all the links (irrespective of score) - we'll ignore fetching the 0 score ones
 		for (ExtractedUrl outlink : result.getExtractedUrls()) {
 			String message =
 				String.format(	"Extracted '%s' from '%s'",
