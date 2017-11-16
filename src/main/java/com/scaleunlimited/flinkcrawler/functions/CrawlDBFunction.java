@@ -83,13 +83,19 @@ public class CrawlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl
 		
 		boolean needMerge = false;
 		if (url.getUrlType() == UrlType.REGULAR) {
-			CounterUtils.increment(getRuntimeContext(), url.getStatus());
+			FetchStatus status = url.getStatus();
+			CounterUtils.increment(getRuntimeContext(), status);
+			// Decrement the UNFETCHED counter (when we have a status that isn't UNFETCHED)
+			if (status != FetchStatus.UNFETCHED) {
+				CounterUtils.increment(getRuntimeContext(), FetchStatus.UNFETCHED, -1);
+			}
+			
 			record(this.getClass(), url, FetchStatus.class.getSimpleName(), url.getStatus().toString());
 			needMerge = _crawlDB.add(url);
 			_addSinceMerge.set(true);
 			
 			// If it's not an unfetched URL, we can decrement our active URLs
-			if (url.getStatus() != FetchStatus.UNFETCHED) {
+			if (status != FetchStatus.UNFETCHED) {
 				if (_activeUrls.decrementAndGet() < 0) {
 					LOGGER.warn("Houston, we have a problem - negative active URLs");
 				}
