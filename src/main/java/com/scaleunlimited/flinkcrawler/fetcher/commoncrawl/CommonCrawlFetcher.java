@@ -306,6 +306,8 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 			String line;
 			while ((line = lineReader.readLine()) != null) {
 				// 0,124,148,146)/index.php 20170429211342 {"url": "http://146.148.124.0/index.php", "mim....
+				// LOGGER.debug(line);
+				
 				Matcher m = CDX_LINE_PATTERN.matcher(line);
 				if (!m.matches()) {
 					throw new IOException("Invalid CDX line: " + line);
@@ -320,7 +322,10 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 					
 					// See if the URL in the JsonObject matches what we're looking for.
 					String newUrl = newResult.get("url").getAsString();
-					if (newUrl.equals(urlAsStr)) {
+					
+					// TODO hack to match encoded characters, where hex digits can be upper
+					// case in the URL, even though the key used for ordering is lower-case.
+					if (newUrl.equalsIgnoreCase(urlAsStr)) {
 						// FUTURE should we check the timestamp to pick the last one?
 						result = newResult;
 						result.addProperty("timestamp", new Long(Long.parseLong(m.group(2))));
