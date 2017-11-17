@@ -7,6 +7,6 @@ public class HashPartitioner implements Partitioner<Integer> {
 
 	@Override
 	public int partition(Integer key, int numPartitions) {
-		return key % numPartitions;
+		return Math.abs(key % numPartitions);
 	}
 }
