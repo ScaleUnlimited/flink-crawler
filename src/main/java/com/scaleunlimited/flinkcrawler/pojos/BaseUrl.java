@@ -1,6 +1,7 @@
 package com.scaleunlimited.flinkcrawler.pojos;
 
 import java.io.Serializable;
+import java.net.MalformedURLException;
 
 @SuppressWarnings("serial")
 public abstract class BaseUrl implements Serializable {
@@ -19,8 +20,8 @@ public abstract class BaseUrl implements Serializable {
 		_url = urlAsString;
 	}
 	
-	public void setUrlAsString(String urlAsString) {
-		_url = urlAsString;
+	public void setUrl(String url) throws MalformedURLException {
+		_url = url;
 	}
 	
 	public String getUrl() {

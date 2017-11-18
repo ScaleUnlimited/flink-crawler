@@ -121,7 +121,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 	}
 
 	/**
-	 * Recursive mthod for attempting to fetch <redirectUrl>.
+	 * Recursive method for attempting to fetch <redirectUrl>.
 	 * 
 	 * @param originalUrl
 	 * @param redirectUrl
