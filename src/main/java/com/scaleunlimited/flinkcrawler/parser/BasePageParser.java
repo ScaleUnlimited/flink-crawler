@@ -8,6 +8,7 @@ import java.util.List;
 import org.apache.tika.utils.CharsetUtils;
 
 import com.scaleunlimited.flinkcrawler.config.ParserPolicy;
+import com.scaleunlimited.flinkcrawler.metrics.CrawlerAccumulator;
 import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.utils.HttpUtils;
 
@@ -17,6 +18,7 @@ import crawlercommons.util.Headers;
 public abstract class BasePageParser implements Serializable {
 
     private ParserPolicy _policy;
+	private transient CrawlerAccumulator _crawlerAccumulator;
     
     public BasePageParser(ParserPolicy policy) {
         _policy = policy;
@@ -26,8 +28,20 @@ public abstract class BasePageParser implements Serializable {
         return _policy;
     }
 
+    public abstract void open(CrawlerAccumulator crawlerAccumulator) throws Exception;
+    public abstract void close() throws Exception;
+    
     public abstract ParserResult parse(FetchedUrl fetchedUrl) throws Exception;
 
+    public void setAccumulator(CrawlerAccumulator crawlerAccumulator) {
+    	_crawlerAccumulator = crawlerAccumulator;
+    }
+ 
+    public CrawlerAccumulator getAccumulator() {
+    	return _crawlerAccumulator;
+    }
+
+    
     /**
      * Extract encoding from content-type
      * 

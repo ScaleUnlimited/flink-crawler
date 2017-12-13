@@ -17,6 +17,7 @@ import com.scaleunlimited.flinkcrawler.fetcher.MockRobotsFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.SiteMapGraphFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.WebGraphFetcher;
 import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
+import com.scaleunlimited.flinkcrawler.metrics.CrawlerAccumulator;
 import com.scaleunlimited.flinkcrawler.parser.ParserResult;
 import com.scaleunlimited.flinkcrawler.parser.SimpleSiteMapParser;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
@@ -136,6 +137,14 @@ public class FocusedCrawlTest {
 		public float score(ParserResult parse) {
 			String title = parse.getParsedUrl().getTitle();
 			return Float.parseFloat(title.substring("Synthetic page - score = ".length()));
+		}
+
+		@Override
+		public void open(CrawlerAccumulator crawlerAccumulator) throws Exception {
+		}
+
+		@Override
+		public void close() throws Exception {
 		}
 	}
 
