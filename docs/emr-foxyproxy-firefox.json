@@ -1,0 +1,92 @@
+{
+  "mode": "patterns",
+  "proxySettings": [
+    {
+      "title": "EMR socks proxy",
+      "type": 3,
+      "color": "#65bad7",
+      "address": "localhost",
+      "port": 8157,
+      "proxyDNS": true,
+      "active": true,
+      "whitePatterns": [
+        {
+          "title": "EC2-1",
+          "active": true,
+          "pattern": "*ec2*.amazonaws.com*",
+          "importedPattern": "*ec2*.amazonaws.com*",
+          "type": 1,
+          "protocols": 1
+        },
+        {
+          "title": "EC2-2",
+          "active": true,
+          "pattern": "*ec2*.compute*",
+          "importedPattern": "*ec2*.compute*",
+          "type": 1,
+          "protocols": 1
+        },
+        {
+          "title": "EC2-3",
+          "active": true,
+          "pattern": "10.*",
+          "importedPattern": "10.*",
+          "type": 1,
+          "protocols": 1
+        },
+        {
+          "title": "EC2-4",
+          "active": true,
+          "pattern": "*10*.amazonaws.com*",
+          "importedPattern": "*10*.amazonaws.com*",
+          "type": 1,
+          "protocols": 1
+        },
+        {
+          "title": "EC2-5",
+          "active": true,
+          "pattern": "*10*.compute*",
+          "importedPattern": "*10*.compute*",
+          "type": 1,
+          "protocols": 1
+        },
+        {
+          "title": "EC2-6",
+          "active": true,
+          "pattern": "*.compute.internal*",
+          "importedPattern": "*.compute.internal*",
+          "type": 1,
+          "protocols": 1
+        },
+        {
+          "title": "EC2-7",
+          "active": true,
+          "pattern": "*.ec2.internal*",
+          "importedPattern": "*.ec2.internal*",
+          "type": 1,
+          "protocols": 1
+        }
+      ],
+      "blackPatterns": [],
+      "id": "import-375749824"
+    },
+    {
+      "type": 5,
+      "title": "Default",
+      "color": "#65BAD7",
+      "active": true,
+      "whitePatterns": [
+        {
+          "title": "All",
+          "active": true,
+          "pattern": "*",
+          "importedPattern": "*",
+          "type": 1,
+          "protocols": 1
+        }
+      ],
+      "blackPatterns": [],
+      "id": "k20d21508277536715"
+    }
+  ]
+}
