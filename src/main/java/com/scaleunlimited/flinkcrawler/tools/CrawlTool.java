@@ -3,9 +3,14 @@ package com.scaleunlimited.flinkcrawler.tools;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.http.HttpStatus;
+import org.apache.tika.mime.MediaType;
+import org.apache.tika.parser.ParseContext;
+import org.apache.tika.parser.html.HtmlParser;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
@@ -40,10 +45,10 @@ public class CrawlTool {
         private long _forceCrawlDelay = CrawlTool.DO_NOT_FORCE_CRAWL_DELAY;
         private long _defaultCrawlDelayMS = 10 * 1000L;
         private int _maxContentSize = SimpleHttpFetcher.DEFAULT_MAX_CONTENT_SIZE;
-        private int _maxFetcherPoolSize = FetchUrlsFunction.DEFAULT_THREAD_COUNT;
         private int _maxThreads = 1;
         private int _parallelism = CrawlTopologyBuilder.DEFAULT_PARALLELISM;
         private String _outputFile = null;
+        private boolean _htmlOnly = false;
         
         private String _cacheDir;
         private String _commonCrawlId;
@@ -83,12 +88,6 @@ public class CrawlTool {
 			_cacheDir = cacheDir;
 	    }
 		
-		// TODO - MaxFetcherPoolSize and MaxThreads are now essentially the same thing.
-		@Option(name = "-maxfetchers", usage = "max fetcher pool size", required = false)
-	    public void setMaxFetcherPoolSize(int maxFetcherPoolSize) {
-			_maxFetcherPoolSize = maxFetcherPoolSize;
-	    }
-		
 		@Option(name = "-maxthreads", usage = "max threads per fetcher", required = false)
 	    public void setMaxThreads(int maxThreads) {
 			_maxThreads = maxThreads;
@@ -102,6 +101,11 @@ public class CrawlTool {
 		@Option(name = "-outputfile", usage = "Local file to store fetched content (testing only)", required = false)
 	    public void setOutputFile(String outputFile) {
 			_outputFile = outputFile;
+	    }
+		
+		@Option(name = "-htmlonly", usage = "Only (fully) fetch and parse HTML pages", required = false)
+	    public void setHtmlOnly(boolean htmlOnly) {
+			_htmlOnly = htmlOnly;
 	    }
 		
 		
@@ -141,10 +145,6 @@ public class CrawlTool {
 			return _cacheDir;
 		}
 		
-		public int getMaxFetcherPoolSize() {
-			return _maxFetcherPoolSize;
-		}
-		
 		public int getMaxThreads() {
 			return _maxThreads;
 		}
@@ -155,6 +155,10 @@ public class CrawlTool {
 		
 		public String getOutputFile() {
 			return _outputFile;
+		}
+		
+		public boolean isHtmlOnly() {
+			return _htmlOnly;
 		}
 	}
 	
@@ -262,10 +266,21 @@ public class CrawlTool {
 			.setDefaultMaxContentSize(options.getMaxContentSize());
 		BaseHttpFetcherBuilder pageFetcherBuilder = getPageFetcherBuilder(options, userAgent)
 				.setDefaultMaxContentSize(options.getMaxContentSize());
+		
+		// See if we need to restrict what mime types we download.
+		if (options.isHtmlOnly()) {
+			Set<String> validMimeTypes = new HashSet<>();
+			for (MediaType mediaType : new HtmlParser().getSupportedTypes(new ParseContext())) {
+				validMimeTypes.add(mediaType.toString());
+			}
+			
+			pageFetcherBuilder.setValidMimeTypes(validMimeTypes);
+		}
+
+
 		CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
 //			.setMaxWaitTime(100000)
 			.setUrlSource(new SeedUrlSource(options.getSeedUrlsFilename(), RawUrl.DEFAULT_SCORE))
-			.setMaxFetcherPoolSize(options.getMaxFetcherPoolSize())
 			.setRobotsFetcherBuilder(robotsFetcherBuilder)
 			.setUrlFilter(urlValidator)
 			.setSiteMapFetcherBuilder(siteMapFetcherBuilder)

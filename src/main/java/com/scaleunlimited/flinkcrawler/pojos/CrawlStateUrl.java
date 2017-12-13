@@ -130,6 +130,10 @@ public class CrawlStateUrl extends ValidUrl {
 		return _urlType;
 	}
 	
+	public void setUrlType(UrlType urlType) {
+		_urlType = urlType;
+	}
+	
 	/**
 	 * We have an array of bytes (with first byte = length) that
 	 * is coming from the result of merging entries in the CrawlDB.

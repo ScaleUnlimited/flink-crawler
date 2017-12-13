@@ -43,8 +43,9 @@ public class ValidUrl extends BaseUrl implements IPayload {
 		_query = base.getQuery();
 	}
 	
+	@Override
 	public void setUrl(String urlAsString) throws MalformedURLException {
-		super.setUrlAsString(urlAsString);
+		super.setUrl(urlAsString);
 
 		if (urlAsString == null) {
 			_protocol = null;
@@ -144,7 +145,7 @@ public class ValidUrl extends BaseUrl implements IPayload {
 		// don't have to create a URL. Remember to exclude port if it's -1.
 		String file = _query == null ? _path : _path + "?" + _query;
 		URL url = new URL(_protocol, _hostname, _port, file);
-		setUrlAsString(url.toString());
+		super.setUrl(url.toString());
 	}
 	
 	public void clear() {

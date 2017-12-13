@@ -39,6 +39,11 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
         _userAgent = userAgent;
     }
     
+	public int getMaxParallelFetches() {
+		// TODO change name to something else
+		return _maxThreads;
+	}
+
 	// From BaseFetcher:
     
     public BaseHttpFetcherBuilder setDefaultMaxContentSize(int defaultMaxContentSize) {
@@ -123,4 +128,5 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
 		fetcher.setRedirectMode(_redirectMode);
     	return fetcher;
     }
+
 }
