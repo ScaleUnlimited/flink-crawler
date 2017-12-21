@@ -15,9 +15,7 @@ public class CrawlToolTest {
 	public void test() throws Exception {
 		CrawlToolOptions options = new CrawlToolOptions();
 		options.setSeedUrlsFilename("./src/it/resources/farsi-seeds.txt");
-		options.setMaxFetcherPoolSize(1);
 		options.setCommonCrawlId("2017-22");
-		options.setDefaultCrawlDelayMS(10_000L);
 		options.setCommonCrawlCacheDir("./target/test/CrawlToolTest/cc-cache/");
 		options.setForceCrawlDelay(0L);
 		options.setMaxContentSize(100000);
