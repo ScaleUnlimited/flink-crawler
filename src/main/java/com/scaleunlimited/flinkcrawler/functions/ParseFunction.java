@@ -42,7 +42,13 @@ public class ParseFunction extends BaseFlatMapFunction<FetchedUrl, Tuple3<Extrac
 			result = _parser.parse(fetchedUrl);
 			LOGGER.debug(String.format("Parsed '%s' in %dms", fetchedUrl, System.currentTimeMillis() - start));
 		} catch (Exception e) {
-			LOGGER.warn("Parsing exception " + fetchedUrl, e);
+			if (LOGGER.isDebugEnabled()) {
+				LOGGER.warn("Parsing exception " + fetchedUrl, e);
+			} else {
+				// If we're not doing debug level logging, don't spit out stack trace.
+				LOGGER.warn(String.format("Parsing exception '%s': %s", fetchedUrl, e.getCause().getMessage()));
+			}
+			
 			return;
 		}
 		
