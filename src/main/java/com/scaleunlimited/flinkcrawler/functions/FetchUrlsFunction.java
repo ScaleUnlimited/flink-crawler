@@ -8,7 +8,7 @@ import java.util.Map;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.metrics.Gauge;
-import org.apache.flink.streaming.api.functions.async.collector.AsyncCollector;
+import org.apache.flink.streaming.api.functions.async.ResultFuture;
 import org.apache.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,7 +70,7 @@ public class FetchUrlsFunction extends BaseAsyncFunction<FetchUrl, Tuple2<CrawlS
 	}
 	
 	@Override
-	public void asyncInvoke(FetchUrl url, AsyncCollector<Tuple2<CrawlStateUrl, FetchedUrl>> collector) throws Exception {
+	public void asyncInvoke(FetchUrl url, ResultFuture<Tuple2<CrawlStateUrl, FetchedUrl>> future) throws Exception {
 		record(this.getClass(), url);
 		
 		final String domainKey = url.getUrlWithoutPath();
@@ -79,7 +79,7 @@ public class FetchUrlsFunction extends BaseAsyncFunction<FetchUrl, Tuple2<CrawlS
 			long currentTime = System.currentTimeMillis();
 			if ((nextFetchTime != null) && (currentTime < nextFetchTime)) {
 				LOGGER.debug("Skipping (crawl-delay) " + url);
-				collector.collect(skipUrl(url, nextFetchTime));
+				future.complete(skipUrl(url, nextFetchTime));
 				return;
 			} else {
 				_nextFetch.put(domainKey, currentTime + url.getCrawlDelay());
@@ -105,18 +105,18 @@ public class FetchUrlsFunction extends BaseAsyncFunction<FetchUrl, Tuple2<CrawlS
 					if (result.getStatusCode() != HttpStatus.SC_OK) {
 						LOGGER.debug(String.format("Failed to fetch '%s' (%d)", result.getFetchedUrl(), result.getStatusCode()));
 						FetchStatus fetchStatus = ExceptionUtils.mapHttpStatusToFetchStatus(result.getStatusCode());
-						collector.collect(Collections.singleton(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url, fetchStatus, 0, System.currentTimeMillis(), 0L), null)));
+						future.complete(Collections.singleton(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url, fetchStatus, 0, System.currentTimeMillis(), 0L), null)));
 						LOGGER.debug(String.format("Forwarded failed URL to update status: '%s'", result.getFetchedUrl()));
 					} else {
 						LOGGER.debug(String.format("Fetched %d bytes from '%s'", result.getContentLength(), result.getFetchedUrl()));
-						collector.collect(Collections.singleton(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url, FetchStatus.FETCHED, 0, fetchedUrl.getFetchTime(), 0L), fetchedUrl)));
+						future.complete(Collections.singleton(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url, FetchStatus.FETCHED, 0, fetchedUrl.getFetchTime(), 0L), fetchedUrl)));
 						LOGGER.debug(String.format("Forwarded fetched URL to be parsed: '%s'", result.getFetchedUrl()));
 					}
 				} catch (Exception e) {
 					LOGGER.debug(String.format("Failed to fetch '%s' due to %s", url, e.getMessage()));
 					
 					if (e instanceof BaseFetchException) {
-						collector.collect(Collections.singleton(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url, ExceptionUtils.mapExceptionToFetchStatus(e), 0, System.currentTimeMillis(), 0L), null)));
+						future.complete(Collections.singleton(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url, ExceptionUtils.mapExceptionToFetchStatus(e), 0, System.currentTimeMillis(), 0L), null)));
 						LOGGER.debug(String.format("Forwarded exception URL to update status: '%s'", url));
 					} else {
 						throw new RuntimeException("Exception fetching " + url, e);

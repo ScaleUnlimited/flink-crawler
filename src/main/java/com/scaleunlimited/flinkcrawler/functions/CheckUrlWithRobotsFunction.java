@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.streaming.api.functions.async.collector.AsyncCollector;
+import org.apache.flink.streaming.api.functions.async.ResultFuture;
 import org.apache.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,7 +82,7 @@ public class CheckUrlWithRobotsFunction extends BaseAsyncFunction<FetchUrl, Tupl
 	}
 	
 	@Override
-	public void asyncInvoke(FetchUrl url, AsyncCollector<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> collector) throws Exception {
+	public void asyncInvoke(FetchUrl url, ResultFuture<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> future) throws Exception {
 		record(this.getClass(), url);
 
 		LOGGER.debug(String.format("Queueing for robots check: %s", url));
@@ -103,7 +103,7 @@ public class CheckUrlWithRobotsFunction extends BaseAsyncFunction<FetchUrl, Tupl
 						_ruleExpirations.remove(robotsUrl);
 					} else {
 						LOGGER.debug(String.format("Found cached rule for '%s', collecting", url));
-						collector.collect(processUrl(rules, url));
+						future.complete(processUrl(rules, url));
 						return;
 					}
 				}
@@ -146,7 +146,7 @@ public class CheckUrlWithRobotsFunction extends BaseAsyncFunction<FetchUrl, Tupl
 				}
 
 				LOGGER.debug(String.format("Collecting checked results for '%s'", url));
-				collector.collect(result);
+				future.complete(result);
 			}
 
 		});
@@ -206,6 +206,7 @@ public class CheckUrlWithRobotsFunction extends BaseAsyncFunction<FetchUrl, Tupl
 	private String makeRobotsKey(FetchUrl url) {
 		return String.format("%s/robots.txt", url.getUrlWithoutPath());
 	}
+
 
 
 }
