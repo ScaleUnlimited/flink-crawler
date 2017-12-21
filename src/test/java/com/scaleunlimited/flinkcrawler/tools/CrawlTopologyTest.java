@@ -8,6 +8,7 @@ import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironmentWithAsyncExecution;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.util.FileUtils;
+import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -171,4 +172,11 @@ public class CrawlTopologyTest {
 			;
 	}
 
+	@Test
+	public void testSingleDomainUrlValidator() {
+		SimpleUrlValidator validator = 
+			new CrawlTool.SingleDomainUrlValidator("scaleunlimited.com");
+        Assert.assertFalse(validator.isValid("http://transpac.com"));
+        Assert.assertTrue(validator.isValid("http://scaleunlimited.com"));
+	}
 }
