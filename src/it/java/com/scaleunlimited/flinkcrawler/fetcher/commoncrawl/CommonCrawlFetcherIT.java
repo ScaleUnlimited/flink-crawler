@@ -24,8 +24,7 @@ public class CommonCrawlFetcherIT {
 	public void testSingleUrlFetchWithRedirects() throws Exception {
 		CommonCrawlFetcherBuilder builder = new CommonCrawlFetcherBuilder(1, new UserAgent("", "", ""))
 			.setCrawlId("2017-17")
-			.setCacheDir(CACHE_DIR)
-			.prepCache();
+			.setCacheDir(CACHE_DIR);
 		BaseHttpFetcher fetcher = builder.build();
 		
 		FetchedResult result = fetcher.get("http://cloudera.com/");
@@ -52,8 +51,7 @@ public class CommonCrawlFetcherIT {
 	public void testTwitter() throws Exception {
 		CommonCrawlFetcherBuilder builder = new CommonCrawlFetcherBuilder(1, new UserAgent("", "", ""))
 				.setCrawlId("2017-17")
-				.setCacheDir(CACHE_DIR)
-				.prepCache();
+				.setCacheDir(CACHE_DIR);
 			BaseHttpFetcher fetcher = builder.build();
 		
 		FetchedResult result = fetcher.get("http://www.twitter.com/");
@@ -68,8 +66,7 @@ public class CommonCrawlFetcherIT {
 		final int numThreads = 3;
 		CommonCrawlFetcherBuilder builder = new CommonCrawlFetcherBuilder(numThreads, new UserAgent("", "", ""))
 				.setCrawlId("2017-22")
-				.setCacheDir(CACHE_DIR)
-				.prepCache();
+				.setCacheDir(CACHE_DIR);
 		BaseHttpFetcher fetcher = builder.build();
 		
 		final String[] urlsToFetch = normalize("http://cloudera.com/",
