@@ -24,11 +24,11 @@ public class FocusedFetchQueue extends FetchQueue {
 	}
 	
 	@Override
-	public UrlState add(CrawlStateUrl url) {
+	public FetchQueueResult add(CrawlStateUrl url) {
 		if (url.getScore() >= _minFetchScore) {
 			return super.add(url);
 		} else {
-			return UrlState.ARCHIVE;
+			return FetchQueueResult.ARCHIVE;
 		}
 	}
 

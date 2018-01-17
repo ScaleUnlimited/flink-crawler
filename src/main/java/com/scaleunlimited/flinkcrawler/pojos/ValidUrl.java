@@ -1,20 +1,15 @@
 package com.scaleunlimited.flinkcrawler.pojos;
 
-import java.io.DataInput;
-import java.io.DataOutput;
-import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.scaleunlimited.flinkcrawler.crawldb.IPayload;
-
 import crawlercommons.domains.EffectiveTldFinder;
 
 @SuppressWarnings("serial")
-public class ValidUrl extends BaseUrl implements IPayload {
+public class ValidUrl extends BaseUrl {
 	private static final Logger LOGGER = LoggerFactory.getLogger(ValidUrl.class);
 
 	private String _protocol;
@@ -111,41 +106,6 @@ public class ValidUrl extends BaseUrl implements IPayload {
 		} else {
 			return String.format("%s://%s:%d", getProtocol(), getHostname(), port);
 		}
-	}
-	
-	@Override
-	public void write(DataOutput out) throws IOException {
-		out.writeUTF(_protocol);
-		out.writeUTF(_hostname);
-		out.writeUTF(_pld);
-		out.writeInt(_port);
-		out.writeUTF(_path);
-		
-		if (_query == null) {
-			out.writeUTF("");
-		} else {
-			out.writeUTF(_query);
-		}
-	}
-
-	@Override
-	public void readFields(DataInput in) throws IOException {
-		_protocol = in.readUTF();
-		_hostname = in.readUTF();
-		_pld = in.readUTF();
-		_port = in.readInt();
-		_path = in.readUTF();
-		_query = in.readUTF();
-		if (_query.isEmpty()) {
-			_query = null;
-		}
-		
-		// Now we need to reconstruct the original URL.
-		// TODO use our own method to build this if it's http or https, so we
-		// don't have to create a URL. Remember to exclude port if it's -1.
-		String file = _query == null ? _path : _path + "?" + _query;
-		URL url = new URL(_protocol, _hostname, _port, file);
-		super.setUrl(url.toString());
 	}
 	
 	public void clear() {

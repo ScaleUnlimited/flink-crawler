@@ -1,21 +1,16 @@
 package com.scaleunlimited.flinkcrawler.pojos;
 
-import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.net.MalformedURLException;
 
-import com.scaleunlimited.flinkcrawler.crawldb.DrumKeyValue;
 import com.scaleunlimited.flinkcrawler.utils.ByteUtils;
 import com.scaleunlimited.flinkcrawler.utils.HashUtils;
 
 
 /**
  * The CrawlStateUrl is the fundamental unit of state in the CrawlDB. It consists of the
- * actual URL (stored in the payload of the DrumMap), plus other fields necessary to handle
- * merging of URLs and prioritizing of URLs to be fetched.
+ * actual URL, plus other fields necessary to handle merging of URLs and prioritizing of
+ * URLs to be fetched.
  * 
- * There's the in-memory version, as represented by the class fields, and the compacted
- * version used by the DrumMap, which is a packed byte array of size VALUE_LENGTH.
- *
  */
 @SuppressWarnings("serial")
 public class CrawlStateUrl extends ValidUrl {
@@ -51,6 +46,10 @@ public class CrawlStateUrl extends ValidUrl {
 		return new CrawlStateUrl(UrlType.TICKLER, id);
 	}
 
+	public static CrawlStateUrl makeDomainUrl(String domain) throws MalformedURLException {
+		return new CrawlStateUrl(UrlType.DOMAIN, domain);
+	}
+
 	public CrawlStateUrl() {
 		// For creating from payload
 	}
@@ -58,6 +57,11 @@ public class CrawlStateUrl extends ValidUrl {
 	public CrawlStateUrl(UrlType urlType, int id) {
 		_urlType = urlType;
 		_id = id;
+	}
+	
+	public CrawlStateUrl(UrlType urlType, String domain) throws MalformedURLException {
+		super(new ValidUrl("http://" + domain));
+		_urlType = urlType;
 	}
 	
 	public CrawlStateUrl(FetchUrl url, FetchStatus status, long nextFetchTime) {
@@ -87,7 +91,7 @@ public class CrawlStateUrl extends ValidUrl {
 	 */
 	@Override
 	public Integer getPartitionKey() {
-		if (_urlType == UrlType.REGULAR) {
+		if ((_urlType == UrlType.REGULAR) || (_urlType == UrlType.DOMAIN)) {
 			return super.getPartitionKey();
 		} else {
 			return _id;
@@ -237,7 +241,7 @@ public class CrawlStateUrl extends ValidUrl {
 	}
 	
 	private static void checkValue(byte[] value) {
-		int valueLength = DrumKeyValue.getValueLength(value);
+		int valueLength = (int)value[0] & 0x00FF;
 		
 		if (valueLength != VALUE_LENGTH) {
 			throw new IllegalArgumentException(String.format("Length of value must be %d, got %d", VALUE_LENGTH, valueLength));
@@ -276,19 +280,6 @@ public class CrawlStateUrl extends ValidUrl {
 		if (_status != other._status)
 			return false;
 		return true;
-	}
-
-	public static CrawlStateUrl fromKV(DrumKeyValue dkv, RandomAccessFile payloadFile) throws IOException {
-		CrawlStateUrl result = new CrawlStateUrl();
-		
-		// Get the URL
-		payloadFile.seek(dkv.getPayloadOffset());
-		result.readFields(payloadFile);
-		
-		// Get the other fields
-		result.setFromValue(dkv.getValue());
-		
-		return result;
 	}
 
 	public static void setValue(byte[] value, FetchStatus status, long statusTime, float score, long fetchTime) {

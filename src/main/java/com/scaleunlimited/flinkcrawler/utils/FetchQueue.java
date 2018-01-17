@@ -11,9 +11,10 @@ import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 @SuppressWarnings("serial")
 public class FetchQueue implements Serializable {
 	
-	public static enum UrlState {
-		ACTIVE,
-		ARCHIVE
+	public static enum FetchQueueResult {
+		QUEUED,	// Added to fetch queue
+		ACTIVE,	// Not added, but keep around
+		ARCHIVE	// Not added, archive
 	}
 
 	private int _maxQueueSize;
@@ -35,18 +36,18 @@ public class FetchQueue implements Serializable {
 		return _fetchQueue.isEmpty();
 	}
 	
-	public UrlState add(CrawlStateUrl url) {
+	public FetchQueueResult add(CrawlStateUrl url) {
 		FetchStatus fetchStatus = url.getStatus();
 		if (fetchStatus == FetchStatus.UNFETCHED) {
 			if (_fetchQueue.size() < _maxQueueSize) {
-				url.setStatus(FetchStatus.FETCHING);
 				_fetchQueue.add(new FetchUrl(url, url.getScore()));
+				return FetchQueueResult.QUEUED;
+			} else {
+				return FetchQueueResult.ACTIVE;
 			}
-			
-			return UrlState.ACTIVE;
 		} else {
 			// TODO decide based on (score? other factors) whether to keep around or not.
-			return UrlState.ACTIVE;
+			return FetchQueueResult.ACTIVE;
 		}
 	}
 

@@ -13,7 +13,6 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.scaleunlimited.flinkcrawler.crawldb.DrumCrawlDB;
 import com.scaleunlimited.flinkcrawler.fetcher.MockRobotsFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.SiteMapGraphFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.WebGraphFetcher;
@@ -82,15 +81,9 @@ public class CrawlTopologyTest {
 			FileUtils.deleteFileOrDirectory(contentTextFile);
 		}
 
-		File drumDBDir = new File("./target/drum/");
-		if (drumDBDir.exists()) {
-			FileUtils.deleteDirectory(drumDBDir);
-		}
-		
 		CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
 			.setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
 			.setUrlLengthener(new SimpleUrlLengthener())
-			.setCrawlDB(new DrumCrawlDB(10_000, drumDBDir.getAbsolutePath()))
 			.setFetchQueue(new FetchQueue(1_000))
 			.setRobotsFetcherBuilder(new MockRobotsFetcher.MockRobotsFetcherBuilder(new MockRobotsFetcher(robotPages)))
 			.setRobotsParser(new SimpleRobotRulesParser())
@@ -114,8 +107,8 @@ public class CrawlTopologyTest {
 		
 		// Execute for a maximum of 20 seconds, but terminate (successfully)
 		// if there's no activity for 5 seconds.
-		ct.execute(20_000, 5_000);
-	
+         ct.execute(20_000, 5_000);
+//        ct.execute(200_000, 200_000);
 
 		for (Tuple3<Class<?>, String, Map<String, String>> entry : UrlLogger.getLog()) {
 			LOGGER.debug(String.format("%s: %s", entry.f0, entry.f1));
