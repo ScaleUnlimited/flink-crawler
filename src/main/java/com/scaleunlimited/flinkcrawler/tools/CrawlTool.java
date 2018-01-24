@@ -18,7 +18,6 @@ import org.kohsuke.args4j.Option;
 import com.scaleunlimited.flinkcrawler.fetcher.BaseHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.fetcher.SimpleHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.fetcher.commoncrawl.CommonCrawlFetcherBuilder;
-import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
 import com.scaleunlimited.flinkcrawler.tools.CrawlTopology.CrawlTopologyBuilder;
@@ -300,8 +299,7 @@ public class CrawlTool {
 		if (options.isCommonCrawl()) {
 			return new CommonCrawlFetcherBuilder(options.getMaxThreads(), userAgent)
 					.setCrawlId(options.getCommonCrawlId())
-					.setCacheDir(options.getCommonCrawlCacheDir())
-					.prepCache();
+					.setCacheDir(options.getCommonCrawlCacheDir());
 		} else {
 			return new SimpleHttpFetcherBuilder(userAgent);
 		}

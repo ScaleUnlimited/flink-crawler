@@ -9,8 +9,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -52,17 +50,10 @@ public class CommonCrawlFetcherBuilder extends BaseHttpFetcherBuilder {
 		return this;
 	}
 	
-	public CommonCrawlFetcherBuilder prepCache() throws IOException {
+	private void prepCache(File cachedFile) throws IOException {
 		// Load the cache with the serialized secondary index file.
-		if (_cacheDir == null) {
-			throw new IllegalStateException("Can't prep cache if cache dir hasn't been set");
-		}
-		if (_crawlId == null) {
-			throw new IllegalStateException("Can't prep cache if crawl id hasn't been set");
-		}
 
 		AmazonS3 client = makeClient();
-		File cachedFile = makeCacheFile();
 		if (!cachedFile.exists()) {
 			// Fetch the secondary index file, which we need in memory.
 			String s3Path = S3Utils.makeS3FilePath(_crawlId, SECONDARY_INDEX_FILENAME);
@@ -88,8 +79,6 @@ public class CommonCrawlFetcherBuilder extends BaseHttpFetcherBuilder {
 				}
 			}
 		}
-
-		return this;
 	}
 	
 	private AmazonS3 makeClient() {
@@ -103,6 +92,12 @@ public class CommonCrawlFetcherBuilder extends BaseHttpFetcherBuilder {
 	
 	private File makeCacheFile() {
 		// TODO support using S3 as cache location.
+		if (_cacheDir == null) {
+			throw new IllegalStateException("Can't set up cache file if cache dir hasn't been set");
+		}
+		if (_crawlId == null) {
+			throw new IllegalStateException("Can't set up cache file if crawl id hasn't been set");
+		}
 		File cacheDir = new File(_cacheDir);
 		return new File(cacheDir, String.format("%s-%s", _crawlId, SERIALIZED_SECONDARY_INDEX_FILENAME));
 	}
@@ -111,16 +106,20 @@ public class CommonCrawlFetcherBuilder extends BaseHttpFetcherBuilder {
 	public BaseHttpFetcher build() throws Exception {
 		AmazonS3 client = makeClient();
 
-		// If the caller hasn't set up the cacheDir, then let prepCache do so.
+		// If the caller hasn't set up a cacheDir then we create a temp location for it
 		if (_cacheDir == null) {
 			File tempDir = File.createTempFile("cache-dir", "");
 			tempDir.delete();
 			tempDir.mkdir();
 			_cacheDir = tempDir.toString();
-			prepCache();
 		}
 		
 		File cachedFile = makeCacheFile();
+		// If cachedFile doesn't already exist, then let prepCache do so.
+		if (!cachedFile.exists()) {
+			prepCache(cachedFile);
+		}
+		
 		LOGGER.info("Loading serialized secondary index for cache from " + cachedFile);
 		try (DataInputStream in = new DataInputStream(new GZIPInputStream(new FileInputStream(cachedFile)))) {
 			SecondaryIndexMap secondaryIndexMap = new SecondaryIndexMap();
