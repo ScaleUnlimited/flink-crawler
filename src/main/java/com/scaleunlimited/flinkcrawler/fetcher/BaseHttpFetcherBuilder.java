@@ -40,6 +40,11 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
         _timeoutInSeconds = DEFAULT_FETCH_TIMEOUT;
     }
     
+	public int getMaxParallelFetches() {
+		// TODO change name to something else
+		return _maxThreads;
+	}
+
 	// From BaseFetcher:
     
     public BaseHttpFetcherBuilder setDefaultMaxContentSize(int defaultMaxContentSize) {
@@ -91,19 +96,19 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
     public abstract BaseHttpFetcher build() throws Exception;
     
     public void setTimeoutInSeconds(int timeoutInSeconds) {
-    	_timeoutInSeconds = timeoutInSeconds;
+        _timeoutInSeconds = timeoutInSeconds;
     }
     
     public int getTimeoutInSeconds() {
-    	return _timeoutInSeconds;
+        	return _timeoutInSeconds;
     }
 
     public UserAgent getUserAgent() {
-    	return _userAgent;
+    	    return _userAgent;
     }
     
     public void setUserAgent(UserAgent userAgent) {
-    	_userAgent = userAgent;
+        _userAgent = userAgent;
     }
     
     /**
@@ -116,7 +121,7 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
      * settings from this builder to that BaseHttpFetcher instance
      */
     protected BaseHttpFetcher configure(BaseHttpFetcher fetcher) {
-    	fetcher.setDefaultMaxContentSize(_defaultMaxContentSize);
+        fetcher.setDefaultMaxContentSize(_defaultMaxContentSize);
 		for (Map.Entry<String, Integer> entry : _maxContentSizes.entrySet()) {
 			fetcher.setMaxContentSize(entry.getKey(), entry.getValue());
 		}
@@ -126,6 +131,7 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
 		fetcher.setAcceptLanguage(_acceptLanguage);
 		fetcher.setMaxRedirects(_maxRedirects);
 		fetcher.setRedirectMode(_redirectMode);
-    	return fetcher;
+    	    return fetcher;
     }
+
 }

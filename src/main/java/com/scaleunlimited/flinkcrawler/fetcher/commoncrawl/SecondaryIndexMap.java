@@ -9,6 +9,9 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Map from (reversed) URL to information about the primary index file (and offset/length of segment
  * in that file) where the URL would have to be found.
@@ -21,6 +24,7 @@ import java.util.regex.Pattern;
 
 
 public class SecondaryIndexMap {
+	static final Logger LOGGER = LoggerFactory.getLogger(SecondaryIndexMap.class);
 
     private String[] _secondaryIndexUrls;
     private SecondaryIndex[] _secondaryIndex;
@@ -51,7 +55,15 @@ public class SecondaryIndexMap {
 			// And now we know that the actual index will be the one before the insertion point,
 			// so back it off by one.
 			index -= 1;
+			
+			// LOGGER.debug(String.format("'%s' should be in segment %d based on secondary value '%s'", key, index, _secondaryIndexUrls[index]));
+			// LOGGER.debug(String.format("First url in segment %d is '%s'", index + 1, _secondaryIndexUrls[index + 1]));
 		}
+		
+		// TODO if the index is > 0, then we have an issue where the previous segment
+		// could also contain this entry. Worst case, we could also have multiple segments
+		// that have the target URL as their first entry. So we really need to return a
+		// list (or start/end) of segment ids.
 
 		return _secondaryIndex[index];
 	}

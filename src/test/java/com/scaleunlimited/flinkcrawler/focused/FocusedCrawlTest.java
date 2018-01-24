@@ -17,6 +17,7 @@ import com.scaleunlimited.flinkcrawler.fetcher.MockRobotsFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.SiteMapGraphFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.WebGraphFetcher;
 import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
+import com.scaleunlimited.flinkcrawler.metrics.CrawlerAccumulator;
 import com.scaleunlimited.flinkcrawler.parser.ParserResult;
 import com.scaleunlimited.flinkcrawler.parser.SimpleSiteMapParser;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
@@ -81,7 +82,6 @@ public class FocusedCrawlTest {
 			.setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
 			.setUrlLengthener(new SimpleUrlLengthener())
 			.setCrawlDB(new DrumCrawlDB(10_000, drumDBDir.getAbsolutePath()))
-			.setMaxFetcherPoolSize(2)
 			.setRobotsFetcherBuilder(new MockRobotsFetcher.MockRobotsFetcherBuilder(new MockRobotsFetcher()))
 			.setRobotsParser(new SimpleRobotRulesParser())
 			.setPageParser(new FocusedPageParser(new PageNumberScorer()))
@@ -136,6 +136,14 @@ public class FocusedCrawlTest {
 		public float score(ParserResult parse) {
 			String title = parse.getParsedUrl().getTitle();
 			return Float.parseFloat(title.substring("Synthetic page - score = ".length()));
+		}
+
+		@Override
+		public void open(CrawlerAccumulator crawlerAccumulator) throws Exception {
+		}
+
+		@Override
+		public void close() throws Exception {
 		}
 	}
 

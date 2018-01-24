@@ -54,6 +54,8 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
     // 0,124,148,146)/index.php 20170429211342 {"url": "http://146.148.124.0/index.php", "mim....
     private static final Pattern CDX_LINE_PATTERN = Pattern.compile("(.+?)[ ]+(\\d+)[ ]+(\\{.+\\})");
     
+    private static final String ENCODED_CHARS = "0123456789abcdefABCDEF";
+    
     private static final Headers EMPTY_HEADERS = new Headers();
     private static final byte[] EMPTY_CONTENT = new byte[0];
 
@@ -96,8 +98,9 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
                 throw new BadProtocolFetchException(url);
             }
             
-            
-            return fetch(realUrl, realUrl, payload, 0);
+            FetchedResult result = fetch(realUrl, realUrl, payload, 0);
+        	LOGGER.debug("Fetched " + url);
+            return result;
         } catch (MalformedURLException e) {
             throw new UrlFetchException(url, e.getMessage());
         } catch (AbortedFetchException e) {
@@ -118,7 +121,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 	}
 
 	/**
-	 * Recursive mthod for attempting to fetch <redirectUrl>.
+	 * Recursive method for attempting to fetch <redirectUrl>.
 	 * 
 	 * @param originalUrl
 	 * @param redirectUrl
@@ -128,6 +131,8 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 	 * @throws BaseFetchException
 	 */
 	private FetchedResult fetch(URL originalUrl, URL redirectUrl, Payload payload, int numRedirects) throws BaseFetchException {
+		LOGGER.debug(String.format("Fetching '%s' with %d redirects", redirectUrl, numRedirects));
+		
 		if (numRedirects > getMaxRedirects()) {
 			throw new RedirectFetchException(originalUrl.toString(), redirectUrl.toString(), RedirectExceptionReason.TOO_MANY_REDIRECTS);
 		}
@@ -174,12 +179,13 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 			double responseRateExact = (double)bytesRead / deltaTime;
 			// Response rate is bytes/second, not bytes/millisecond
 			int responseRate = (int)Math.round(responseRateExact * 1000.0);
-			LOGGER.debug(String.format(	"Read %,d bytes from page at %,d offset within %s in %,d seconds (%,d bytes/sec)",
+			LOGGER.debug(String.format(	"Read %,d bytes from page at %,d offset from '%s' in %,dms (%,d bytes/sec) for '%s'",
 										bytesRead,
 										offset,
 										warcFile,
-										deltaTime / 1000,
-										responseRate));
+										deltaTime,
+										responseRate,
+										redirectUrl));
 			Headers headers = new Headers();
 			for (String httpHeader : pageRecord.getHttpHeaders()) {
 				String[] keyValue = httpHeader.split(":", 2);
@@ -295,14 +301,13 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 		JsonObject result = null;
 		String urlAsStr = url.toString();
 		
-		try {
-			InputStream lis = new GZIPInputStream(new ByteArrayInputStream(segmentData));
-			InputStreamReader isr = new InputStreamReader(lis, StandardCharsets.UTF_8);
-			BufferedReader lineReader = new BufferedReader(isr);
+		try (BufferedReader lineReader = new BufferedReader(new InputStreamReader(new GZIPInputStream(new ByteArrayInputStream(segmentData)), StandardCharsets.UTF_8))) {
 
 			String line;
 			while ((line = lineReader.readLine()) != null) {
 				// 0,124,148,146)/index.php 20170429211342 {"url": "http://146.148.124.0/index.php", "mim....
+				// LOGGER.debug(line);
+				
 				Matcher m = CDX_LINE_PATTERN.matcher(line);
 				if (!m.matches()) {
 					throw new IOException("Invalid CDX line: " + line);
@@ -317,13 +322,15 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 					
 					// See if the URL in the JsonObject matches what we're looking for.
 					String newUrl = newResult.get("url").getAsString();
-					if (newUrl.equals(urlAsStr)) {
+					
+					// TODO hack to match encoded characters, where hex digits can be upper
+					// case in the URL, even though the key used for ordering is lower-case.
+					if (newUrl.equalsIgnoreCase(urlAsStr)) {
 						// FUTURE should we check the timestamp to pick the last one?
 						result = newResult;
 						result.addProperty("timestamp", new Long(Long.parseLong(m.group(2))));
 					}
 				} else if (sort < 0) {
-					// We're past where it could be.
 					return result;
 				}
 			}
@@ -345,6 +352,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 	private byte[] getSegmentData(URL url, SecondaryIndex indexEntry) throws IOFetchException {
 		byte[] result = _cache.get(indexEntry.getSegmentId());
 		if (result != null) {
+			LOGGER.debug(String.format("Found data for segment #%d in our cache for '%s'", indexEntry.getSegmentId(), url));
 			return result;
 		}
 	
@@ -364,12 +372,14 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 			double responseRateExact = (double)length / deltaTime;
 			// Response rate is bytes/second, not bytes/millisecond
 			int responseRate = (int)Math.round(responseRateExact * 1000.0);
-			LOGGER.debug(String.format(	"Read %,d byte segment at %,d offset within %s in %,d seconds (%,d bytes/sec)",
+			LOGGER.debug(String.format(	"Read %,d byte segment #%d at %,d offset within %s in %,dms (%,d bytes/sec) for '%s'",
 										length,
+										indexEntry.getSegmentId(),
 										offset,
 										indexFilename,
-										deltaTime / 1000,
-										responseRate));
+										deltaTime,
+										responseRate,
+										url));
 			
 			_cache.put(indexEntry.getSegmentId(), result);
 			return result;
@@ -460,7 +470,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 		reversedUrl.append(")");
 
 		if (!url.getPath().isEmpty()) {
-			reversedUrl.append(url.getPath());
+			reversedUrl.append(lowerCaseEncodedChars(url.getPath()));
 		} else {
 			reversedUrl.append('/');
 		}
@@ -472,5 +482,61 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 
 		return reversedUrl.toString();
     }
+
+	/**
+	 * If the path contains URL-encoded characters, we need to make sure A-F are
+	 * lowercased.
+	 * 
+	 * @param path
+	 * @return
+	 */
+	private static String lowerCaseEncodedChars(final String path) {
+		int offset = path.indexOf('%');
+		if (offset == -1) {
+			return path;
+		}
+		
+		boolean inPercent = true;
+		boolean inFirstDigit = false;
+		char savedFirstDigit = ' ';
+		
+		offset += 1;
+		StringBuilder result = new StringBuilder(path.substring(0, offset));
+		
+		for (; offset < path.length(); offset++) {
+			char c = path.charAt(offset);
+			if (!inPercent) {
+				result.append(c);
+				if (c == '%') {
+					inPercent = true;
+				}
+			} else if (!inFirstDigit) {
+				if (ENCODED_CHARS.indexOf(c) != -1) {
+					inFirstDigit = true;
+					savedFirstDigit = c;
+				} else {
+					inPercent = false;
+					result.append(c);
+				}
+			} else {
+				if (ENCODED_CHARS.indexOf(c) != -1) {
+					result.append(Character.toLowerCase(savedFirstDigit));
+					result.append(Character.toLowerCase(c));
+				} else {
+					result.append(savedFirstDigit);
+					result.append(c);
+				}
+				
+				inPercent = false;
+				inFirstDigit = false;
+			}
+		}
+		
+		if (inFirstDigit) {
+			result.append(savedFirstDigit);
+		}
+		
+		return result.toString();
+	}
     
 }

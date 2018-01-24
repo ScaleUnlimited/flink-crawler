@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.config.ParserPolicy;
+import com.scaleunlimited.flinkcrawler.metrics.CrawlerAccumulator;
 import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.utils.IoUtils;
 
@@ -25,23 +26,11 @@ import com.scaleunlimited.flinkcrawler.utils.IoUtils;
 public class SimplePageParser extends BasePageParser {
     private static final Logger LOGGER = LoggerFactory.getLogger(SimplePageParser.class);
 
-//    /**
-//     * Fixed version of Tika 1.0's IdentityHtmlMapper
-//     */
-//    private static class FixedIdentityHtmlMapper extends IdentityHtmlMapper implements Serializable {
-//
-//        public static final HtmlMapper INSTANCE = new FixedIdentityHtmlMapper();
-//
-//        @Override
-//        public String mapSafeElement(String name) {
-//            return name.toLowerCase(Locale.ENGLISH);
-//        }
-//    }
-
     private boolean _extractLanguage = true;
     protected BaseContentExtractor _contentExtractor;
     protected BaseLinkExtractor _linkExtractor;
     protected ParseContext _parseContext;
+    
     private transient Parser _parser;
     
     public SimplePageParser() {
@@ -121,19 +110,24 @@ public class SimplePageParser extends BasePageParser {
         _parseContext = parseContext;
     }
 
-    protected synchronized void init() {
+    @Override
+	public void open(CrawlerAccumulator crawlerAccumulator) throws Exception {
+		setAccumulator(crawlerAccumulator);
+	}
+
+	@Override
+	public void close() throws Exception {
+	}
+
+	protected synchronized void init() {
         if (_parser == null) {
-            _parser = getTikaParser();
+            _parser = new AutoDetectParser();
         }
         
         _contentExtractor.reset();
         _linkExtractor.setLinkTags(getParserPolicy().getLinkTags());
         _linkExtractor.setLinkAttributeTypes(getParserPolicy().getLinkAttributeTypes());
         _linkExtractor.reset();
-    }
-
-    public Parser getTikaParser() {
-        return new AutoDetectParser();
     }
 
     public void setExtractLanguage(boolean extractLanguage) {

@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.streaming.api.functions.async.collector.AsyncCollector;
+import org.apache.flink.streaming.api.functions.async.ResultFuture;
 import org.apache.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,7 +48,7 @@ public class CheckUrlWithRobotsFunction extends BaseAsyncFunction<FetchUrl, Tupl
 	protected static final long DEFAULT_RETRY_INTERVAL_MS = 100_000 * 1000L;
 
 	// Make this controllable from the command line
-	private static final int THREAD_COUNT = 100;
+	private static final int THREAD_COUNT = 10;
 
 	private BaseHttpFetcherBuilder _fetcherBuilder;
 	private SimpleRobotRulesParser _parser;
@@ -82,34 +82,30 @@ public class CheckUrlWithRobotsFunction extends BaseAsyncFunction<FetchUrl, Tupl
 	}
 	
 	@Override
-	public void asyncInvoke(FetchUrl url, AsyncCollector<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> collector) throws Exception {
+	public void asyncInvoke(FetchUrl url, ResultFuture<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> future) throws Exception {
 		record(this.getClass(), url);
 
-		final String robotsUrl = makeRobotsKey(url);
-		BaseRobotRules rules = _rules.get(robotsUrl);
-		if (rules != null) {
-			// See if the rule should be expired.
-			if (System.currentTimeMillis() >= _ruleExpirations.get(robotsUrl)) {
-				_rules.remove(robotsUrl);
-				_ruleExpirations.remove(robotsUrl);
-			} else {
-				collector.collect(processUrl(rules, url));
-				return;
-			}
-		}
-
-		// We don't have robots yet, so queue up the URL for fetching code
+		LOGGER.debug(String.format("Queueing for robots check: %s", url));
+		
 		_executor.execute(new Runnable() {
 
 			@Override
 			public void run() {
-				// We might, in the thread, get a URL that we've already processed because multiple were queued up.
-				// So do the check again, then fetch if needed. We might also have multiple threads processing URLs
-				// for the same domain, but for now let's not worry about that case (just slightly less efficient).
+				final String robotsUrl = makeRobotsKey(url);
+				// TODO make _rules a class that manages both the rules and the expiration
+				// time, so we don't have to worry about edge cases with expiration and
+				// rules maps potentially getting out of sync in this multi-threaded environment.
 				BaseRobotRules rules = _rules.get(robotsUrl);
 				if (rules != null) {
-					collector.collect(processUrl(rules, url));
-					return;
+					// See if the rule should be expired.
+					if (System.currentTimeMillis() >= _ruleExpirations.get(robotsUrl)) {
+						_rules.remove(robotsUrl);
+						_ruleExpirations.remove(robotsUrl);
+					} else {
+						LOGGER.debug(String.format("Found cached rule for '%s', collecting", url));
+						future.complete(processUrl(rules, url));
+						return;
+					}
 				}
 
 				long robotsFetchRetryDelay;
@@ -149,7 +145,8 @@ public class CheckUrlWithRobotsFunction extends BaseAsyncFunction<FetchUrl, Tupl
 					}
 				}
 
-				collector.collect(result);
+				LOGGER.debug(String.format("Collecting checked results for '%s'", url));
+				future.complete(result);
 			}
 
 		});
@@ -209,6 +206,7 @@ public class CheckUrlWithRobotsFunction extends BaseAsyncFunction<FetchUrl, Tupl
 	private String makeRobotsKey(FetchUrl url) {
 		return String.format("%s/robots.txt", url.getUrlWithoutPath());
 	}
+
 
 
 }

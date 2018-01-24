@@ -8,6 +8,7 @@ import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironmentWithAsyncExecution;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.util.FileUtils;
+import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,7 +44,7 @@ public class CrawlTopologyTest {
     private static final String CRLF = "\r\n";
 
 	@Test
-	public void test() throws Exception {
+	public void testAsync() throws Exception {
 		UrlLogger.clear();
 		
 		LocalStreamEnvironmentWithAsyncExecution env = new LocalStreamEnvironmentWithAsyncExecution();
@@ -90,10 +91,7 @@ public class CrawlTopologyTest {
 			.setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
 			.setUrlLengthener(new SimpleUrlLengthener())
 			.setCrawlDB(new DrumCrawlDB(10_000, drumDBDir.getAbsolutePath()))
-			// .setCrawlDB(new InMemoryCrawlDB())
 			.setFetchQueue(new FetchQueue(1_000))
-			// .setCrawlDB(new InMemoryCrawlDB())
-			.setMaxFetcherPoolSize(2)
 			.setRobotsFetcherBuilder(new MockRobotsFetcher.MockRobotsFetcherBuilder(new MockRobotsFetcher(robotPages)))
 			.setRobotsParser(new SimpleRobotRulesParser())
 			.setPageParser(new SimplePageParser())
@@ -117,7 +115,8 @@ public class CrawlTopologyTest {
 		// Execute for a maximum of 20 seconds, but terminate (successfully)
 		// if there's no activity for 5 seconds.
 		ct.execute(20_000, 5_000);
-		
+	
+
 		for (Tuple3<Class<?>, String, Map<String, String>> entry : UrlLogger.getLog()) {
 			LOGGER.debug(String.format("%s: %s", entry.f0, entry.f1));
 		}
@@ -171,5 +170,13 @@ public class CrawlTopologyTest {
 								FetchStatus.class.getSimpleName(), FetchStatus.HTTP_NOT_FOUND.toString())
 
 			;
+	}
+
+	@Test
+	public void testSingleDomainUrlValidator() {
+		SimpleUrlValidator validator = 
+			new CrawlTool.SingleDomainUrlValidator("scaleunlimited.com");
+        Assert.assertFalse(validator.isValid("http://transpac.com"));
+        Assert.assertTrue(validator.isValid("http://scaleunlimited.com"));
 	}
 }
