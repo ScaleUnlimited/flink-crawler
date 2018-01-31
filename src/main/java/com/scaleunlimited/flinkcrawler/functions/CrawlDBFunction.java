@@ -37,7 +37,7 @@ public class CrawlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl
     static final Logger LOGGER = LoggerFactory.getLogger(CrawlDBFunction.class);
 
     private static final int URLS_PER_TICKLE = 10;
-    private static final int MAX_IN_FLIGHT_URLS = URLS_PER_TICKLE * 2;
+    private static final int MAX_IN_FLIGHT_URLS = URLS_PER_TICKLE * 3;
 
     private BaseCrawlDBMerger _merger;
 
@@ -72,6 +72,14 @@ public class CrawlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl
             @Override
             public Integer getValue() {
                 return _fetchQueue.size();
+            }
+        });
+
+        // Track how many URLs we think are being processed.
+        context.getMetricGroup().gauge(CrawlerMetrics.GAUGE_URLS_IN_FLIGHT.toString(), new Gauge<Integer>() {
+            @Override
+            public Integer getValue() {
+                return _numInFlightUrls.get();
             }
         });
 

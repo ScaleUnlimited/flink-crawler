@@ -45,7 +45,7 @@ public class CrawlTool {
         private long _forceCrawlDelay = CrawlTool.DO_NOT_FORCE_CRAWL_DELAY;
         private long _defaultCrawlDelayMS = 10 * 1000L;
         private int _maxContentSize = SimpleHttpFetcher.DEFAULT_MAX_CONTENT_SIZE;
-        private int _maxThreads = 1;
+        private int _fetchersPerTask = 1;
         private int _parallelism = CrawlTopologyBuilder.DEFAULT_PARALLELISM;
         private String _outputFile = null;
         private boolean _htmlOnly = false;
@@ -58,10 +58,10 @@ public class CrawlTool {
 	        _urlsFilename = urlsFilename;
 	    }
 		
-		@Option(name = "-singledomain", usage = "only fetch URLs within this domain (and its sub-domains)", required = false)
-	    public void setSingleDomain(String singleDomain) {
-			_singleDomain = singleDomain;
-	    }
+        @Option(name = "-singledomain", usage = "only fetch URLs within this domain (and its sub-domains)", required = false)
+        public void setSingleDomain(String singleDomain) {
+            _singleDomain = singleDomain;
+        }
 		
 		@Option(name = "-forcecrawldelay", usage = "use this crawl delay (ms) even if robots.txt provides something else", required = false)
 	    public void setForceCrawlDelay(long forceCrawlDelay) {
@@ -88,9 +88,9 @@ public class CrawlTool {
 			_cacheDir = cacheDir;
 	    }
 		
-		@Option(name = "-maxthreads", usage = "max threads per fetcher", required = false)
-	    public void setMaxThreads(int maxThreads) {
-			_maxThreads = maxThreads;
+		@Option(name = "-fetcherspertask", usage = "fetchers per task", required = false)
+	    public void setFetchersPerTask(int fetchersPerTask) {
+			_fetchersPerTask = fetchersPerTask;
 	    }
 		
 		@Option(name = "-parallelism", usage = "Flink paralellism", required = false)
@@ -145,8 +145,8 @@ public class CrawlTool {
 			return _cacheDir;
 		}
 		
-		public int getMaxThreads() {
-			return _maxThreads;
+		public int getFetchersPerTask() {
+			return _fetchersPerTask;
 		}
 		
 		public int getParallelism() {
@@ -227,8 +227,8 @@ public class CrawlTool {
 	public static void main(String[] args) {
 		
         // Dump the classpath to stdout to debug artifact version conflicts
-		System.out.println(    "Java classpath: "
-                    		+   System.getProperty("java.class.path", "."));
+//		System.out.println(    "Java classpath: "
+//                    		+   System.getProperty("java.class.path", "."));
 
         CrawlToolOptions options = new CrawlToolOptions();
         CmdLineParser parser = new CmdLineParser(options);
@@ -244,6 +244,8 @@ public class CrawlTool {
         
 		try {
 			StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+			// Not really needed, as we are limited by fetch time and parsing CPU
+			// env.getConfig().enableObjectReuse();
 	        run(env, options);
 		} catch (Throwable t) {
 			System.err.println("Error running CrawlTool: " + t.getMessage());
@@ -298,12 +300,12 @@ public class CrawlTool {
 	
 	private static BaseHttpFetcherBuilder getPageFetcherBuilder(CrawlToolOptions options, UserAgent userAgent) throws IOException {
 		if (options.isCommonCrawl()) {
-			return new CommonCrawlFetcherBuilder(options.getMaxThreads(), userAgent)
+			return new CommonCrawlFetcherBuilder(options.getFetchersPerTask(), userAgent)
 					.setCrawlId(options.getCommonCrawlId())
 					.setCacheDir(options.getCommonCrawlCacheDir())
 					.prepCache();
 		} else {
-			return new SimpleHttpFetcherBuilder(userAgent);
+			return new SimpleHttpFetcherBuilder(options.getFetchersPerTask(), userAgent);
 		}
 	}
 

@@ -9,8 +9,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -38,8 +36,8 @@ public class CommonCrawlFetcherBuilder extends BaseHttpFetcherBuilder {
 	private String _crawlId;
 	private String _cacheDir;
 	
-	public CommonCrawlFetcherBuilder(int maxThreads, UserAgent userAgent) {
-		super(maxThreads, userAgent);
+	public CommonCrawlFetcherBuilder(int maxSimultaneousRequests, UserAgent userAgent) {
+		super(maxSimultaneousRequests, userAgent);
 	}
 
 	public CommonCrawlFetcherBuilder setCrawlId(String crawlId) {
@@ -125,7 +123,7 @@ public class CommonCrawlFetcherBuilder extends BaseHttpFetcherBuilder {
 		try (DataInputStream in = new DataInputStream(new GZIPInputStream(new FileInputStream(cachedFile)))) {
 			SecondaryIndexMap secondaryIndexMap = new SecondaryIndexMap();
 			secondaryIndexMap.read(in);
-			CommonCrawlFetcher result = new CommonCrawlFetcher(client, _crawlId, _maxThreads, CommonCrawlFetcher.DEFAULT_CACHE_SIZE, secondaryIndexMap);
+			CommonCrawlFetcher result = new CommonCrawlFetcher(client, _crawlId, _maxSimultaneousRequests, CommonCrawlFetcher.DEFAULT_CACHE_SIZE, secondaryIndexMap);
 			return configure(result);
 		}
 	}
