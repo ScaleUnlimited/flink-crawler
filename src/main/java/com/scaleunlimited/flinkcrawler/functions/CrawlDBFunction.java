@@ -53,9 +53,7 @@ public class CrawlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl
 
     private transient Random _rand;
 
-    private transient byte[] _firstUrlState;
-    private transient byte[] _secondUrlState;
-    private transient byte[] _mergedUrlState;
+    private transient CrawlStateUrl _mergedUrlState;
 
     public CrawlDBFunction(BaseCrawlDBMerger merger, FetchQueue fetchQueue) {
         _merger = merger;
@@ -83,6 +81,8 @@ public class CrawlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl
             }
         });
 
+        _mergedUrlState = new CrawlStateUrl();
+        
         _numInFlightUrls = new AtomicInteger(0);
 
         _fetchQueue.open();
@@ -115,10 +115,6 @@ public class CrawlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl
                                                                                                                          // name
                 Integer.class, Long.class);
         _activeUrlsIndex = getRuntimeContext().getMapState(activeUrlsIndexStateDescriptor);
-
-        _firstUrlState = new byte[CrawlStateUrl.VALUE_SIZE];
-        _secondUrlState = new byte[CrawlStateUrl.VALUE_SIZE];
-        _mergedUrlState = new byte[CrawlStateUrl.VALUE_SIZE];
     }
 
     @Override
@@ -143,14 +139,18 @@ public class CrawlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl
             Long urlHash = url.makeKey();
             if (_archivedUrls.contains(urlHash)) {
                 if (LOGGER.isTraceEnabled()) {
-                    LOGGER.trace("Ignoring archived URL: " + url);
+                    LOGGER.trace(String.format(
+                            "CrawlDBFunction (%d/%d) ignoring archived URL %s with hash %d",
+                            _partition, _parallelism, url, urlHash));
                 }
                 // It's been archived, ignore
             } else {
                 CrawlStateUrl stateUrl = _activeUrls.get(urlHash);
                 if (stateUrl == null) {
                     if (LOGGER.isTraceEnabled()) {
-                        LOGGER.trace("Adding new URL to crawlDB: " + url);
+                        LOGGER.trace(String.format(
+                                "CrawlDBFunction (%d/%d) adding new URL %s with hash %d",
+                                _partition, _parallelism, url, urlHash));
                     }
 
                     // TODO need to copy URL if object reuse enabled?
@@ -162,37 +162,44 @@ public class CrawlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl
 
                     _activeUrlsIndex.put(numActiveUrls, urlHash);
                     _numActiveUrls.update(numActiveUrls + 1);
-                } else if (mergeUrls(url, stateUrl)) {
-                    _activeUrls.put(urlHash, stateUrl);
+                } else {
+                    if (LOGGER.isTraceEnabled()) {
+                        LOGGER.trace(String.format(
+                                "CrawlDBFunction (%d/%d) need to merge incoming URL %s with %s (hash %d)",
+                                _partition, _parallelism, url, stateUrl, urlHash));
+                    }
+
+                    if (mergeUrls(stateUrl, url)) {
+                        _activeUrls.put(urlHash, stateUrl);
+                    }
                 }
             }
 
             // If it's not an unfetched URL, we can decrement our active URLs
             if (status != FetchStatus.UNFETCHED) {
                 if (_numInFlightUrls.decrementAndGet() < 0) {
-                    LOGGER.warn("Houston, we have a problem - negative in-flight URLs");
+                    LOGGER.warn(String.format("CrawlDBFunction (%d/%d) has negative in-flight URLs", _partition, _parallelism));
                 }
             }
         } else if (url.getUrlType() == UrlType.TICKLER) {
             if (LOGGER.isTraceEnabled()) {
-                LOGGER.trace("Got tickler URL");
+                LOGGER.trace(String.format("CrawlDBFunction (%d/%d) checking for URLs to emit", _partition, _parallelism));
             }
-            
-            LOGGER.trace(String.format("CrawlDBFunction (%d/%d) checking for URLs to emit", _partition, _parallelism));
 
             for (int i = 0; i < URLS_PER_TICKLE; i++) {
                 int activeUrls = _numInFlightUrls.get();
                 if (activeUrls > MAX_IN_FLIGHT_URLS) {
-                    LOGGER.trace(String.format("CrawlDBFunction (%d/%d) skipping emit, too many active URLs (%d)",
-                            _partition, _parallelism, activeUrls));
+                    if (LOGGER.isTraceEnabled()) {
+                        LOGGER.trace(String.format("CrawlDBFunction (%d/%d) skipping emit, too many active URLs (%d)",
+                                _partition, _parallelism, activeUrls));
+                    }
+                    
                     return;
                 }
 
                 FetchUrl fetchUrl = _fetchQueue.poll();
 
                 if (fetchUrl != null) {
-                    LOGGER.debug(String.format("CrawlDBFunction (%d/%d) emitting URL %s", _partition, _parallelism,
-                            fetchUrl));
                     collector.collect(fetchUrl);
                     int nowActive = _numInFlightUrls.incrementAndGet();
                     LOGGER.debug(String.format("CrawlDBFunction (%d/%d) emitted URL %s (%d active)", _partition,
@@ -220,6 +227,13 @@ public class CrawlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl
                     int index = (startingIndex + i) % numUrls;
                     CrawlStateUrl stateUrl = _activeUrls.get(_activeUrlsIndex.get(index));
                     FetchQueueResult queueResult = _fetchQueue.add(stateUrl);
+                    if (LOGGER.isTraceEnabled()) {
+                        LOGGER.trace(String.format(
+                                "CrawlDBFunction (%d/%d) got result %s adding '%s' to fetch queue",
+                                _partition, _parallelism,
+                                queueResult, stateUrl));
+                    }
+                    
                     switch (queueResult) {
                         case QUEUED:
                             // TODO so I don't have to do MapState.put(hash, stateUrl) to get this
@@ -249,21 +263,20 @@ public class CrawlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl
         }
     }
 
-    private boolean mergeUrls(CrawlStateUrl newUrl, CrawlStateUrl stateUrl) {
-        newUrl.getValue(_firstUrlState);
-        stateUrl.getValue(_secondUrlState);
-        MergeResult result = _merger.doMerge(_firstUrlState, _secondUrlState, _mergedUrlState);
+    private boolean mergeUrls(CrawlStateUrl stateUrl, CrawlStateUrl newUrl) {
+        MergeResult result = _merger.doMerge(stateUrl, newUrl, _mergedUrlState);
 
         switch (result) {
             case USE_FIRST:
-                stateUrl.setFromValue(_firstUrlState);
-                return true;
-
-            case USE_SECOND:
+                // All set, stateUrl is what we want to use, so no update
                 return false;
 
+            case USE_SECOND:
+                stateUrl.setFrom(newUrl);
+                return true;
+
             case USE_MERGED:
-                stateUrl.setFromValue(_mergedUrlState);
+                stateUrl.setFrom(_mergedUrlState);
                 return true;
 
             default:

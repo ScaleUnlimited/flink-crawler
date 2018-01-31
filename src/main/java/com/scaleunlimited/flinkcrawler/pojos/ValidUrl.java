@@ -28,14 +28,9 @@ public class ValidUrl extends BaseUrl {
 	}
 	
 	public ValidUrl(ValidUrl base) {
-		super(base);
+		super();
 		
-		_protocol = base.getProtocol();
-		_hostname = base.getHostname();
-		_pld = base.getPld();
-		_port = base.getPort();
-		_path = base.getPath();
-		_query = base.getQuery();
+		setFrom(base);
 	}
 	
 	@Override
@@ -116,6 +111,18 @@ public class ValidUrl extends BaseUrl {
 		}
 	}
 	
+    public void setFrom(ValidUrl url) {
+        super.setFrom(url);
+        
+        _protocol = url._protocol;
+        _hostname = url._hostname;
+        _pld = url._pld;
+        _port = url._port;
+        _path = url._path;
+        _query = url._query;
+    }
+    
+
 	@Override
 	public String toString() {
 		return super.toString();
@@ -185,5 +192,5 @@ public class ValidUrl extends BaseUrl {
         	return result;
         }
     }
-	
+
 }

@@ -16,41 +16,28 @@ public class DefaultCrawlDBMergerTest {
     public void testMergingUnfetched() throws Exception {
         BaseCrawlDBMerger merger = new DefaultCrawlDBMerger();
         
-        byte[] firstValue = new byte[CrawlStateUrl.VALUE_SIZE];
-        byte[] secondValue = new byte[CrawlStateUrl.VALUE_SIZE];
-        byte[] mergedValue = new byte[CrawlStateUrl.VALUE_SIZE];
-        
 		ValidUrl url = new ValidUrl("http://domain.com?q=s");
 		CrawlStateUrl csu1 = new CrawlStateUrl(url, FetchStatus.UNFETCHED, 100, 1.0f, 1000);
-		csu1.getValue(firstValue);
-		
 		CrawlStateUrl csu2 = new CrawlStateUrl(url, FetchStatus.UNFETCHED, 100, 1.0f, 1000);
-		csu2.getValue(secondValue);
+		CrawlStateUrl mergedValue = new CrawlStateUrl();
 		
-        MergeResult result = merger.doMerge(firstValue, secondValue, mergedValue);
+        MergeResult result = merger.doMerge(csu1, csu2, mergedValue);
         assertThat(result).isEqualTo(MergeResult.USE_MERGED);
-        
-		csu1.setFromValue(mergedValue);
-		assertThat(csu1.getScore()).isCloseTo(2.0f, Percentage.withPercentage(0.01));
+        assertThat(mergedValue.getUrl()).isEqualTo(url.getUrl());
+		assertThat(mergedValue.getScore()).isCloseTo(2.0f, Percentage.withPercentage(0.01));
     }
 
     @Test
-    public void testMergingFetchedWithUnfetched() throws Exception {
+    public void testMergingFetchedWithFetching() throws Exception {
         BaseCrawlDBMerger merger = new DefaultCrawlDBMerger();
         
-        byte[] firstValue = new byte[CrawlStateUrl.VALUE_SIZE];
-        byte[] secondValue = new byte[CrawlStateUrl.VALUE_SIZE];
-        byte[] mergedValue = new byte[CrawlStateUrl.VALUE_SIZE];
-        
-		ValidUrl url = new ValidUrl("http://domain.com?q=s");
-		CrawlStateUrl csu1 = new CrawlStateUrl(url, FetchStatus.FETCHED, 100, 1.0f, 1000);
-		csu1.getValue(firstValue);
-		
-		CrawlStateUrl csu2 = new CrawlStateUrl(url, FetchStatus.UNFETCHED, 100, 1.0f, 1000);
-		csu2.getValue(secondValue);
-		
-        MergeResult result = merger.doMerge(firstValue, secondValue, mergedValue);
-        assertThat(result).isEqualTo(MergeResult.USE_FIRST);
+		ValidUrl url = new ValidUrl("http://domain1.com/");
+		CrawlStateUrl stateUrl = new CrawlStateUrl(url, FetchStatus.FETCHING, 100, 1.0f, 1000);
+		CrawlStateUrl newUrl = new CrawlStateUrl(url, FetchStatus.FETCHED, 200, 1.0f, 1000);
+	    CrawlStateUrl mergedValue = new CrawlStateUrl();
+
+        MergeResult result = merger.doMerge(stateUrl, newUrl, mergedValue);
+        assertThat(result).isEqualTo(MergeResult.USE_SECOND);
     }
 
 }

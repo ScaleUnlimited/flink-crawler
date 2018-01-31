@@ -62,6 +62,10 @@ public abstract class BaseUrl implements Serializable {
 		return true;
 	}
 
+    public void setFrom(BaseUrl url) {
+        _url = url._url;
+    }
+
 
 	
 }
