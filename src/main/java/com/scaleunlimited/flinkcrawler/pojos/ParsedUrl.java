@@ -11,6 +11,10 @@ public class ParsedUrl extends ValidUrl {
 	private float _score;
 	private Map<String, String> _parsedMeta;
 
+	public ParsedUrl() {
+	    super();
+	}
+	
 	public ParsedUrl(ValidUrl url, String parsedText,
 			String language, String title, Map<String, String> parsedMeta, float score) {
 		super(url);

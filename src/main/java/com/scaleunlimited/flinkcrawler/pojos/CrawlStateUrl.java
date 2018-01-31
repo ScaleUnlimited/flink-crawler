@@ -120,6 +120,14 @@ public class CrawlStateUrl extends ValidUrl {
 		_urlType = urlType;
 	}
 	
+	public int getId() {
+	    return _id;
+	}
+	
+	public void setId(int id) {
+	    _id = id;
+	}
+	
     /**
      * Set all fields from url
      * 

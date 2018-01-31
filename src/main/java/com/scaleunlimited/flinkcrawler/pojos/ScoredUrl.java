@@ -5,6 +5,10 @@ public class ScoredUrl extends ValidUrl {
 
 	private float _score;
 	
+	public ScoredUrl() {
+	    super();
+	}
+	
 	public ScoredUrl(ValidUrl url, float score) {
 		super(url);
 		
