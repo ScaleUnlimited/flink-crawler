@@ -17,9 +17,9 @@ public class SimpleHttpFetcherBuilder extends BaseHttpFetcherBuilder {
 		super(maxSimultaneousRequests, userAgent);
 	}
 
-	public SimpleHttpFetcherBuilder(int maxThreads, int timeoutInSeconds, UserAgent userAgent) {
+	public SimpleHttpFetcherBuilder(int maxThreads, int fetchDurationTimeoutInSeconds, UserAgent userAgent) {
 		super(maxThreads, userAgent);
-		setTimeoutInSeconds(timeoutInSeconds);
+		setFetchDurationTimeoutInSeconds(fetchDurationTimeoutInSeconds);
 	}
 
 

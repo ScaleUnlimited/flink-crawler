@@ -23,7 +23,7 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
 
     // From BaseHttpFetcher:
     protected int _maxThreads;
-    protected int _timeoutInSeconds;
+    protected int _fetchDurationTimeoutInSeconds;
     protected UserAgent _userAgent;
     protected int _maxRedirects = BaseHttpFetcher.DEFAULT_MAX_REDIRECTS;
     protected int _maxConnectionsPerHost = BaseHttpFetcher.DEFAULT_MAX_CONNECTIONS_PER_HOST;
@@ -37,7 +37,7 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
         
         _maxThreads = maxThreads;
         _userAgent = userAgent;
-        _timeoutInSeconds = DEFAULT_FETCH_TIMEOUT;
+        _fetchDurationTimeoutInSeconds = DEFAULT_FETCH_TIMEOUT;
     }
     
 	public int getMaxParallelFetches() {
@@ -95,12 +95,12 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
      */
     public abstract BaseHttpFetcher build() throws Exception;
     
-    public void setTimeoutInSeconds(int timeoutInSeconds) {
-        _timeoutInSeconds = timeoutInSeconds;
+    public void setFetchDurationTimeoutInSeconds(int fetchDurationTimeoutInSeconds) {
+        _fetchDurationTimeoutInSeconds = fetchDurationTimeoutInSeconds;
     }
     
-    public int getTimeoutInSeconds() {
-        	return _timeoutInSeconds;
+    public int getFetchDurationTimeoutInSeconds() {
+        	return _fetchDurationTimeoutInSeconds;
     }
 
     public UserAgent getUserAgent() {
@@ -131,6 +131,7 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
 		fetcher.setAcceptLanguage(_acceptLanguage);
 		fetcher.setMaxRedirects(_maxRedirects);
 		fetcher.setRedirectMode(_redirectMode);
+		fetcher.setFetchDurationTimeoutInSeconds(_fetchDurationTimeoutInSeconds);
     	    return fetcher;
     }
 

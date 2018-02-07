@@ -44,7 +44,8 @@ public class FetchUrlsFunction extends BaseAsyncFunction<FetchUrl, Tuple2<CrawlS
 	 * @param fetcherBuider
 	 */
 	public FetchUrlsFunction(BaseHttpFetcherBuilder fetcherBuilder) {
-		super(fetcherBuilder.getMaxParallelFetches(), fetcherBuilder.getTimeoutInSeconds());
+	    // Double the fetch duration for the timeout we use for the async function to be safe
+		super(fetcherBuilder.getMaxParallelFetches(), 2 *fetcherBuilder.getFetchDurationTimeoutInSeconds());
 		
 		_fetcherBuilder = fetcherBuilder;
 	}
