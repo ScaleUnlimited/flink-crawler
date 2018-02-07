@@ -64,7 +64,8 @@ public class CheckUrlWithRobotsFunction extends BaseAsyncFunction<FetchUrl, Tupl
 	private transient Map<String, Long> _ruleExpirations;
 	
 	public CheckUrlWithRobotsFunction(BaseHttpFetcherBuilder fetcherBuilder, SimpleRobotRulesParser parser, long forceCrawlDelay, long defaultCrawlDelay) {
-		super(THREAD_COUNT, fetcherBuilder.getFetchDurationTimeoutInSeconds());
+		// Double the fetch duration timeout for the executor timeout value.
+	    super(THREAD_COUNT, 2 * fetcherBuilder.getFetchDurationTimeoutInSeconds());
 		
 		_fetcherBuilder = fetcherBuilder;
 		_parser = parser;
