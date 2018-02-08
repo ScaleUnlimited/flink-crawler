@@ -17,6 +17,12 @@ public class SimpleHttpFetcherBuilder extends BaseHttpFetcherBuilder {
 		super(maxSimultaneousRequests, userAgent);
 	}
 
+	public SimpleHttpFetcherBuilder(int maxThreads, int fetchDurationTimeoutInSeconds, UserAgent userAgent) {
+		super(maxThreads, userAgent);
+		setFetchDurationTimeoutInSeconds(fetchDurationTimeoutInSeconds);
+	}
+
+
 	@Override
 	public BaseHttpFetcher build() {
 		// Note that crawler-commons fetcher uses "maxThreads", but it actually means

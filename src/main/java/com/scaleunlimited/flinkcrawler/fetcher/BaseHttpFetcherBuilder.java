@@ -14,9 +14,7 @@ import crawlercommons.fetcher.http.UserAgent;
 @SuppressWarnings("serial")
 public abstract class BaseHttpFetcherBuilder implements Serializable {
 	
-	// FUTURE set timeout explicitly.
-	// See https://github.com/ScaleUnlimited/flink-crawler/issues/52
-	private static final int DEFAULT_FETCH_TIMEOUT_SECONDS = 100;
+	private static final int DEFAULT_FETCH_TIMEOUT = 100;
 	
 	// From BaseFetcher:
     protected Map<String, Integer> _maxContentSizes = new HashMap<String, Integer>();
@@ -25,6 +23,7 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
 
     // From BaseHttpFetcher:
     protected int _maxThreads;
+    protected int _fetchDurationTimeoutInSeconds;
     protected UserAgent _userAgent;
     protected int _maxRedirects = BaseHttpFetcher.DEFAULT_MAX_REDIRECTS;
     protected int _maxConnectionsPerHost = BaseHttpFetcher.DEFAULT_MAX_CONNECTIONS_PER_HOST;
@@ -32,11 +31,13 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
     protected String _acceptLanguage = BaseHttpFetcher.DEFAULT_ACCEPT_LANGUAGE;
     protected RedirectMode _redirectMode = BaseHttpFetcher.DEFAULT_REDIRECT_MODE;
 
+
     public BaseHttpFetcherBuilder(int maxThreads, UserAgent userAgent) {
     	super();
         
         _maxThreads = maxThreads;
         _userAgent = userAgent;
+        _fetchDurationTimeoutInSeconds = DEFAULT_FETCH_TIMEOUT;
     }
     
 	public int getMaxParallelFetches() {
@@ -94,16 +95,20 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
      */
     public abstract BaseHttpFetcher build() throws Exception;
     
-    public int getTimeoutInSeconds() {
-    	return DEFAULT_FETCH_TIMEOUT_SECONDS;
+    public void setFetchDurationTimeoutInSeconds(int fetchDurationTimeoutInSeconds) {
+        _fetchDurationTimeoutInSeconds = fetchDurationTimeoutInSeconds;
+    }
+    
+    public int getFetchDurationTimeoutInSeconds() {
+        	return _fetchDurationTimeoutInSeconds;
     }
 
     public UserAgent getUserAgent() {
-    	return _userAgent;
+    	    return _userAgent;
     }
     
     public void setUserAgent(UserAgent userAgent) {
-    	_userAgent = userAgent;
+        _userAgent = userAgent;
     }
     
     /**
@@ -116,7 +121,7 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
      * settings from this builder to that BaseHttpFetcher instance
      */
     protected BaseHttpFetcher configure(BaseHttpFetcher fetcher) {
-    	fetcher.setDefaultMaxContentSize(_defaultMaxContentSize);
+        fetcher.setDefaultMaxContentSize(_defaultMaxContentSize);
 		for (Map.Entry<String, Integer> entry : _maxContentSizes.entrySet()) {
 			fetcher.setMaxContentSize(entry.getKey(), entry.getValue());
 		}
@@ -126,7 +131,8 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
 		fetcher.setAcceptLanguage(_acceptLanguage);
 		fetcher.setMaxRedirects(_maxRedirects);
 		fetcher.setRedirectMode(_redirectMode);
-    	return fetcher;
+		fetcher.setFetchDurationTimeoutInSeconds(_fetchDurationTimeoutInSeconds);
+    	    return fetcher;
     }
 
 }
