@@ -1,7 +1,9 @@
 package com.scaleunlimited.flinkcrawler.sources;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,7 +28,7 @@ import com.scaleunlimited.flinkcrawler.utils.S3Utils;
 @SuppressWarnings("serial")
 public class SeedUrlSource extends BaseUrlSource {
 	static final Logger LOGGER = LoggerFactory.getLogger(SeedUrlSource.class);
-
+	
 	// For when we're reading from S3
 	private String _seedUrlsS3Bucket;
 	private String _seedUrlsS3Path;
@@ -68,14 +70,22 @@ public class SeedUrlSource extends BaseUrlSource {
 			List<String> rawUrls = FileUtils.readLines(seedUrlsFile);
 			List<RawUrl> seedUrls = new ArrayList<>(rawUrls.size());
 			for (String seedUrl : rawUrls) {
-				seedUrl = seedUrl.trim();
-				if (!seedUrl.isEmpty() && !seedUrl.startsWith("#")) {
-					seedUrls.add(new RawUrl(seedUrl, _estimatedScore));
-				}
+			    RawUrl parsedUrl = parseSourceLine(seedUrl);
+			    if (parsedUrl != null) {
+			        seedUrls.add(parsedUrl);
+			    }
 			}
 			
 			_urls = seedUrls.toArray(new RawUrl[seedUrls.size()]);
 		}
+	}
+	
+	private RawUrl parseSourceLine(String sourceLine) throws Exception {
+	    String seedUrl = sourceLine.trim();
+	    if (seedUrl.isEmpty() || seedUrl.startsWith("#")) {
+	        return null;
+	    }
+	    return new RawUrl(seedUrl, _estimatedScore);
 	}
 	
 	public SeedUrlSource(float estimatedScore, String... rawUrls) throws Exception {
@@ -98,17 +108,6 @@ public class SeedUrlSource extends BaseUrlSource {
 		_seedUrlIndex = 0;
 
 		if (useS3File()) {
-			
-//			// TODO move this code into S3Utils? Or S3Helper?
-//			// See http://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/services/s3/AmazonS3ClientBuilder.html
-//			AmazonS3ClientBuilder builder = AmazonS3ClientBuilder.standard();
-//			
-//			// http://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/auth/EnvironmentVariableCredentialsProvider.html
-//			builder.setCredentials(new EnvironmentVariableCredentialsProvider());
-//			AmazonS3 s3Client = builder.build();
-//			S3Object object = s3Client.getObject(new GetObjectRequest(_seedUrlsS3Bucket, _seedUrlsS3Path));
-//			_s3FileStream = object.getObjectContent();
-
 			AmazonS3 s3Client = S3Utils.makeS3Client();
 			S3Object object = s3Client.getObject(new GetObjectRequest(_seedUrlsS3Bucket, _seedUrlsS3Path));
 			_s3FileStream = object.getObjectContent();
@@ -130,25 +129,53 @@ public class SeedUrlSource extends BaseUrlSource {
 	public void run(SourceContext<RawUrl> context) throws Exception {
 		_keepRunning = true;
 		
+        BufferedReader s3FileReader = null;
+        if (useS3File()) {
+            s3FileReader = new BufferedReader(new InputStreamReader(_s3FileStream));
+        }
+        
 		while (_keepRunning) {
+		    
+	        // TODO Handle skipping empty lines/comments after we've decided if
+	        // the line is for the appropriate partition, so that we could use
+	        // _seedUrlIndex to re-sync if we get terminated/checkpointed/the
+	        // stream is closed & we have to reopen it, etc.
+		    // 
+		    // Hmmm. That would make _seedUrlIndex an input line index rather
+		    // than a URL index, no?  Assuming the file contents don't change,
+		    // it seems like we could either save a separate input line index
+		    // (i.e., to save re-parsing each input line for the re-sync),
+		    // or we just let it spin through the file re-parsing each line
+		    // until we've seen _seedUrlIndex real URLs.
+		    //
 			if (useS3File()) {
-				// TODO read the next line from the file. Break if we're at the end.
-				// Handle skipping empty lines/comments after we've decided if the
-				// line is for the appropriate partition, so that we could use the
-				// _seedUrlIndex to re-sync if we get terminated/checkpointed/the
-				// stream is closed & we have to reopen it, etc.
+			    String sourceLine = s3FileReader.readLine();
+			    if (sourceLine == null) {
+			        break;
+			    }
+			    RawUrl url = parseSourceLine(sourceLine);
+			    if (url != null) {
+	                collectUrl(url, context);
+			    }
 			} else if (_seedUrlIndex >= _urls.length) {
 				break;
 			} else {
-				if ((_seedUrlIndex % _parallelism) == _index) {
-					RawUrl url = _urls[_seedUrlIndex];
-					LOGGER.debug(String.format("Emitting %s for partition %d of %d", url, _index, _parallelism));
-					context.collect(url);
-				}
-				
-				_seedUrlIndex += 1;
+			    collectUrl(_urls[_seedUrlIndex], context);
 			}
 		}
+		
+		if (s3FileReader != null) {
+		    s3FileReader.close();
+		}
+	}
+	
+	private void collectUrl(RawUrl url, SourceContext<RawUrl> context) {
+        if ((_seedUrlIndex % _parallelism) == _index) {
+            LOGGER.debug(String.format("Emitting %s for partition %d of %d", url, _index, _parallelism));
+            context.collect(url);
+        }
+        
+        _seedUrlIndex += 1;
 	}
 	
 	private boolean useS3File() {
