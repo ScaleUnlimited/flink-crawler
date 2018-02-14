@@ -148,7 +148,7 @@ public class CrawlStateUrl extends ValidUrl {
 	public String toString() {
 		// TODO add more fields to the response.
 		if (_urlType == UrlType.REGULAR) {
-			return String.format("%s (%s)", getUrl(), _status);
+			return String.format("%s (%s at %d)", getUrl(), _status, _statusTime);
 		} else {
 			return String.format("%s (%d)", _urlType, _id);
 		}
