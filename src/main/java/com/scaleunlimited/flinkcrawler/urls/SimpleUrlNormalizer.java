@@ -34,14 +34,18 @@ public class SimpleUrlNormalizer extends BaseUrlNormalizer {
     
     // http://en.wikipedia.org/wiki/Percent-encoding - full set of reserved chars is:
     // !    *   '   (   )   ;   :   @   &   =   +   $   ,   /   ?   %   #   [   ]
+    private static final String RESERVED_CHARS = "!*'();:@&=+$,/?#[]";
+
     // But you only need to encode "reserved purpose" characters, and that sub-set of
     // the reserved chars varies depending upon the protocol and the component. Since
-    // we only are really worried about normalizing http(s) URLs
+    // we only are really worried about normalizing http(s) URLs.
+    private static final String RESERVED_PATH_CHARS = "/?#";
+
     // Not really sure about ':' and '?' being reserved in queries, but that's what StumbleUpon thinks, and that's
     // who we need to support, so...
     private static final String RESERVED_QUERY_CHARS = "%&;=:?#";
-
-    private static final String RESERVED_PATH_CHARS = "%/?#";
+    
+    private static final String UNRESERVED_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.~";
     
     private static final String HEX_CODES = "0123456789abcdefABCDEF";
     
@@ -96,10 +100,9 @@ public class SimpleUrlNormalizer extends BaseUrlNormalizer {
             LOGGER.error("Unexpected exception during URL encoding: " + e);
             return "";
         }
-
     }
     
-    private String encodeUrlComponent(String component, String reservedChars) {
+    private String encodeUrlComponent(String component, String specialChars) {
         StringBuilder result = new StringBuilder();
         for (int i = 0; i < component.length(); ) {
             int codePoint = component.codePointAt(i);
@@ -107,7 +110,14 @@ public class SimpleUrlNormalizer extends BaseUrlNormalizer {
                 result.append('+');
             } else if (codePoint >= 0x007F) {
                 result.append(encodeCodePoint(codePoint));
-            } else if ((codePoint < 0x0020) || (reservedChars.indexOf((char)codePoint) != -1)) {
+            } else if ((codePoint < 0x0020) || (specialChars.indexOf((char)codePoint) != -1)) {
+                // It's either a control char or a "special" char, which is a reserved char
+                // that has special meaning for this component of the URL. In either case we
+                // have to encode it.
+                result.append(String.format("%%%02x", codePoint));
+            } else if ((UNRESERVED_CHARS.indexOf((char)codePoint) == -1)
+                    && (RESERVED_CHARS.indexOf((char)codePoint) == -1)) {
+                // It's not an unreserved or a reserved char, so we have to encode it.
                 result.append(String.format("%%%02x", codePoint));
             } else {
                 result.append((char)codePoint);

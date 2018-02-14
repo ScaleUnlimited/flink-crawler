@@ -56,6 +56,14 @@ public class SimpleUrlValidatorTest {
         assertFalse(validator.isValid("http://foo.com/page1.xml"));
    }
     
+   @Test
+   public void testUnencodedUrl() {
+       SimpleUrlValidator validator = new SimpleUrlValidator();
+       
+       assertFalse(validator.isValid("http://mail-archives.us.apache.org/mod_mbox/www-announce/201705.mbox/<CACRbFyjtT7QQGHUzTRdbJoySbJb7tt4BDk5-r-VRn0GB0Kgvag@mail.gmail.com>"));
+       assertTrue(validator.isValid("http://mail-archives.us.apache.org/mod_mbox/www-announce/201705.mbox/%3CCACRbFyjtT7QQGHUzTRdbJoySbJb7tt4BDk5-r-VRn0GB0Kgvag@mail.gmail.com%3E"));
+   }
+    
     
     
 }

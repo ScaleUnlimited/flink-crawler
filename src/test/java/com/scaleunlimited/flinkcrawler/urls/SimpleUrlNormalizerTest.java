@@ -400,4 +400,9 @@ public class SimpleUrlNormalizerTest {
         normalizeTest("http://www.domain.com", "http://www.domain.com/", "Add trailing slash");
         normalizeTest("www.pondliner.com", "http://www.pondliner.com/", "Add trailing slash even if no protocol");
     }
+    
+    @Test
+    public void testEncodingReservedChars() {
+        normalizeTest("http://domain.org/201705.mbox/<CAC@mail.gmail.com>", "http://domain.org/201705.mbox/%3cCAC@mail.gmail.com%3e", "Encode <> chars");
+    }
 }
