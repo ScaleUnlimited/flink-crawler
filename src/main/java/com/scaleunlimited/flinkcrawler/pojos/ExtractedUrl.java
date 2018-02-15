@@ -9,6 +9,10 @@ public class ExtractedUrl extends BaseUrl {
     private String _relAttributes;
     private float _score;
     
+    public ExtractedUrl() {
+        super();
+    }
+    
     public ExtractedUrl(String url) {
     	this(url, null, null);
     }

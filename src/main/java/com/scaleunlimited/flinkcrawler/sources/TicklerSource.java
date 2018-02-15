@@ -35,7 +35,8 @@ public class TicklerSource extends RichParallelSourceFunction<CrawlStateUrl> {
 	public void open(Configuration parameters) throws Exception {
 		super.open(parameters);
 		
-		_index = getRuntimeContext().getIndexOfThisSubtask();
+//        _index = getRuntimeContext().getIndexOfThisSubtask();
+        _index = 0;
 		LOGGER.debug("Opening TicklerSource for partition " + _index);
 	}
 	
@@ -50,7 +51,7 @@ public class TicklerSource extends RichParallelSourceFunction<CrawlStateUrl> {
 		while (_keepRunning) {
 			LOGGER.trace("Emitting tickler URL for partition " + _index);
 
-			context.collect(CrawlStateUrl.makeTicklerUrl(_index));
+			context.collect(CrawlStateUrl.makeTicklerUrl(_index++));
 			Thread.sleep(TICKLE_INTERVAL);
 		}
 		

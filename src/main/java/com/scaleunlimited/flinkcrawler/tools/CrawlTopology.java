@@ -30,16 +30,14 @@ import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDB;
 import com.scaleunlimited.flinkcrawler.crawldb.DefaultCrawlDBMerger;
-import com.scaleunlimited.flinkcrawler.crawldb.InMemoryCrawlDB;
 import com.scaleunlimited.flinkcrawler.fetcher.BaseHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.fetcher.SimpleHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.functions.CheckUrlWithRobotsFunction;
 import com.scaleunlimited.flinkcrawler.functions.CrawlDBFunction;
+import com.scaleunlimited.flinkcrawler.functions.DomainTicklerFunction;
 import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.HandleFailedSiteMapFunction;
-import com.scaleunlimited.flinkcrawler.functions.HashPartitioner;
 import com.scaleunlimited.flinkcrawler.functions.LengthenUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.NormalizeUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.OutlinkToStateUrlFunction;
@@ -163,7 +161,6 @@ public class CrawlTopology {
         
         private BaseUrlSource _urlSource = new SeedUrlSource(makeDefaultSeedUrl());;
         private FetchQueue _fetchQueue = new FetchQueue(10_000);
-        private BaseCrawlDB _crawlDB = new InMemoryCrawlDB();
         
         private BaseHttpFetcherBuilder _robotsFetcherBuilder = new SimpleHttpFetcherBuilder(INVALID_USER_AGENT);
         private SimpleRobotRulesParser _robotsParser = new SimpleRobotRulesParser();
@@ -205,11 +202,6 @@ public class CrawlTopology {
         
         public CrawlTopologyBuilder setUrlLengthener(BaseUrlLengthener lengthener) {
             _urlLengthener = lengthener;
-            return this;
-        }
-
-        public CrawlTopologyBuilder setCrawlDB(BaseCrawlDB crawlDB) {
-        	_crawlDB = crawlDB;
             return this;
         }
 
@@ -313,11 +305,17 @@ public class CrawlTopology {
             // Update the Crawl DB, then run URLs it emits through robots filtering.
             IterativeStream<CrawlStateUrl> crawlDbIteration = cleanedUrls.iterate(/* TicklerSource.TICKLE_INTERVAL * 5 */);
             DataStream<FetchUrl> preRobotsUrls = crawlDbIteration
-            		.partitionCustom(new HashPartitioner(), new PldKeySelector<CrawlStateUrl>())
-            		.flatMap(new CrawlDBFunction(_crawlDB, new DefaultCrawlDBMerger(), _fetchQueue))
+                    .keyBy(new PldKeySelector<CrawlStateUrl>())
+            		.flatMap(new DomainTicklerFunction())
+            		.name("DomainTicklerFunction")
+            		
+            		// We have to re-key since flatMap destroys the keyed state
+                    .keyBy(new PldKeySelector<CrawlStateUrl>())
+            		.flatMap(new CrawlDBFunction(new DefaultCrawlDBMerger(), _fetchQueue))
             		.name("CrawlDBFunction")
-            		// TODO still use KeyedStream here?
-            		.partitionCustom(new HashPartitioner(), new PldKeySelector<FetchUrl>());
+            		
+            		// We have to re-key so that CheckUrlWithRobotsFunction can also use keyed state.
+                    .keyBy(new PldKeySelector<FetchUrl>());
             
             DataStream<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> postRobotsUrls =
             		AsyncDataStream.unorderedWait(preRobotsUrls,

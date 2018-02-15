@@ -11,5 +11,4 @@ public class PldKeySelector<T extends ValidUrl> implements KeySelector<T, Intege
 	public Integer getKey(T url) throws Exception {
 		return url.getPartitionKey();
 	}
-
 }

@@ -28,7 +28,7 @@ public class SimpleHttpFetcherBuilder extends BaseHttpFetcherBuilder {
 		// Note that crawler-commons fetcher uses "maxThreads", but it actually means
 		// the size of the connection pool, and thus the max number of simultaneous
 		// requests.
-		SimpleHttpFetcher result = new SimpleHttpFetcher(_maxThreads, _userAgent);
+		SimpleHttpFetcher result = new SimpleHttpFetcher(_maxSimultaneousRequests, _userAgent);
 		return configure(result);
 	}
 

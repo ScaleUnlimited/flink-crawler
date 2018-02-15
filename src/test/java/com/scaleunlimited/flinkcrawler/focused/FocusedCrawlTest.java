@@ -4,15 +4,14 @@ import java.io.File;
 import java.util.Map;
 
 import org.apache.flink.api.java.tuple.Tuple3;
-import org.apache.flink.streaming.api.environment.LocalStreamEnvironmentWithAsyncExecution;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
+import org.apache.flink.streaming.api.environment.LocalStreamEnvironmentWithAsyncExecution;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.util.FileUtils;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.scaleunlimited.flinkcrawler.crawldb.DrumCrawlDB;
 import com.scaleunlimited.flinkcrawler.fetcher.MockRobotsFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.SiteMapGraphFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.WebGraphFetcher;
@@ -73,15 +72,9 @@ public class FocusedCrawlTest {
 			FileUtils.deleteFileOrDirectory(contentTextFile);
 		}
 
-		File drumDBDir = new File("./target/drum/");
-		if (drumDBDir.exists()) {
-			FileUtils.deleteDirectory(drumDBDir);
-		}
-		
 		CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
 			.setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
 			.setUrlLengthener(new SimpleUrlLengthener())
-			.setCrawlDB(new DrumCrawlDB(10_000, drumDBDir.getAbsolutePath()))
 			.setRobotsFetcherBuilder(new MockRobotsFetcher.MockRobotsFetcherBuilder(new MockRobotsFetcher()))
 			.setRobotsParser(new SimpleRobotRulesParser())
 			.setPageParser(new FocusedPageParser(new PageNumberScorer()))

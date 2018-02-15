@@ -168,9 +168,12 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 		warcRequest.setRange(offset, offset + length);
 
 		String newRedirectUrlAsStr = "";
+		DataInputStream dis = null;
+		S3ObjectInputStream ois = null;
 		try (S3Object warcObject = _s3Client.getObject(warcRequest)) {
-			InputStream warcInputStream = new GZIPInputStream(warcObject.getObjectContent());
-			DataInputStream dis = new DataInputStream(warcInputStream);
+			ois = warcObject.getObjectContent();
+			InputStream warcInputStream = new GZIPInputStream(ois);
+			dis = new DataInputStream(warcInputStream);
 			long startTime = System.currentTimeMillis();
 			WarcRecordReader warcReader = new WarcRecordReader(dis);
 			WarcRecord pageRecord = warcReader.readNextRecord();
@@ -293,6 +296,10 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 			throw new UrlFetchException(newRedirectUrlAsStr, e.getMessage());
 		} catch (IOException e) {
 			throw new IOFetchException(redirectUrl.toString(), e);
+		} finally {
+			if (ois != null) {
+				ois.abort();
+			}
 		}
 	}
 
@@ -352,7 +359,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 	private byte[] getSegmentData(URL url, SecondaryIndex indexEntry) throws IOFetchException {
 		byte[] result = _cache.get(indexEntry.getSegmentId());
 		if (result != null) {
-			LOGGER.debug(String.format("Found data for segment #%d in our cache for '%s'", indexEntry.getSegmentId(), url));
+			LOGGER.trace(String.format("Found data for segment #%d in our cache for '%s'", indexEntry.getSegmentId(), url));
 			return result;
 		}
 	
@@ -364,8 +371,9 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 		long offset = indexEntry.getSegmentOffset();
 		objectRequest.setRange(offset, offset + length);
 		
+		S3ObjectInputStream is = null;
 		try (S3Object object = _s3Client.getObject(objectRequest)) {
-			S3ObjectInputStream is = object.getObjectContent();
+			is = object.getObjectContent();
 			long startTime = System.currentTimeMillis();
 			IOUtils.read(is, result);
 			long deltaTime = System.currentTimeMillis() - startTime;
@@ -385,6 +393,10 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 			return result;
 		} catch (IOException e) {
 			throw new IOFetchException(url.toString(), e);
+		} finally {
+			if (is != null) {
+				is.abort();
+			}
 		}
 	}
 

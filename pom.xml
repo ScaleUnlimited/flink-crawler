@@ -288,6 +288,12 @@ under the License.
 				<version>4.12</version>
 			</dependency>
 		
+			<dependency>
+				<groupId>org.assertj</groupId>
+				<artifactId>assertj-core</artifactId>
+				<version>3.8.0</version>
+			</dependency>
+		
         </dependencies>
 	</dependencyManagement>
 
@@ -390,10 +396,6 @@ under the License.
 	            	<artifactId>bcprov-jdk15on</artifactId>
 	            </exclusion>
 	            <exclusion>
-	            	<groupId>org.apache.cxf</groupId>
-	            	<artifactId>cxf-rt-rs-client</artifactId>
-	            </exclusion>
-	            <exclusion>
 	            	<groupId>org.apache.opennlp</groupId>
 	            	<artifactId>opennlp-tools</artifactId>
 	            </exclusion>
@@ -449,6 +451,12 @@ under the License.
 		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
+		</dependency>
+		
+		<dependency>
+			<groupId>org.assertj</groupId>
+			<artifactId>assertj-core</artifactId>
+			<scope>test</scope>
 		</dependency>
 		
 		<dependency>
@@ -648,9 +656,6 @@ under the License.
 									<exclude>org.apache.sling:org.apache.sling.commons.json</exclude>
 									<exclude>commons-logging:commons-logging</exclude>
 									<exclude>commons-codec:commons-codec</exclude>
-									<exclude>com.fasterxml.jackson.core:jackson-core</exclude>
-									<exclude>com.fasterxml.jackson.core:jackson-databind</exclude>
-									<exclude>com.fasterxml.jackson.core:jackson-annotations</exclude>
 									<exclude>stax:stax-api</exclude>
 									<exclude>com.typesafe:config</exclude>
 									<exclude>org.uncommons.maths:uncommons-maths</exclude>

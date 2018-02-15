@@ -8,6 +8,9 @@ public enum UrlType {
 	// A special URL that is used to keep the iteration running smoothly.
 	TICKLER,
 	
+	// A special URL that is tells the crawl DB what keyed state to process.
+	DOMAIN,
+	
 	// A special URL that tells the CrawlDBFunction to stop emitting URLs.
 	TERMINATION
 }
