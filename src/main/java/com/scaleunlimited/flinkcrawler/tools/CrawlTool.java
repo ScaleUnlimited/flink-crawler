@@ -18,7 +18,6 @@ import org.kohsuke.args4j.Option;
 import com.scaleunlimited.flinkcrawler.fetcher.BaseHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.fetcher.SimpleHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.fetcher.commoncrawl.CommonCrawlFetcherBuilder;
-import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
 import com.scaleunlimited.flinkcrawler.tools.CrawlTopology.CrawlTopologyBuilder;
@@ -37,6 +36,9 @@ import crawlercommons.util.Headers;
 public class CrawlTool {
 
 	public static final long DO_NOT_FORCE_CRAWL_DELAY = -1L;
+	
+	// As per https://developers.google.com/search/reference/robots_txt
+    private static final int MAX_ROBOTS_TXT_SIZE = 500 * 1024;
 
 	public static class CrawlToolOptions {
 		
@@ -265,7 +267,7 @@ public class CrawlTool {
 		BaseHttpFetcherBuilder siteMapFetcherBuilder = getPageFetcherBuilder(options, userAgent)
 			.setDefaultMaxContentSize(SiteMapParser.MAX_BYTES_ALLOWED);
 		BaseHttpFetcherBuilder robotsFetcherBuilder = getRobotsFetcherBuilder(options, userAgent)
-			.setDefaultMaxContentSize(options.getMaxContentSize());
+			.setDefaultMaxContentSize(MAX_ROBOTS_TXT_SIZE);
 		BaseHttpFetcherBuilder pageFetcherBuilder = getPageFetcherBuilder(options, userAgent)
 				.setDefaultMaxContentSize(options.getMaxContentSize());
 		
@@ -281,7 +283,6 @@ public class CrawlTool {
 
 
 		CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
-//			.setMaxWaitTime(100000)
 			.setUrlSource(new SeedUrlSource(options.getSeedUrlsFilename(), RawUrl.DEFAULT_SCORE))
 			.setRobotsFetcherBuilder(robotsFetcherBuilder)
 			.setUrlFilter(urlValidator)

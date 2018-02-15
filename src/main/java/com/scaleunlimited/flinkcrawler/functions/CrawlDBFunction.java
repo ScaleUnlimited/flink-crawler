@@ -40,7 +40,7 @@ public class CrawlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl
     static final Logger LOGGER = LoggerFactory.getLogger(CrawlDBFunction.class);
 
     private static final int URLS_PER_TICKLE = 10;
-    private static final int MAX_IN_FLIGHT_URLS = 5; // TODO(kkrugler) - revert to URLS_PER_TICKLE * 3;
+    private static final int MAX_IN_FLIGHT_URLS = URLS_PER_TICKLE * 10;
 
     private BaseCrawlDBMerger _merger;
 
@@ -253,8 +253,12 @@ public class CrawlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl
         // If it's not an unfetched URL, we can decrement our active URLs
         FetchStatus newStatus = url.getStatus();
         if (newStatus != FetchStatus.UNFETCHED) {
+            if (url.getStatusTime() == 0) {
+                throw new RuntimeException(String.format("CrawlDBFunction (%d/%d) got URL with invalid status time: %s", _partition, _parallelism, url));
+            }
+            
             if (_numInFlightUrls.decrementAndGet() < 0) {
-                LOGGER.warn(String.format("CrawlDBFunction (%d/%d) has negative in-flight URLs", _partition, _parallelism));
+                throw new RuntimeException(String.format("CrawlDBFunction (%d/%d) has negative in-flight URLs", _partition, _parallelism));
             }
         }
 
@@ -271,7 +275,7 @@ public class CrawlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl
             // If the state is unfetched, we're all good, but if not then that's a logical error
             // as we shouldn't be emitting URLs that are archived.
             if (newStatus != FetchStatus.UNFETCHED) {
-                LOGGER.error(String.format(
+                throw new RuntimeException(String.format(
                         "CrawlDBFunction (%d/%d) got archived URL %s with active status %s",
                         _partition, _parallelism, url, newStatus));
             }
@@ -288,10 +292,9 @@ public class CrawlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl
 
                 // Better be unfetched.
                 if (newStatus != FetchStatus.UNFETCHED) {
-                    LOGGER.error(String.format(
+                    throw new RuntimeException(String.format(
                             "CrawlDBFunction (%d/%d) got new URL '%s' with active status %s",
                             _partition, _parallelism, url, newStatus));
-                    return;
                 }
                 
                 CounterUtils.increment(getRuntimeContext(), FetchStatus.UNFETCHED);
@@ -307,8 +310,8 @@ public class CrawlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl
                 _activeUrlsIndex.put(numActiveUrls, urlHash);
                 _numActiveUrls.update(numActiveUrls + 1);
             } else {
-                if (LOGGER.isTraceEnabled()) {
-                    LOGGER.trace(String.format(
+                if (LOGGER.isDebugEnabled()) {
+                    LOGGER.debug(String.format(
                             "CrawlDBFunction (%d/%d) needs to merge incoming URL %s with %s (hash %d)",
                             _partition, _parallelism, url, stateUrl, urlHash));
                 }

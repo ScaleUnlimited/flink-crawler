@@ -44,7 +44,7 @@ public class DefaultCrawlDBMerger extends BaseCrawlDBMerger {
 				return MergeResult.USE_MERGED;
 			}
 		} else if (secondStatus == FetchStatus.UNFETCHED) {
-			// firstValue is not unfetched, secondValue is unfetched, so use old.
+			// firstValue is not unfetched, secondValue is unfetched, so use first.
 			return MergeResult.USE_FIRST;
 		} else {
 			// Neither first nor second value is unfetched, so use the more recent one.

@@ -82,6 +82,8 @@ public class CrawlTopologyTest {
 		}
 
 		CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
+	        // Explicitly set parallelism so that it doesn't vary based on # of cores
+	        .setParallelism(2)
 			.setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
 			.setUrlLengthener(new SimpleUrlLengthener())
 			.setFetchQueue(new FetchQueue(1_000))
@@ -96,8 +98,6 @@ public class CrawlTopologyTest {
 			.setSiteMapFetcherBuilder(new SiteMapGraphFetcher.SiteMapGraphFetcherBuilder(new SiteMapGraphFetcher(sitemapGraph)))
 			.setSiteMapParser(new SimpleSiteMapParser())
 			.setDefaultCrawlDelay(0)
-			// Explicitly set parallelism so that it doesn't vary based on # of cores
-			.setParallelism(2)
 			.setPageFetcherBuilder(new WebGraphFetcher.WebGraphFetcherBuilder(new WebGraphFetcher(graph)));
 
 		CrawlTopology ct = builder.build();
