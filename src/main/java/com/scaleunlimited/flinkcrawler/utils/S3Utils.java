@@ -64,11 +64,5 @@ public class S3Utils {
 	
 	public static AmazonS3 makeS3Client() {
 		return AmazonS3ClientBuilder.defaultClient();
-		
-//		AmazonS3ClientBuilder builder = AmazonS3ClientBuilder.standard();
-//		
-//		// http://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/auth/EnvironmentVariableCredentialsProvider.html
-//		builder.setCredentials(new DefaultAWSCredentialsProviderChain());
-//		return builder.build();
 	}
 }

@@ -320,7 +320,7 @@ public class CrawlTopology {
             DataStream<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> postRobotsUrls =
             		AsyncDataStream.unorderedWait(preRobotsUrls,
             				new CheckUrlWithRobotsFunction(_robotsFetcherBuilder, _robotsParser, _forceCrawlDelay, _defaultCrawlDelay),
-            				_robotsFetcherBuilder.getTimeoutInSeconds(), TimeUnit.SECONDS)
+            				_robotsFetcherBuilder.getFetchDurationTimeoutInSeconds() * 2, TimeUnit.SECONDS)
                     .name("CheckUrlWithRobotsFunction");
             
             // Split this stream into passed, blocked or sitemap.
@@ -361,7 +361,8 @@ public class CrawlTopology {
 
             DataStream<Tuple2<CrawlStateUrl, FetchedUrl>> sitemapUrls = 
             		// TODO get capacity from fetcher builder.
-            		AsyncDataStream.unorderedWait(sitemapUrlsToFetch, new FetchUrlsFunction(_siteMapFetcherBuilder), _siteMapFetcherBuilder.getTimeoutInSeconds(), TimeUnit.SECONDS, 10000)
+            		AsyncDataStream.unorderedWait(sitemapUrlsToFetch, new FetchUrlsFunction(_siteMapFetcherBuilder), 
+            		        _siteMapFetcherBuilder.getFetchDurationTimeoutInSeconds() * 2, TimeUnit.SECONDS, 10000)
 					.name("FetchUrlsFunction for sitemap"); // FUTURE Have a separate FetchSiteMapUrlFunction that extends FetchUrlsFunction
            
             // Run the failed urls into a custom function to log it and then to a DiscardingSink.
@@ -408,7 +409,8 @@ public class CrawlTopology {
             		
             DataStream<Tuple2<CrawlStateUrl, FetchedUrl>> fetchedUrls = 
             		// TODO get capacity from fetcher builder.
-            		AsyncDataStream.unorderedWait(urlsToFetch, new FetchUrlsFunction(_pageFetcherBuilder), _pageFetcherBuilder.getTimeoutInSeconds(), TimeUnit.SECONDS, 10000)
+            		AsyncDataStream.unorderedWait(urlsToFetch, new FetchUrlsFunction(_pageFetcherBuilder), 
+            		        _pageFetcherBuilder.getFetchDurationTimeoutInSeconds() * 2, TimeUnit.SECONDS, 10000)
                     .name("FetchUrlsFunction");
             
             SplitStream<Tuple2<CrawlStateUrl, FetchedUrl>> fetchAttemptedUrls = splitFetchedUrlsStream(fetchedUrls);

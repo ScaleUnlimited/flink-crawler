@@ -303,8 +303,7 @@ public class CrawlTool {
 		if (options.isCommonCrawl()) {
 			return new CommonCrawlFetcherBuilder(options.getFetchersPerTask(), userAgent)
 					.setCrawlId(options.getCommonCrawlId())
-					.setCacheDir(options.getCommonCrawlCacheDir())
-					.prepCache();
+					.setCacheDir(options.getCommonCrawlCacheDir());
 		} else {
 			return new SimpleHttpFetcherBuilder(options.getFetchersPerTask(), userAgent);
 		}
