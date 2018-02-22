@@ -13,6 +13,10 @@ public class FetchedUrl extends ValidUrl {
 	private String _contentType;
 	private int _responseRate;
 	
+	public FetchedUrl() {
+	    super();
+	}
+	
 	public FetchedUrl(ValidUrl url, String fetchedUrl, long fetchTime, Headers headers,
 			byte[] content, String contentType, int responseRate) {
 		super(url);

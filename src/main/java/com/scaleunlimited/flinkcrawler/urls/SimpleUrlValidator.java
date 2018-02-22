@@ -1,5 +1,5 @@
 /*
- * Copyright 2009-2015 Scale Unlimited
+ * Copyright 2009-2018 Scale Unlimited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,32 @@ import java.util.regex.Pattern;
 public class SimpleUrlValidator extends BaseUrlValidator {
     private static final Pattern HTTP_PATTERN = Pattern.compile("^(http|https):");
 
+    private Pattern _invalidSuffixes;
+    
+    public SimpleUrlValidator() {
+    	super();
+    	
+    	_invalidSuffixes = null;
+    }
+    
+    public SimpleUrlValidator(String...suffixes) {
+    	super();
+    	
+    	StringBuilder patternStr = new StringBuilder(".(");
+    	boolean firstSuffix = true;
+    	for (String suffix : suffixes) {
+    		if (firstSuffix) {
+    			firstSuffix = false;
+    		} else {
+    			patternStr.append("|");
+    		}
+    		patternStr.append(suffix);
+    	}
+    	
+    	patternStr.append(")$");
+    	_invalidSuffixes = Pattern.compile(patternStr.toString());
+	}
+    
     @Override
     public boolean isValid(String urlString) {
         if (!HTTP_PATTERN.matcher(urlString).find()) {
@@ -43,7 +69,11 @@ public class SimpleUrlValidator extends BaseUrlValidator {
                 return false;
             }
             
-            return true;
+            if (_invalidSuffixes == null) {
+            	return true;
+            } else {
+            	return !_invalidSuffixes.matcher(urlString).find();
+            }
         } catch (Exception e) {
             return false;
         }

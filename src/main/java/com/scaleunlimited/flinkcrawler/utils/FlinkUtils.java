@@ -5,6 +5,9 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.apache.flink.runtime.executiongraph.ExecutionJobVertex;
+import org.apache.flink.runtime.state.KeyGroupRangeAssignment;
+
 import com.google.gson.Gson;
 
 public class FlinkUtils {
@@ -133,4 +136,24 @@ public class FlinkUtils {
 		result.append("}\n");
 		return result.toString();
 	}
+	
+	public static Integer makeKeyForOperatorIndex(int maxParallelism, int parallelism, int operatorIndex) {
+		if (maxParallelism == ExecutionJobVertex.VALUE_NOT_SET) {
+			maxParallelism = KeyGroupRangeAssignment.computeDefaultMaxParallelism(parallelism);
+		}
+		
+		for (int i = 0; i < maxParallelism * 2; i++) {
+			
+			Integer key = new Integer(i);
+			int keyGroup = KeyGroupRangeAssignment.assignToKeyGroup(key, maxParallelism);
+			int index = KeyGroupRangeAssignment.computeOperatorIndexForKeyGroup(maxParallelism, parallelism, keyGroup);
+			if (index == operatorIndex) {
+				return key;
+			}
+		}
+		
+		throw new RuntimeException(String.format("Unable to find key for target operator index %d (max parallelism = %d, parallelism = %d", 
+				operatorIndex, maxParallelism, parallelism));
+	}
+
 }

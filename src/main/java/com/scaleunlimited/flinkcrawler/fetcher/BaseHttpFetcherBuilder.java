@@ -22,7 +22,7 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
     protected Set<String> _validMimeTypes = new HashSet<String>();
 
     // From BaseHttpFetcher:
-    protected int _maxThreads;
+    protected int _maxSimultaneousRequests;
     protected int _fetchDurationTimeoutInSeconds;
     protected UserAgent _userAgent;
     protected int _maxRedirects = BaseHttpFetcher.DEFAULT_MAX_REDIRECTS;
@@ -31,18 +31,16 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
     protected String _acceptLanguage = BaseHttpFetcher.DEFAULT_ACCEPT_LANGUAGE;
     protected RedirectMode _redirectMode = BaseHttpFetcher.DEFAULT_REDIRECT_MODE;
 
-
-    public BaseHttpFetcherBuilder(int maxThreads, UserAgent userAgent) {
+    public BaseHttpFetcherBuilder(int maxSimultaneousRequests, UserAgent userAgent) {
     	super();
         
-        _maxThreads = maxThreads;
+        _maxSimultaneousRequests = maxSimultaneousRequests;
         _userAgent = userAgent;
         _fetchDurationTimeoutInSeconds = DEFAULT_FETCH_TIMEOUT;
     }
     
-	public int getMaxParallelFetches() {
-		// TODO change name to something else
-		return _maxThreads;
+	public int getMaxSimultaneousRequests() {
+		return _maxSimultaneousRequests;
 	}
 
 	// From BaseFetcher:

@@ -13,7 +13,6 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.scaleunlimited.flinkcrawler.crawldb.DrumCrawlDB;
 import com.scaleunlimited.flinkcrawler.fetcher.MockRobotsFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.MockUrlLengthenerFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.SiteMapGraphFetcher;
@@ -88,15 +87,11 @@ public class CrawlTopologyTest {
 			FileUtils.deleteFileOrDirectory(contentTextFile);
 		}
 
-		File drumDBDir = new File("./target/drum/");
-		if (drumDBDir.exists()) {
-			FileUtils.deleteDirectory(drumDBDir);
-		}
-		
 		CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
+	        // Explicitly set parallelism so that it doesn't vary based on # of cores
+	        .setParallelism(2)
 			.setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
 			.setUrlLengthener(new SimpleUrlLengthener(new MockUrlLengthenerFetcher.MockUrlLengthenerFetcherBuilder(new MockUrlLengthenerFetcher(redirections))))
-			.setCrawlDB(new DrumCrawlDB(10_000, drumDBDir.getAbsolutePath()))
 			.setFetchQueue(new FetchQueue(1_000))
 			.setRobotsFetcherBuilder(new MockRobotsFetcher.MockRobotsFetcherBuilder(new MockRobotsFetcher(robotPages)))
 			.setRobotsParser(new SimpleRobotRulesParser())
@@ -109,8 +104,6 @@ public class CrawlTopologyTest {
 			.setSiteMapFetcherBuilder(new SiteMapGraphFetcher.SiteMapGraphFetcherBuilder(new SiteMapGraphFetcher(sitemapGraph)))
 			.setSiteMapParser(new SimpleSiteMapParser())
 			.setDefaultCrawlDelay(0)
-			// Explicitly set parallelism so that it doesn't vary based on # of cores
-			.setParallelism(2)
 			.setPageFetcherBuilder(new WebGraphFetcher.WebGraphFetcherBuilder(new WebGraphFetcher(graph)));
 
 		CrawlTopology ct = builder.build();
@@ -120,8 +113,8 @@ public class CrawlTopologyTest {
 		
 		// Execute for a maximum of 20 seconds, but terminate (successfully)
 		// if there's no activity for 5 seconds.
-		ct.execute(20_000, 5_000);
-	
+         ct.execute(20_000, 5_000);
+//        ct.execute(200_000, 200_000);
 
 		for (Tuple3<Class<?>, String, Map<String, String>> entry : UrlLogger.getLog()) {
 			LOGGER.debug(String.format("%s: %s", entry.f0, entry.f1));

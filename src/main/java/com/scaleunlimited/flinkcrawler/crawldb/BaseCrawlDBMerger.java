@@ -2,6 +2,8 @@ package com.scaleunlimited.flinkcrawler.crawldb;
 
 import java.io.Serializable;
 
+import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
+
 @SuppressWarnings("serial")
 public abstract class BaseCrawlDBMerger implements Serializable {
 
@@ -17,8 +19,8 @@ public abstract class BaseCrawlDBMerger implements Serializable {
 	 * 
 	 * @param firstValue
 	 * @param secondValue
-	 * @param mergedValue Preallocated buffer for result, but only if USE_MERGED is returned
+	 * @param mergedValue Preallocated object for result, but only if USE_MERGED is returned
 	 * @return Result of the merge.
 	 */
-	public abstract MergeResult doMerge(byte[] firstValue, byte[] secondValue, byte[] mergedValue);
+	public abstract MergeResult doMerge(CrawlStateUrl firstValue, CrawlStateUrl secondValue, CrawlStateUrl mergedValue);
 }

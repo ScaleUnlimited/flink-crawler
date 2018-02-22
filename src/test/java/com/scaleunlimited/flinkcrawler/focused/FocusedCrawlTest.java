@@ -12,7 +12,6 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.scaleunlimited.flinkcrawler.crawldb.DrumCrawlDB;
 import com.scaleunlimited.flinkcrawler.fetcher.MockRobotsFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.MockUrlLengthenerFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.SiteMapGraphFetcher;
@@ -74,15 +73,9 @@ public class FocusedCrawlTest {
 			FileUtils.deleteFileOrDirectory(contentTextFile);
 		}
 
-		File drumDBDir = new File("./target/drum/");
-		if (drumDBDir.exists()) {
-			FileUtils.deleteDirectory(drumDBDir);
-		}
-		
 		CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
 			.setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
 			.setUrlLengthener(new SimpleUrlLengthener(new MockUrlLengthenerFetcher.MockUrlLengthenerFetcherBuilder(new MockUrlLengthenerFetcher())))
-			.setCrawlDB(new DrumCrawlDB(10_000, drumDBDir.getAbsolutePath()))
 			.setRobotsFetcherBuilder(new MockRobotsFetcher.MockRobotsFetcherBuilder(new MockRobotsFetcher()))
 			.setRobotsParser(new SimpleRobotRulesParser())
 			.setPageParser(new FocusedPageParser(new PageNumberScorer()))

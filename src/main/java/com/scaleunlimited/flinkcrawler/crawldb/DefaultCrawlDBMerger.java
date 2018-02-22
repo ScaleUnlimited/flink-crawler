@@ -16,9 +16,9 @@ public class DefaultCrawlDBMerger extends BaseCrawlDBMerger {
 	}
 	
 	@Override
-	public MergeResult doMerge(byte[] firstValue, byte[] secondValue, byte[] mergedValue) {
-		FetchStatus firstStatus = CrawlStateUrl.getFetchStatus(firstValue);
-		FetchStatus secondStatus = CrawlStateUrl.getFetchStatus(secondValue);
+	public MergeResult doMerge(CrawlStateUrl firstValue, CrawlStateUrl secondValue, CrawlStateUrl mergedValue) {
+		FetchStatus firstStatus = firstValue.getStatus();
+		FetchStatus secondStatus = secondValue.getStatus();
 		
 		if (firstStatus == FetchStatus.UNFETCHED) {
 			if (secondStatus != FetchStatus.UNFETCHED) {
@@ -27,28 +27,30 @@ public class DefaultCrawlDBMerger extends BaseCrawlDBMerger {
 				// We need to merge the two unfetched entries, which means combining
 				// their scores. We'll also want to update the status time to the
 				// more recent.
-				long firstStatusTime = CrawlStateUrl.getStatusTime(firstValue);
-				long secondStatusTime = CrawlStateUrl.getStatusTime(secondValue);
-				float firstScore = CrawlStateUrl.getScore(firstValue);
-				float secondScore = CrawlStateUrl.getScore(secondValue);
-				long firstFetchTime = CrawlStateUrl.getFetchTime(firstValue);
-				long secondFetchTime = CrawlStateUrl.getFetchTime(secondValue);
+                mergedValue.setFrom(firstValue);
+			    
+	            long firstStatusTime = firstValue.getStatusTime();
+	            long secondStatusTime = secondValue.getStatusTime();
+			    mergedValue.setStatusTime(Math.max(firstStatusTime, secondStatusTime));
+			    
+				float firstScore = firstValue.getScore();
+				float secondScore = secondValue.getScore();
+				mergedValue.setScore(firstScore + secondScore);
+				
+				long firstFetchTime = firstValue.getNextFetchTime();
+				long secondFetchTime = secondValue.getNextFetchTime();
+				mergedValue.setNextFetchTime(Math.min(firstFetchTime, secondFetchTime));
 
-				CrawlStateUrl.setValue(	mergedValue,
-										FetchStatus.UNFETCHED, 
-										Math.max(firstStatusTime, secondStatusTime), 
-										firstScore + secondScore, 
-										Math.min(firstFetchTime, secondFetchTime));
 				return MergeResult.USE_MERGED;
 			}
 		} else if (secondStatus == FetchStatus.UNFETCHED) {
-			// firstValue is not unfetched, secondValue is unfetched, so use old.
+			// firstValue is not unfetched, secondValue is unfetched, so use first.
 			return MergeResult.USE_FIRST;
 		} else {
 			// Neither first nor second value is unfetched, so use the more recent one.
 			// TODO actual do more useful things with status?
-			long firstTime = CrawlStateUrl.getStatusTime(firstValue);
-			long secondTime = CrawlStateUrl.getStatusTime(secondValue);
+			long firstTime = firstValue.getStatusTime();
+			long secondTime = secondValue.getStatusTime();
 			
 			if (secondTime > firstTime) {
 				return MergeResult.USE_SECOND;
