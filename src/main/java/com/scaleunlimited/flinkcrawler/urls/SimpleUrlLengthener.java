@@ -14,24 +14,33 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.fetcher.BaseHttpFetcherBuilder;
+import com.scaleunlimited.flinkcrawler.fetcher.FetchUtils;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 
 import crawlercommons.fetcher.BaseFetchException;
 import crawlercommons.fetcher.FetchedResult;
 import crawlercommons.fetcher.RedirectFetchException;
 import crawlercommons.fetcher.http.BaseHttpFetcher;
+import crawlercommons.fetcher.http.UserAgent;
 
 @SuppressWarnings("serial")
 public class SimpleUrlLengthener extends BaseUrlLengthener {
     private static final Logger LOGGER = LoggerFactory.getLogger(SimpleUrlLengthener.class);
 
-    private static final Pattern HOSTNAME_PATTERN = Pattern.compile("^http://([^/:?]{3,})");
+    private static final Pattern HOSTNAME_PATTERN = Pattern.compile("^https?://([^/:?]{3,})");
 
-    private BaseHttpFetcher _fetcher;
-    private Set<String> _urlShorteners;
+    private BaseHttpFetcherBuilder _fetcherBuilder;
+    
+    private transient BaseHttpFetcher _fetcher;
+    private transient Set<String> _urlShorteners;
+    
+    public SimpleUrlLengthener(UserAgent userAgent) {
+        this(FetchUtils.makeRedirectFetcherBuilder(userAgent));
+    }
 
     public SimpleUrlLengthener(BaseHttpFetcherBuilder fetcherBuilder) {
         super();
+        _fetcherBuilder = fetcherBuilder;
         try {
             _fetcher = fetcherBuilder.build();
             _urlShorteners = loadUrlShorteners();
@@ -41,10 +50,14 @@ public class SimpleUrlLengthener extends BaseUrlLengthener {
     }
 	
     @Override
+    public void open() throws Exception {
+        _fetcher = _fetcherBuilder.build();
+        _urlShorteners = loadUrlShorteners();
+    }
+
+    @Override
 	public RawUrl lengthen(RawUrl url) {
 		// If the domain is a link shortener, lengthen it.
-		// FUTURE  Try to fetch the URL. This call needs to be thread-safe
-		// See https://github.com/ScaleUnlimited/flink-crawler/issues/50
 		
         String urlString = url.getUrl();
         
@@ -65,20 +78,28 @@ public class SimpleUrlLengthener extends BaseUrlLengthener {
             FetchedResult fr = _fetcher.get(urlString);
             int statusCode = fr.getStatusCode();
             if (statusCode == HttpStatus.SC_OK) {
+                // This will happen if we're using a fetcher configured to
+                // follow redirects (rather than one configured to throw a
+                // RedirectFetchException with the details).  This isn't very
+                // nice, since we're fetching content from the target site
+                // without checking its robot rules, but the caller knows best.
                 redirectedUrl = fr.getFetchedUrl();
                 LOGGER.debug(String.format("Normal redirection of %s to %s", urlString, redirectedUrl));
             } else {
                 LOGGER.trace("Status code " + statusCode + " processing redirect for " + urlString);
             }
         } catch (RedirectFetchException e) {
-            // We'll get this exception if the URL that's redirected by
-            // a link shortening site is to a URL that gets redirected again.
+            // We'll get this exception if our fetcher has been configured with
+            // zero redirects to avoid fetching any content from the target URL
+            // (as it should be).  (We'll also get this if we're using a fetcher
+            // configured to follow redirects, and the target of the link
+            // shortening site's redirection is itself redirected).
             // In this case, we've captured the final URL in the exception,
             // so use that for downstream fetching.
             redirectedUrl = e.getRedirectedUrl();
             LOGGER.trace(String.format("Redirecting %s to %s", urlString, redirectedUrl));
         } catch (BaseFetchException e) {
-            // We might have hit a site that doesn't process HEAD requests properly,
+            // The site doesn't seem to like the way we're forcing it to redirect,
             // so just emit the same URL for downstream fetching.
             LOGGER.debug("Exception processing redirect for " + urlString + ": " + e.getMessage(), e);
         }
@@ -93,7 +114,7 @@ public class SimpleUrlLengthener extends BaseUrlLengthener {
 
 	@Override
 	public int getTimeoutInSeconds() {
-		return 10;
+		return _fetcher.getFetchDurationTimeoutInSeconds();
 	}
     
     public static Set<String> loadUrlShorteners() throws IOException {

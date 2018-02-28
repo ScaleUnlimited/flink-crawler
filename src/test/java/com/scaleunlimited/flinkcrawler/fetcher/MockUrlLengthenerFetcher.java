@@ -8,6 +8,8 @@ import org.apache.http.HttpStatus;
 import crawlercommons.fetcher.BaseFetchException;
 import crawlercommons.fetcher.FetchedResult;
 import crawlercommons.fetcher.Payload;
+import crawlercommons.fetcher.RedirectFetchException;
+import crawlercommons.fetcher.RedirectFetchException.RedirectExceptionReason;
 import crawlercommons.fetcher.http.BaseHttpFetcher;
 import crawlercommons.fetcher.http.UserAgent;
 import crawlercommons.util.Headers;
@@ -65,19 +67,9 @@ public class MockUrlLengthenerFetcher extends BaseHttpFetcher {
                                         HttpStatus.SC_NOT_FOUND, 
                                         null);
         } else {
-            return new FetchedResult(   originalUrl,
-                                        redirectedUrl, 
-                                        System.currentTimeMillis(), 
-                                        new Headers(), 
-                                        new byte[0], 
-                                        "text/plain", 
-                                        responseRate, 
-                                        payload, 
-                                        originalUrl, 
-                                        0, 
-                                        "192.168.1.1", 
-                                        HttpStatus.SC_OK, 
-                                        null);
+            throw new RedirectFetchException(   originalUrl, 
+                                                redirectedUrl, 
+                                                RedirectExceptionReason.TOO_MANY_REDIRECTS);
         }
     }
 

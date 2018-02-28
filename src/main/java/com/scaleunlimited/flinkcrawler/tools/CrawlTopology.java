@@ -165,7 +165,7 @@ public class CrawlTopology {
         private BaseHttpFetcherBuilder _robotsFetcherBuilder = new SimpleHttpFetcherBuilder(INVALID_USER_AGENT);
         private SimpleRobotRulesParser _robotsParser = new SimpleRobotRulesParser();
 
-        private BaseUrlLengthener _urlLengthener = new SimpleUrlLengthener(new SimpleHttpFetcherBuilder(INVALID_USER_AGENT));
+        private BaseUrlLengthener _urlLengthener = new SimpleUrlLengthener(INVALID_USER_AGENT);
         private SinkFunction<ParsedUrl> _contentSink = new DiscardingSink<ParsedUrl>();
         private SinkFunction<String> _contentTextSink;
         private String _contentTextFilePathString;

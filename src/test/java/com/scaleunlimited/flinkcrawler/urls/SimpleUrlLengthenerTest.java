@@ -18,14 +18,15 @@ public class SimpleUrlLengthenerTest {
     public static final Map<String, String> REDIRECTIONS = 
         new HashMap<String, String>();
 
-    SimpleUrlLengthener _lengthener;
-    SimpleUrlNormalizer _normalizer = new SimpleUrlNormalizer();
+    private SimpleUrlLengthener _lengthener;
+    private SimpleUrlNormalizer _normalizer = new SimpleUrlNormalizer();
+    
     @Before
-    public void setup() {
+    public void setup() throws Throwable {
         REDIRECTIONS.clear();
         REDIRECTIONS.put(   _normalizer.normalize("bit.ly/4526"), 
                             _normalizer.normalize("target-domain-1.com"));
-        REDIRECTIONS.put(   _normalizer.normalize("tinyurl.com/my-url-name"), 
+        REDIRECTIONS.put(   _normalizer.normalize("https://tinyurl.com/my-url-name"), 
                             _normalizer.normalize("target-domain-2.com"));
         REDIRECTIONS.put(   _normalizer.normalize("tinyurl.com.my-domain.com/my-url-name"), 
                             SHOULD_NOT_REDIRECT_HERE_URL);
@@ -34,6 +35,7 @@ public class SimpleUrlLengthenerTest {
         MockUrlLengthenerFetcher.MockUrlLengthenerFetcherBuilder fetcherBuilder = 
             new MockUrlLengthenerFetcher.MockUrlLengthenerFetcherBuilder(fetcher);
         _lengthener = new SimpleUrlLengthener(fetcherBuilder);
+        _lengthener.open();
     }
     
     @Test
