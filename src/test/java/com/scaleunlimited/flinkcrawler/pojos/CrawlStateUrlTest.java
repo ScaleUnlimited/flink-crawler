@@ -1,6 +1,6 @@
 package com.scaleunlimited.flinkcrawler.pojos;
 
-import static org.junit.Assert.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.Test;
 
@@ -14,7 +14,7 @@ public class CrawlStateUrlTest {
 		CrawlStateUrl newUrl = new CrawlStateUrl();
 		newUrl.setFrom(csu);
 		
-		assertEquals(csu, newUrl);
+		assertThat(newUrl).isEqualTo(csu);
 	}
 
 }

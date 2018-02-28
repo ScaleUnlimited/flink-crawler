@@ -8,7 +8,6 @@ import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironmentWithAsyncExecution;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.util.FileUtils;
-import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +36,7 @@ import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 import com.scaleunlimited.flinkcrawler.webgraph.SimpleWebGraph;
 
 import crawlercommons.robots.SimpleRobotRulesParser;
+import static org.assertj.core.api.Assertions.*;
 
 public class CrawlTopologyTest {
 	static final Logger LOGGER = LoggerFactory.getLogger(CrawlTopologyTest.class);
@@ -175,7 +175,7 @@ public class CrawlTopologyTest {
 	public void testSingleDomainUrlValidator() {
 		SimpleUrlValidator validator = 
 			new CrawlTool.SingleDomainUrlValidator("scaleunlimited.com");
-        Assert.assertFalse(validator.isValid("http://transpac.com"));
-        Assert.assertTrue(validator.isValid("http://scaleunlimited.com"));
+        assertThat(validator.isValid("http://transpac.com")).isFalse();
+        assertThat(validator.isValid("http://scaleunlimited.com")).isTrue();
 	}
 }
