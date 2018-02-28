@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.fetcher.MockRobotsFetcher;
+import com.scaleunlimited.flinkcrawler.fetcher.MockUrlLengthenerFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.SiteMapGraphFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.WebGraphFetcher;
 import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
@@ -74,7 +75,7 @@ public class FocusedCrawlTest {
 
 		CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
 			.setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
-			.setUrlLengthener(new SimpleUrlLengthener())
+			.setUrlLengthener(new SimpleUrlLengthener(new MockUrlLengthenerFetcher.MockUrlLengthenerFetcherBuilder(new MockUrlLengthenerFetcher())))
 			.setRobotsFetcherBuilder(new MockRobotsFetcher.MockRobotsFetcherBuilder(new MockRobotsFetcher()))
 			.setRobotsParser(new SimpleRobotRulesParser())
 			.setPageParser(new FocusedPageParser(new PageNumberScorer()))

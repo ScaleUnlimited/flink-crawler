@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.fetcher.MockRobotsFetcher;
+import com.scaleunlimited.flinkcrawler.fetcher.MockUrlLengthenerFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.SiteMapGraphFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.WebGraphFetcher;
 import com.scaleunlimited.flinkcrawler.functions.CheckUrlWithRobotsFunction;
@@ -54,7 +55,7 @@ public class CrawlTopologyTest {
 			.add("domain1.com/page1")
 			.add("domain1.com/page2", "domain2.com", "domain1.com", "domain1.com/page1")
 			.add("domain2.com", "domain2.com/page1", "domain3.com")
-			.add("domain3.com", "domain3.com/page1", "domain4.com")
+			.add("domain3.com", "domain3.com/page1", "bit.ly/domain4.com")
 			.add("domain4.com");
 
 		SimpleWebGraph sitemapGraph = new SimpleWebGraph(normalizer)
@@ -74,7 +75,12 @@ public class CrawlTopologyTest {
 		robotPages.put(normalizer.normalize("http://domain4.com:80/robots.txt"), 
 				"User-agent: *" + CRLF + "sitemap : http://domain4.com/sitemap.txt");
 
-		File testDir = new File("target/CrawlTopologyTest/");
+		// We've got a single URL that needs to get lengthened by our mock lengthener
+        Map<String, String> redirections = new HashMap<String, String>();
+        redirections.put(   normalizer.normalize("bit.ly/domain4.com"), 
+                            normalizer.normalize("domain4.com"));
+        
+        File testDir = new File("target/CrawlTopologyTest/");
 		testDir.mkdirs();
 		File contentTextFile = new File(testDir, "content.txt");
 		if (contentTextFile.exists()) {
@@ -85,7 +91,7 @@ public class CrawlTopologyTest {
 	        // Explicitly set parallelism so that it doesn't vary based on # of cores
 	        .setParallelism(2)
 			.setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
-			.setUrlLengthener(new SimpleUrlLengthener())
+			.setUrlLengthener(new SimpleUrlLengthener(new MockUrlLengthenerFetcher.MockUrlLengthenerFetcherBuilder(new MockUrlLengthenerFetcher(redirections))))
 			.setFetchQueue(new FetchQueue(1_000))
 			.setRobotsFetcherBuilder(new MockRobotsFetcher.MockRobotsFetcherBuilder(new MockRobotsFetcher(robotPages)))
 			.setRobotsParser(new SimpleRobotRulesParser())
