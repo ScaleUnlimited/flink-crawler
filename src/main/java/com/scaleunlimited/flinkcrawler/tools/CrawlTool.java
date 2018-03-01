@@ -21,6 +21,7 @@ import com.scaleunlimited.flinkcrawler.fetcher.commoncrawl.CommonCrawlFetcherBui
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
 import com.scaleunlimited.flinkcrawler.tools.CrawlTopology.CrawlTopologyBuilder;
+import com.scaleunlimited.flinkcrawler.urls.SimpleUrlLengthener;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlValidator;
 
 import crawlercommons.domains.PaidLevelDomain;
@@ -42,6 +43,7 @@ public class CrawlTool {
 
 	public static class CrawlToolOptions {
 		
+	    private UserAgent _userAgent;
 		private String _urlsFilename;
 	    private String _singleDomain;
         private long _forceCrawlDelay = CrawlTool.DO_NOT_FORCE_CRAWL_DELAY;
@@ -54,6 +56,34 @@ public class CrawlTool {
         
         private String _cacheDir;
         private String _commonCrawlId;
+        
+        @Option(name = "-agent", usage = "user agent info, format:'name,email,website'", required = false)
+        public void setUserAgent(String agentNameWebsiteEmailString) {
+            if (isCommonCrawl()) {
+                throw new RuntimeException("user agent not used in common crawl mode");
+            }
+            String fields[] = agentNameWebsiteEmailString.split(",", 4);
+            if (fields.length != 3) {
+                throw new RuntimeException("Invalid format for user agent (expected 'name,email,website')");
+            }
+            String agentName = fields[0];
+            String agentEmail = fields[1];
+            String agentWebSite = fields[2];
+            if (!(agentEmail.contains("@"))) {
+                throw new RuntimeException("Invalid email address for user agent: " + agentEmail);
+            }
+            if (!(agentWebSite.startsWith("http"))) {
+                throw new RuntimeException("Invalid web site URL for user agent: " + agentWebSite);
+            }
+            setUserAgent(new UserAgent(agentName, agentEmail, agentWebSite));
+        }
+        
+        public void setUserAgent(UserAgent newUserAgent) {
+            if (isCommonCrawl()) {
+                throw new RuntimeException("user agent not used in common crawl mode");
+            }
+            _userAgent = newUserAgent;
+        }
         
 		@Option(name = "-seedurls", usage = "text file containing list of seed urls", required = true)
 	    public void setSeedUrlsFilename(String urlsFilename) {
@@ -82,6 +112,9 @@ public class CrawlTool {
 		
 		@Option(name = "-commoncrawl", usage = "crawl id for CommonCrawl.org dataset", required = false)
 	    public void setCommonCrawlId(String commonCrawlId) {
+            if (getUserAgent() != null) {
+                throw new RuntimeException("user agent not used in common crawl mode");
+            }
 			_commonCrawlId = commonCrawlId;
 	    }
 		
@@ -111,7 +144,11 @@ public class CrawlTool {
 	    }
 		
 		
-		public String getSeedUrlsFilename() {
+		public UserAgent getUserAgent() {
+            return _userAgent;
+        }
+
+        public String getSeedUrlsFilename() {
 			return _urlsFilename;
 		}
 		
@@ -257,19 +294,26 @@ public class CrawlTool {
 	}
 
 	public static void run(StreamExecutionEnvironment env, CrawlToolOptions options) throws Exception {
-		UserAgent userAgent = new UserAgent("flink-crawler", "flink-crawler@scaleunlimited.com", "https://github.com/ScaleUnlimited/flink-crawler/wiki/Crawler-Policy");
 		
-		SimpleUrlValidator urlValidator =
+	    // TODO Complain if -cachedir is specified when not running locally?
+	    
+	    SimpleUrlValidator urlValidator =
 			(	options.isSingleDomain() ?
 				new SingleDomainUrlValidator(options.getSingleDomain())
 			:	new SimpleUrlValidator());
 		
+		UserAgent userAgent =
+	        (   options.isCommonCrawl() ?
+                new UserAgent("unused-common-crawl-user-agent", "", "")
+            :   options.getUserAgent());
+
+		SimpleUrlLengthener urlLengthener = getUrlLengthener(options, userAgent);
 		BaseHttpFetcherBuilder siteMapFetcherBuilder = getPageFetcherBuilder(options, userAgent)
 			.setDefaultMaxContentSize(SiteMapParser.MAX_BYTES_ALLOWED);
 		BaseHttpFetcherBuilder robotsFetcherBuilder = getRobotsFetcherBuilder(options, userAgent)
 			.setDefaultMaxContentSize(MAX_ROBOTS_TXT_SIZE);
 		BaseHttpFetcherBuilder pageFetcherBuilder = getPageFetcherBuilder(options, userAgent)
-				.setDefaultMaxContentSize(options.getMaxContentSize());
+			.setDefaultMaxContentSize(options.getMaxContentSize());
 		
 		// See if we need to restrict what mime types we download.
 		if (options.isHtmlOnly()) {
@@ -283,6 +327,8 @@ public class CrawlTool {
 
 
 		CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
+		    .setUserAgent(userAgent)
+		    .setUrlLengthener(urlLengthener)
 			.setUrlSource(new SeedUrlSource(options.getSeedUrlsFilename(), RawUrl.DEFAULT_SCORE))
 			.setRobotsFetcherBuilder(robotsFetcherBuilder)
 			.setUrlFilter(urlValidator)
@@ -298,15 +344,41 @@ public class CrawlTool {
 		
 		builder.build().execute();
 	}
-	
+
+    private static SimpleUrlLengthener getUrlLengthener(CrawlToolOptions options, UserAgent userAgent) {
+        if (options.isCommonCrawl()) {
+            return new CommonCrawlUrlLengthener(userAgent);
+        }
+        return new SimpleUrlLengthener(userAgent);
+    }
+    
+    @SuppressWarnings("serial")
+    private static class CommonCrawlUrlLengthener extends SimpleUrlLengthener {
+
+        public CommonCrawlUrlLengthener(UserAgent userAgent) {
+            super(userAgent);
+        }
+
+        @Override
+        public void open() throws Exception {
+            // We never even build the fetcher
+        }
+
+        @Override
+        public RawUrl lengthen(RawUrl url) {
+            // Never lengthen anything
+            return url;
+        }
+    }
+    
 	private static BaseHttpFetcherBuilder getPageFetcherBuilder(CrawlToolOptions options, UserAgent userAgent) throws IOException {
 		if (options.isCommonCrawl()) {
-			return new CommonCrawlFetcherBuilder(options.getFetchersPerTask(), userAgent)
-					.setCrawlId(options.getCommonCrawlId())
-					.setCacheDir(options.getCommonCrawlCacheDir());
-		} else {
-			return new SimpleHttpFetcherBuilder(options.getFetchersPerTask(), userAgent);
+            return new CommonCrawlFetcherBuilder(   options.getFetchersPerTask(), 
+			                                        userAgent, 
+			                                        options.getCommonCrawlId(),
+			                                        options.getCommonCrawlCacheDir());
 		}
+        return new SimpleHttpFetcherBuilder(options.getFetchersPerTask(), userAgent);
 	}
 
 	@SuppressWarnings("serial")
@@ -349,9 +421,8 @@ public class CrawlTool {
 					};
 				}
 			};
-		} else {
-			return new SimpleHttpFetcherBuilder(userAgent);
 		}
+        return new SimpleHttpFetcherBuilder(userAgent);
 	}
 
 }

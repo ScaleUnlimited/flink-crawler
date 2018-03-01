@@ -34,22 +34,24 @@ public class CommonCrawlFetcherBuilder extends BaseHttpFetcherBuilder {
     private static final String SECONDARY_INDEX_FILENAME = "cluster.idx";
 
 	private String _crawlId;
-	private String _cacheDir;
-	
-	public CommonCrawlFetcherBuilder(int maxSimultaneousRequests, UserAgent userAgent) {
+	private File _cachedFile;
+    
+    public CommonCrawlFetcherBuilder(   int maxSimultaneousRequests, 
+	                                    UserAgent userAgent,
+	                                    String crawlId,
+	                                    String cacheDir) {
 		super(maxSimultaneousRequests, userAgent);
+		_crawlId = crawlId;
+		if (cacheDir != null) {
+	        _cachedFile = makeCacheFile(new File(cacheDir));
+            try {
+                prepCache(_cachedFile);
+            } catch (IOException e) {
+                throw new RuntimeException("Unable to prepare secondary index file cache", e);
+            }
+		}
 	}
 
-	public CommonCrawlFetcherBuilder setCrawlId(String crawlId) {
-		_crawlId = crawlId;
-		return this;
-	}
-	
-	public CommonCrawlFetcherBuilder setCacheDir(String cacheDir) {
-		_cacheDir = cacheDir;
-		return this;
-	}
-	
 	private void prepCache(File cachedFile) throws IOException {
 		// Load the cache with the serialized secondary index file.
 
@@ -90,38 +92,28 @@ public class CommonCrawlFetcherBuilder extends BaseHttpFetcherBuilder {
                 .build();
 	}
 	
-	private File makeCacheFile() {
-		// TODO support using S3 as cache location.
-		if (_cacheDir == null) {
-			throw new IllegalStateException("Can't set up cache file if cache dir hasn't been set");
-		}
+	private File makeCacheFile(File cacheDir) {
 		if (_crawlId == null) {
 			throw new IllegalStateException("Can't set up cache file if crawl id hasn't been set");
 		}
-		File cacheDir = new File(_cacheDir);
 		return new File(cacheDir, String.format("%s-%s", _crawlId, SERIALIZED_SECONDARY_INDEX_FILENAME));
 	}
 	
 	@Override
 	public BaseHttpFetcher build() throws Exception {
 		AmazonS3 client = makeClient();
+		
+		// If the caller hasn't set up a cachedFile then we create one in a temp location
+		if (_cachedFile == null) {
+            File tempDir = File.createTempFile("cache-dir", "");
+            tempDir.delete();
+            tempDir.mkdir();
+            _cachedFile = makeCacheFile(tempDir);
+            prepCache(_cachedFile);
+		}
 
-		// If the caller hasn't set up a cacheDir then we create a temp location for it
-		if (_cacheDir == null) {
-			File tempDir = File.createTempFile("cache-dir", "");
-			tempDir.delete();
-			tempDir.mkdir();
-			_cacheDir = tempDir.toString();
-		}
-		
-		File cachedFile = makeCacheFile();
-		// If cachedFile doesn't already exist, then let prepCache do so.
-		if (!cachedFile.exists()) {
-			prepCache(cachedFile);
-		}
-		
-		LOGGER.info("Loading serialized secondary index for cache from " + cachedFile);
-		try (DataInputStream in = new DataInputStream(new GZIPInputStream(new FileInputStream(cachedFile)))) {
+		LOGGER.info("Loading serialized secondary index for cache from " + _cachedFile);
+		try (DataInputStream in = new DataInputStream(new GZIPInputStream(new FileInputStream(_cachedFile)))) {
 			SecondaryIndexMap secondaryIndexMap = new SecondaryIndexMap();
 			secondaryIndexMap.read(in);
 			CommonCrawlFetcher result = new CommonCrawlFetcher(client, _crawlId, _maxSimultaneousRequests, CommonCrawlFetcher.DEFAULT_CACHE_SIZE, secondaryIndexMap);

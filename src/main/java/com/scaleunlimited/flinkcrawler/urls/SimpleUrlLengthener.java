@@ -42,11 +42,18 @@ public class SimpleUrlLengthener extends BaseUrlLengthener {
         super();
         _fetcherBuilder = fetcherBuilder;
         try {
-            _fetcher = fetcherBuilder.build();
             _urlShorteners = loadUrlShorteners();
         } catch (Exception e) {
             throw new RuntimeException("Unable to build URL lengthener", e);
         }
+    }
+    
+    public void setUserAgent(UserAgent newUserAgent) {
+        _fetcherBuilder.setUserAgent(newUserAgent);
+    }
+    
+    public UserAgent getUserAgent() {
+        return _fetcherBuilder.getUserAgent();
     }
 	
     @Override
@@ -114,6 +121,9 @@ public class SimpleUrlLengthener extends BaseUrlLengthener {
 
 	@Override
 	public int getTimeoutInSeconds() {
+	    if (_fetcher == null) {
+	        return _fetcherBuilder.getFetchDurationTimeoutInSeconds();
+	    }
 		return _fetcher.getFetchDurationTimeoutInSeconds();
 	}
     
