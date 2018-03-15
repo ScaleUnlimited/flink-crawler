@@ -1,20 +1,22 @@
-package com.scaleunlimited.flinkcrawler.crawldb;
+package com.scaleunlimited.flinkcrawler.urldb;
 
 import static org.assertj.core.api.Assertions.*;
 
 import org.assertj.core.data.Percentage;
 import org.junit.Test;
 
-import com.scaleunlimited.flinkcrawler.crawldb.BaseCrawlDBMerger.MergeResult;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.ValidUrl;
+import com.scaleunlimited.flinkcrawler.urldb.BaseUrlStateMerger;
+import com.scaleunlimited.flinkcrawler.urldb.DefaultUrlStateMerger;
+import com.scaleunlimited.flinkcrawler.urldb.BaseUrlStateMerger.MergeResult;
 
-public class DefaultCrawlDBMergerTest {
+public class DefaultUrlStateMergerTest {
 
     @Test
     public void testMergingUnfetched() throws Exception {
-        BaseCrawlDBMerger merger = new DefaultCrawlDBMerger();
+        BaseUrlStateMerger merger = new DefaultUrlStateMerger();
         
 		ValidUrl url = new ValidUrl("http://domain.com?q=s");
 		CrawlStateUrl csu1 = new CrawlStateUrl(url, FetchStatus.UNFETCHED, 100, 1.0f, 1000);
@@ -29,7 +31,7 @@ public class DefaultCrawlDBMergerTest {
 
     @Test
     public void testMergingFetchedWithFetching() throws Exception {
-        BaseCrawlDBMerger merger = new DefaultCrawlDBMerger();
+        BaseUrlStateMerger merger = new DefaultUrlStateMerger();
         
 		ValidUrl url = new ValidUrl("http://domain1.com/");
 		CrawlStateUrl stateUrl = new CrawlStateUrl(url, FetchStatus.FETCHING, 100, 1.0f, 1000);

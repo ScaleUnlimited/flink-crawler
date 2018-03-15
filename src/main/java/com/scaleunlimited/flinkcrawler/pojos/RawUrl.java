@@ -17,14 +17,14 @@ public class RawUrl extends BaseUrl {
 		this(url, DEFAULT_SCORE);
 	}
 	
-	public RawUrl(String url, float score) throws MalformedURLException {
+	public RawUrl(String url, float score) {
 		super(url);
 		
 		setScore(score);
 	}
 
 	public RawUrl(BaseUrl url, float score) {
-		super(url.getUrl());
+		super(url);
 		
 		setScore(score);
 	}
@@ -39,7 +39,14 @@ public class RawUrl extends BaseUrl {
 	
 	@Override
 	public String toString() {
-		return getUrl();
+	    if (isRegular()) {
+	        return getUrl();
+	    } else {
+	        return String.format("%s (%s)", getUrl(), getUrlType());
+	    }
 	}
 	
+	public static RawUrl makeRawTickerUrl(int maxParallelism, int parallelism, int operatorIndex) {
+        return new RawUrl(BaseUrl.makeTicklerUrl(maxParallelism, parallelism, operatorIndex), 0.0f);
+	}
 }

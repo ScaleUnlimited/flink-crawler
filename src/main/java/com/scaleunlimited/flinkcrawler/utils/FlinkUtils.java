@@ -138,31 +138,59 @@ public class FlinkUtils {
 	}
 	
 	
-	/**
-	 * Return an integer value that will get partitioned to the target <operatorIndex>, given the
-	 * workflow's <maxParallelism> (for key groups) and the operator <parallelism>.
-	 * 
-	 * @param maxParallelism
-	 * @param parallelism
-	 * @param operatorIndex
-	 * @return Integer suitable for use in a record as the key.
-	 */
-	public static Integer makeKeyForOperatorIndex(int maxParallelism, int parallelism, int operatorIndex) {
-		if (maxParallelism == ExecutionJobVertex.VALUE_NOT_SET) {
-			maxParallelism = KeyGroupRangeAssignment.computeDefaultMaxParallelism(parallelism);
-		}
-		
-		for (int i = 0; i < maxParallelism * 2; i++) {
-			Integer key = new Integer(i);
-			int keyGroup = KeyGroupRangeAssignment.assignToKeyGroup(key, maxParallelism);
-			int index = KeyGroupRangeAssignment.computeOperatorIndexForKeyGroup(maxParallelism, parallelism, keyGroup);
-			if (index == operatorIndex) {
-				return key;
-			}
-		}
-		
-		throw new RuntimeException(String.format("Unable to find key for target operator index %d (max parallelism = %d, parallelism = %d", 
-				operatorIndex, maxParallelism, parallelism));
-	}
+    /**
+     * Return an integer value that will get partitioned to the target <operatorIndex>, given the
+     * workflow's <maxParallelism> (for key groups) and the operator <parallelism>.
+     * 
+     * @param maxParallelism
+     * @param parallelism
+     * @param operatorIndex
+     * @return Integer suitable for use in a record as the key.
+     */
+    public static Integer makeKeyForOperatorIndex(int maxParallelism, int parallelism, int operatorIndex) {
+        if (maxParallelism == ExecutionJobVertex.VALUE_NOT_SET) {
+            maxParallelism = KeyGroupRangeAssignment.computeDefaultMaxParallelism(parallelism);
+        }
+        
+        for (int i = 0; i < maxParallelism * 2; i++) {
+            Integer key = new Integer(i);
+            int keyGroup = KeyGroupRangeAssignment.assignToKeyGroup(key, maxParallelism);
+            int index = KeyGroupRangeAssignment.computeOperatorIndexForKeyGroup(maxParallelism, parallelism, keyGroup);
+            if (index == operatorIndex) {
+                return key;
+            }
+        }
+        
+        throw new RuntimeException(String.format("Unable to find key for target operator index %d (max parallelism = %d, parallelism = %d", 
+                operatorIndex, maxParallelism, parallelism));
+    }
+
+    /**
+     * Return an String key that will get partitioned to the target <operatorIndex>, given the
+     * workflow's <maxParallelism> (for key groups) and the operator <parallelism>.
+     * 
+     * @param format - format for key that we'll append to (must have one %d param in it)
+     * @param maxParallelism
+     * @param parallelism
+     * @param operatorIndex
+     * @return Integer suitable for use in a record as the key.
+     */
+    public static String makeKeyForOperatorIndex(String format, int maxParallelism, int parallelism, int operatorIndex) {
+        if (maxParallelism == ExecutionJobVertex.VALUE_NOT_SET) {
+            maxParallelism = KeyGroupRangeAssignment.computeDefaultMaxParallelism(parallelism);
+        }
+        
+        for (int i = 0; i < maxParallelism * 2; i++) {
+            String key = String.format(format, i);
+            int keyGroup = KeyGroupRangeAssignment.assignToKeyGroup(key, maxParallelism);
+            int index = KeyGroupRangeAssignment.computeOperatorIndexForKeyGroup(maxParallelism, parallelism, keyGroup);
+            if (index == operatorIndex) {
+                return key;
+            }
+        }
+        
+        throw new RuntimeException(String.format("Unable to find key for target operator index %d (max parallelism = %d, parallelism = %d", 
+                operatorIndex, maxParallelism, parallelism));
+    }
 
 }

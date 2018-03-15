@@ -33,21 +33,23 @@ public abstract class BaseAsyncFunction<IN, OUT> extends RichAsyncFunction<IN, O
 		
 		RuntimeContext context = getRuntimeContext();
 		_parallelism = context.getNumberOfParallelSubtasks();
-		_partition = context.getIndexOfThisSubtask();
+		_partition = context.getIndexOfThisSubtask() + 1;
 		
 		_executor = new ThreadedExecutor("Flink-crawler-" + context.getTaskName(), _threadCount);
 	}
 	
 	@Override
 	public void close() throws Exception {
-		try {
-			_executor.terminate(_timeoutInSeconds, TimeUnit.SECONDS);
-		} catch (InterruptedException e) {
-			// TODO we have an issue where the TaskManager thread that's
-			// calling us gets interrupted right away, and that in turn
-			// triggers this exception.
-		}
-		
+	    if (_executor != null) {
+	        try {
+	            _executor.terminate(_timeoutInSeconds, TimeUnit.SECONDS);
+	        } catch (InterruptedException e) {
+	            // TODO we have an issue where the TaskManager thread that's
+	            // calling us gets interrupted right away, and that in turn
+	            // triggers this exception.
+	        }
+	    }
+	    
 		super.close();
 	}
 	

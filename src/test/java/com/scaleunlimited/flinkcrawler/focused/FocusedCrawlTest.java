@@ -39,7 +39,7 @@ public class FocusedCrawlTest {
 	static final Logger LOGGER = LoggerFactory.getLogger(CrawlTopologyTest.class);
 	
 	@Test
-	public void test() throws Exception {
+	public void testFocused() throws Exception {
 		UrlLogger.clear();
 
 		LocalStreamEnvironment env = new LocalStreamEnvironmentWithAsyncExecution();
@@ -72,24 +72,25 @@ public class FocusedCrawlTest {
 			FileUtils.deleteFileOrDirectory(contentTextFile);
 		}
 
-		CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
-			.setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
-			.setUrlLengthener(new SimpleUrlLengthener())
-			.setRobotsFetcherBuilder(new MockRobotsFetcher.MockRobotsFetcherBuilder(new MockRobotsFetcher()))
-			.setRobotsParser(new SimpleRobotRulesParser())
-			.setPageParser(new FocusedPageParser(new PageNumberScorer()))
-			.setContentSink(new DiscardingSink<ParsedUrl>())
-			.setContentTextFile(contentTextFile.getAbsolutePath())
-			.setUrlNormalizer(normalizer)
-			.setUrlFilter(new SimpleUrlValidator())
-			.setSiteMapFetcherBuilder(new SiteMapGraphFetcher.SiteMapGraphFetcherBuilder(new SiteMapGraphFetcher(BaseWebGraph.EMPTY_GRAPH)))
-			.setSiteMapParser(new SimpleSiteMapParser())
-			.setDefaultCrawlDelay(0)
-			// Explicitly set parallelism so that it doesn't vary based on # of cores
-			.setParallelism(2)
-			.setPageFetcherBuilder(new WebGraphFetcher.WebGraphFetcherBuilder(new WebGraphFetcher(graph)))
-			.setFetchQueue(new FocusedFetchQueue(10_000, minFetchScore));
-
+        final int crawlDbParallelism = 2;
+        CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
+                // Explicitly set parallelism so that it doesn't vary based on # of cores
+                .setParallelism(1)
+                .setUrlSource(new SeedUrlSource(crawlDbParallelism, 1.0f, "http://domain1.com"))
+                .setUrlLengthener(new SimpleUrlLengthener())
+                .setRobotsFetcherBuilder(
+                        new MockRobotsFetcher.MockRobotsFetcherBuilder(new MockRobotsFetcher()))
+                .setRobotsParser(new SimpleRobotRulesParser())
+                .setPageParser(new FocusedPageParser(new PageNumberScorer()))
+                .setContentSink(new DiscardingSink<ParsedUrl>())
+                .setContentTextFile(contentTextFile.getAbsolutePath()).setUrlNormalizer(normalizer)
+                .setUrlFilter(new SimpleUrlValidator())
+                .setSiteMapFetcherBuilder(new SiteMapGraphFetcher.SiteMapGraphFetcherBuilder(
+                        new SiteMapGraphFetcher(BaseWebGraph.EMPTY_GRAPH)))
+                .setSiteMapParser(new SimpleSiteMapParser()).setDefaultCrawlDelay(0)
+                .setPageFetcherBuilder(
+                        new WebGraphFetcher.WebGraphFetcherBuilder(new WebGraphFetcher(graph)))
+                .setFetchQueue(new FocusedFetchQueue(10_000, minFetchScore));
 			
 		CrawlTopology ct = builder.build();
 		

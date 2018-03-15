@@ -19,7 +19,7 @@ public abstract class BaseFlatMapFunction<IN, OUT> extends RichFlatMapFunction<I
 		
 		RuntimeContext context = getRuntimeContext();
 		_parallelism = context.getNumberOfParallelSubtasks();
-		_partition = context.getIndexOfThisSubtask();
+		_partition = context.getIndexOfThisSubtask() + 1;
 	}
 	
 	protected void record(Class<?> clazz, BaseUrl url, String... metaData) {
