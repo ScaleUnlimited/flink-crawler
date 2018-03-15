@@ -1,4 +1,4 @@
-package com.scaleunlimited.flinkcrawler.crawldb;
+package com.scaleunlimited.flinkcrawler.urldb;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -8,10 +8,10 @@ import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 
 
 @SuppressWarnings("serial")
-public class DefaultCrawlDBMerger extends BaseCrawlDBMerger {
-    static final Logger LOGGER = LoggerFactory.getLogger(DefaultCrawlDBMerger.class);
+public class DefaultUrlStateMerger extends BaseUrlStateMerger {
+    static final Logger LOGGER = LoggerFactory.getLogger(DefaultUrlStateMerger.class);
 
-	public DefaultCrawlDBMerger() {
+	public DefaultUrlStateMerger() {
 		super();
 	}
 	

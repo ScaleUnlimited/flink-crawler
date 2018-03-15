@@ -1,11 +1,11 @@
-package com.scaleunlimited.flinkcrawler.crawldb;
+package com.scaleunlimited.flinkcrawler.urldb;
 
 import java.io.Serializable;
 
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 
 @SuppressWarnings("serial")
-public abstract class BaseCrawlDBMerger implements Serializable {
+public abstract class BaseUrlStateMerger implements Serializable {
 
 	public static enum MergeResult {
 		USE_FIRST,

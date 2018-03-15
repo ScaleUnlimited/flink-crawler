@@ -99,7 +99,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
             }
             
             FetchedResult result = fetch(realUrl, realUrl, payload, 0);
-        	LOGGER.debug("Fetched " + url);
+        	LOGGER.debug(String.format("Fetched '%s' (%d)", url, result.getStatusCode()));
             return result;
         } catch (MalformedURLException e) {
             throw new UrlFetchException(url, e.getMessage());
@@ -107,7 +107,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
             // Don't bother reporting that we bailed because the mime-type
             // wasn't one that we wanted.
             if (e.getAbortReason() != AbortedFetchReason.INVALID_MIMETYPE) {
-                LOGGER.debug("Exception fetching {}: {}", url, e.getMessage());
+                LOGGER.debug("Aborted fetching {}: {}", url, e.getMessage());
             }
             
             throw e;
@@ -259,6 +259,10 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 			if (followRedirect) {
 				newRedirectUrlAsStr = pageRecord.getHttpHeader("Location");
 				if (newRedirectUrlAsStr != null) {
+				    // TODO - need to handle path-only case (e.g. "/ignite/"), where we then build the
+				    // URL from the original hostname plus this path. Otherwise we get a MalformedUrlException
+				    // here due to no protocol. Specific case is https://blogs.apache.org/ignite, which
+				    // redirects to (effectively) https://blogs.apache.org/ignite/ via the "/ignite/" path.
 					URL newRedirectUrl = new URL(newRedirectUrlAsStr);
 					return fetch(originalUrl, newRedirectUrl, payload, numRedirects + 1);
 				} else {

@@ -11,6 +11,6 @@ public enum UrlType {
 	// A special URL that is tells the crawl DB what keyed state to process.
 	DOMAIN,
 	
-	// A special URL that tells the CrawlDBFunction to stop emitting URLs.
+	// A special URL that tells the UrlDBFunction to stop emitting URLs.
 	TERMINATION
 }

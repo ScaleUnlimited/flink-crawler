@@ -3,11 +3,10 @@ package com.scaleunlimited.flinkcrawler.pojos;
 
 
 @SuppressWarnings("serial")
-public class ExtractedUrl extends BaseUrl {
+public class ExtractedUrl extends RawUrl {
 
     private String _anchorText;
     private String _relAttributes;
-    private float _score;
     
     public ExtractedUrl() {
         super();
@@ -22,13 +21,12 @@ public class ExtractedUrl extends BaseUrl {
     }
     
     public ExtractedUrl(String url, String anchorText, String relAttributes, float score) {
-    	super(url);
+    	super(url, score);
     	
     	// Often comes in with extra spaces/returns before the actual text.
     	// But sometimes they're actually null
         _anchorText = anchorText == null ? "" : anchorText.trim();
         _relAttributes = relAttributes;
-        _score = score;
     }
     
     public String getAnchorText() {
@@ -49,14 +47,6 @@ public class ExtractedUrl extends BaseUrl {
 
     @Override
     public String toString() {
-    	return String.format("[%s](%s) - %.2f", _anchorText, getUrl(), _score);
+    	return String.format("[%s](%s) - %.2f", _anchorText, getUrl(), getScore());
     }
-
-	public float getScore() {
-		return _score;
-	}
-	
-	public void setScore(float score) {
-		_score = score;
-	}
 }

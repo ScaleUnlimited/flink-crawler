@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.runtime.state.memory.MemoryStateBackend;
+import org.apache.flink.streaming.api.CheckpointingMode;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironmentWithAsyncExecution;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.util.FileUtils;
@@ -17,7 +19,7 @@ import com.scaleunlimited.flinkcrawler.fetcher.MockUrlLengthenerFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.SiteMapGraphFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.WebGraphFetcher;
 import com.scaleunlimited.flinkcrawler.functions.CheckUrlWithRobotsFunction;
-import com.scaleunlimited.flinkcrawler.functions.CrawlDBFunction;
+import com.scaleunlimited.flinkcrawler.functions.UrlDBFunction;
 import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.ParseFunction;
 import com.scaleunlimited.flinkcrawler.functions.ParseSiteMapFunction;
@@ -48,7 +50,11 @@ public class CrawlTopologyTest {
 		UrlLogger.clear();
 		
 		LocalStreamEnvironmentWithAsyncExecution env = new LocalStreamEnvironmentWithAsyncExecution();
-
+		
+		// Set up for checkpointing with in-memory state.
+        env.setStateBackend(new MemoryStateBackend());
+		env.enableCheckpointing(100L, CheckpointingMode.AT_LEAST_ONCE, true);
+		
 		SimpleUrlNormalizer normalizer = new SimpleUrlNormalizer();
 		SimpleWebGraph graph = new SimpleWebGraph(normalizer)
 			.add("domain1.com", "domain1.com/page1", "domain1.com/page2", "domain1.com/blocked")
@@ -87,10 +93,11 @@ public class CrawlTopologyTest {
 			FileUtils.deleteFileOrDirectory(contentTextFile);
 		}
 
+		final int crawlDbParallelism = 3;
 		CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
 	        // Explicitly set parallelism so that it doesn't vary based on # of cores
 	        .setParallelism(2)
-			.setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
+			.setUrlSource(new SeedUrlSource(crawlDbParallelism, 1.0f, "http://domain1.com"))
 			.setUrlLengthener(new SimpleUrlLengthener(new MockUrlLengthenerFetcher.MockUrlLengthenerFetcherBuilder(new MockUrlLengthenerFetcher(redirections))))
 			.setFetchQueue(new FetchQueue(1_000))
 			.setRobotsFetcherBuilder(new MockRobotsFetcher.MockRobotsFetcherBuilder(new MockRobotsFetcher(robotPages)))
@@ -134,38 +141,38 @@ public class CrawlTopologyTest {
 		results
 			.assertUrlLoggedBy(CheckUrlWithRobotsFunction.class, domain1page1, 1)
 			.assertUrlLoggedBy(FetchUrlsFunction.class, domain1page1, 1)
-			.assertUrlLoggedBy(	CrawlDBFunction.class, domain1page1, 1,
+			.assertUrlLoggedBy(	UrlDBFunction.class, domain1page1, 1,
 								FetchStatus.class.getSimpleName(), FetchStatus.FETCHED.toString())
 			.assertUrlLoggedBy(ParseFunction.class, domain1page1)
 			
 			.assertUrlLoggedBy(CheckUrlWithRobotsFunction.class, domain1page2, 1)
 			.assertUrlLoggedBy(FetchUrlsFunction.class, domain1page2, 1)
-			.assertUrlLoggedBy(	CrawlDBFunction.class, domain1page2, 1,
+			.assertUrlLoggedBy(	UrlDBFunction.class, domain1page2, 1,
 								FetchStatus.class.getSimpleName(), FetchStatus.FETCHED.toString())
 			.assertUrlLoggedBy(ParseFunction.class, domain1page2)
 			
 			.assertUrlLoggedBy(CheckUrlWithRobotsFunction.class, domain2page1, 1)
 			.assertUrlLoggedBy(FetchUrlsFunction.class, domain2page1, 1)
-			.assertUrlLoggedBy(	CrawlDBFunction.class, domain2page1, 1,
+			.assertUrlLoggedBy(	UrlDBFunction.class, domain2page1, 1,
 								FetchStatus.class.getSimpleName(), FetchStatus.HTTP_NOT_FOUND.toString())
 			.assertUrlNotLoggedBy(ParseFunction.class, domain2page1)
 			
 			// domain3.com/page1 should be skipped due to crawl-delay.
 			.assertUrlLoggedBy(CheckUrlWithRobotsFunction.class, domain3deferredPage, 1)
 			.assertUrlLoggedBy(FetchUrlsFunction.class, domain3deferredPage, 1)
-			.assertUrlLoggedBy(	CrawlDBFunction.class, domain3deferredPage, 1,
+			.assertUrlLoggedBy(	UrlDBFunction.class, domain3deferredPage, 1,
 								FetchStatus.class.getSimpleName(), FetchStatus.SKIPPED_CRAWLDELAY.toString())
 			.assertUrlNotLoggedBy(ParseFunction.class, domain3deferredPage)
 
 			.assertUrlLoggedBy(CheckUrlWithRobotsFunction.class, domain1blockedPage)
 			.assertUrlNotLoggedBy(FetchUrlsFunction.class, domain1blockedPage)
 			.assertUrlNotLoggedBy(ParseFunction.class, domain1blockedPage)
-			.assertUrlLoggedBy(CrawlDBFunction.class, domain1blockedPage, 2)
+			.assertUrlLoggedBy(UrlDBFunction.class, domain1blockedPage, 2)
 			
 			.assertUrlLoggedBy(ParseSiteMapFunction.class, domain4SiteMap)
-			.assertUrlLoggedBy(	CrawlDBFunction.class, domain4page1, 1,
+			.assertUrlLoggedBy(	UrlDBFunction.class, domain4page1, 1,
 								FetchStatus.class.getSimpleName(), FetchStatus.HTTP_NOT_FOUND.toString())
-			.assertUrlLoggedBy(	CrawlDBFunction.class, domain4page2, 1,
+			.assertUrlLoggedBy(	UrlDBFunction.class, domain4page2, 1,
 								FetchStatus.class.getSimpleName(), FetchStatus.HTTP_NOT_FOUND.toString())
 
 			;

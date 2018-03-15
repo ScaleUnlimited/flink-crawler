@@ -156,7 +156,7 @@ public class FetchUrlsFunction extends BaseAsyncFunction<FetchUrl, Tuple2<CrawlS
                     if (e instanceof BaseFetchException) {
                         future.complete(Collections.singleton(new Tuple2<CrawlStateUrl, FetchedUrl>(
                                 new CrawlStateUrl(url, ExceptionUtils.mapExceptionToFetchStatus(e),
-                                        0, System.currentTimeMillis(), 0L),
+                                        System.currentTimeMillis(), 0, 0L),
                                 null)));
                         LOGGER.trace(String.format("Forwarded exception URL to update status: '%s'",
                                 url));

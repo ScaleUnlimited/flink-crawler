@@ -3,6 +3,7 @@ package com.scaleunlimited.flinkcrawler.fetcher.commoncrawl;
 import static org.junit.Assert.*;
 
 import org.apache.http.HttpStatus;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.scaleunlimited.flinkcrawler.parser.ParserResult;
@@ -47,6 +48,22 @@ public class CommonCrawlFetcherIT {
 		assertTrue(outlinks.length > 0);
 	}
 	
+	@Ignore
+	@Test
+	// Enable this test to try pulling a particular URL out of the common crawl dataset.
+	public void testSpecificUrl() throws Exception {
+        CommonCrawlFetcherBuilder builder = new CommonCrawlFetcherBuilder(1, new UserAgent("", "", ""))
+            .setCrawlId("2017-17")
+            .setCacheDir(CACHE_DIR);
+        BaseHttpFetcher fetcher = builder.build();
+        
+        FetchedResult result = fetcher.get("http://www.ghandalf.org/actividades/");
+        
+        System.out.println("Redirects: " + result.getNumRedirects());
+        System.out.println("Status: " + result.getStatusCode());
+    }
+    
+
 	@Test
 	public void testTwitter() throws Exception {
 		CommonCrawlFetcherBuilder builder = new CommonCrawlFetcherBuilder(1, new UserAgent("", "", ""))
