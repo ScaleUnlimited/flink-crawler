@@ -36,4 +36,16 @@ public class ValidUrlTest {
 		assertEquals("fi.com", url.getPld());
 	}
 	
+	@Test
+	public void testSuspectUrl() throws Exception {
+	    ValidUrl url = new ValidUrl("https://apachebigdata2017.sched.com/overview/type/BoFs");
+	    assertNotNull(url.getPartitionKey());
+	}
+	
+	@Test
+	public void testSettingUrlType() throws Exception {
+        ValidUrl url = new ValidUrl("http://domain.com");
+        assertEquals(UrlType.REGULAR, url.getUrlType());
+	}
+	
 }

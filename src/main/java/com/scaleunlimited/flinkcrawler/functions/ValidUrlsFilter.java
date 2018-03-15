@@ -32,7 +32,7 @@ public class ValidUrlsFilter extends BaseFlatMapFunction<RawUrl, CrawlStateUrl> 
 				ValidUrl validatedUrl = new ValidUrl(urlAsString);
 				collector.collect(new CrawlStateUrl(validatedUrl, FetchStatus.UNFETCHED, System.currentTimeMillis(), url.getScore(), 0));
 			} catch (MalformedURLException e) {
-				LOGGER.debug("Filtering malformed URL " + urlAsString);
+				LOGGER.warn("Filtering malformed URL (not caught by validator!!!) " + urlAsString);
 			} catch (Throwable t) {
 				LOGGER.error("Failure to collect: " + t.getMessage(), t);
 			}

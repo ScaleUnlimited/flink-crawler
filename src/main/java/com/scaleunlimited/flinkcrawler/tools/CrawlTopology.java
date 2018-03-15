@@ -30,12 +30,10 @@ import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.scaleunlimited.flinkcrawler.crawldb.DefaultCrawlDBMerger;
 import com.scaleunlimited.flinkcrawler.fetcher.BaseHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.fetcher.SimpleHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.functions.CheckUrlWithRobotsFunction;
-import com.scaleunlimited.flinkcrawler.functions.CrawlDBFunction;
-import com.scaleunlimited.flinkcrawler.functions.DomainTicklerFunction;
+import com.scaleunlimited.flinkcrawler.functions.DomainDBFunction;
 import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.HandleFailedSiteMapFunction;
 import com.scaleunlimited.flinkcrawler.functions.LengthenUrlsFunction;
@@ -44,6 +42,7 @@ import com.scaleunlimited.flinkcrawler.functions.OutlinkToStateUrlFunction;
 import com.scaleunlimited.flinkcrawler.functions.ParseFunction;
 import com.scaleunlimited.flinkcrawler.functions.ParseSiteMapFunction;
 import com.scaleunlimited.flinkcrawler.functions.PldKeySelector;
+import com.scaleunlimited.flinkcrawler.functions.UrlDBFunction;
 import com.scaleunlimited.flinkcrawler.functions.UrlKeySelector;
 import com.scaleunlimited.flinkcrawler.functions.ValidUrlsFilter;
 import com.scaleunlimited.flinkcrawler.parser.BasePageParser;
@@ -57,7 +56,7 @@ import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.sources.BaseUrlSource;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
-import com.scaleunlimited.flinkcrawler.sources.TicklerSource;
+import com.scaleunlimited.flinkcrawler.urldb.DefaultUrlStateMerger;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlLengthener;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlValidator;
@@ -162,8 +161,8 @@ public class CrawlTopology {
         private int _parallelism = DEFAULT_PARALLELISM;
         private long _forceCrawlDelay = CrawlTool.DO_NOT_FORCE_CRAWL_DELAY;
         private long _defaultCrawlDelay = 10_000L;
-
-        private BaseUrlSource _urlSource = new SeedUrlSource(makeDefaultSeedUrl());;
+        
+        private BaseUrlSource _urlSource = new SeedUrlSource(1, makeDefaultSeedUrl());;
         private FetchQueue _fetchQueue = new FetchQueue(10_000);
 
         private BaseHttpFetcherBuilder _robotsFetcherBuilder = new SimpleHttpFetcherBuilder(
@@ -323,20 +322,39 @@ public class CrawlTopology {
             // unless we register a special serializer provided by the "kryo-serializers" project.
             _env.registerTypeWithKryoSerializer(Collections.unmodifiableList(new ArrayList<>()).getClass(), UnmodifiableCollectionsSerializer.class);
             
-            DataStream<RawUrl> seedUrls = _env.addSource(_urlSource).name("Seed urls source");
-            DataStream<CrawlStateUrl> cleanedUrls = cleanUrls(seedUrls);
+            SplitStream<RawUrl> seedUrls = _env.addSource(_urlSource)
+                    .name("Seed urls source")
+                    .split(new OutputSelector<RawUrl>() {
+
+                        private final List<String> REGULAR_URLS = Arrays.asList("regular");
+                        private final List<String> SPECIAL_URLS = Arrays.asList("special");
+
+                        @Override
+                        public Iterable<String> select(RawUrl url) {
+                            return url.isRegular() ? REGULAR_URLS : SPECIAL_URLS;
+                        }
+                    });
+            
+            DataStream<CrawlStateUrl> cleanedUrls = cleanUrls(seedUrls.select("regular"))
+                    .union(seedUrls.select("special").map(new MapFunction<RawUrl, CrawlStateUrl>() {
+
+                        @Override
+                        public CrawlStateUrl map(RawUrl url) throws Exception {
+                            return new CrawlStateUrl(url);
+                        }
+                    }));
             
             // Update the Crawl DB, then run URLs it emits through robots filtering.
             IterativeStream<CrawlStateUrl> crawlDbIteration = cleanedUrls.iterate(/* TicklerSource.TICKLE_INTERVAL * 5 */);
             DataStream<FetchUrl> preRobotsUrls = crawlDbIteration
                     .keyBy(new PldKeySelector<CrawlStateUrl>())
-            		.flatMap(new DomainTicklerFunction())
-            		.name("DomainTicklerFunction")
+            		.flatMap(new DomainDBFunction())
+            		.name("DomainDBFunction")
             		
             		// We have to re-key since flatMap destroys the keyed state
                     .keyBy(new PldKeySelector<CrawlStateUrl>())
-            		.flatMap(new CrawlDBFunction(new DefaultCrawlDBMerger(), _fetchQueue))
-            		.name("CrawlDBFunction")
+            		.flatMap(new UrlDBFunction(new DefaultUrlStateMerger(), _fetchQueue))
+            		.name("UrlDBFunction")
             		
             		// We have to re-key so that CheckUrlWithRobotsFunction can also use keyed state.
                     .keyBy(new PldKeySelector<FetchUrl>());
@@ -458,10 +476,7 @@ public class CrawlTopology {
 
             // We need to merge robotBlockedUrls with the "status" stream from fetchAttemptedUrls and status 
             // stream of the siteMapFetchAttemptedUrls and all of the new URLs from outlinks and sitemaps.
-            // We also merge in tickler URLs, which keep the crawlDB alive.
-            DataStream<CrawlStateUrl> tickler = _env.addSource(new TicklerSource())
-            		.name("Tickler source");
-            crawlDbIteration.closeWith(robotBlockedUrls.union(fetchStatusUrls, newUrls, tickler));
+            crawlDbIteration.closeWith(robotBlockedUrls.union(fetchStatusUrls, newUrls));
             
             // Save off parsed page content. So just extract the parsed content piece of the Tuple3, and
             // then pass it on to the provided content sink function.

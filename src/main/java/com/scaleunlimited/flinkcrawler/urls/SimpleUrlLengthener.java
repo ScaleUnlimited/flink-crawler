@@ -98,12 +98,7 @@ public class SimpleUrlLengthener extends BaseUrlLengthener {
             LOGGER.debug("Exception processing redirect for " + urlString + ": " + e.getMessage(), e);
         }
         
-		try {
-            return new RawUrl(redirectedUrl, url.getScore());
-        } catch (MalformedURLException e) {
-            LOGGER.debug(urlString + " redirected to malformed URL: " + redirectedUrl);
-            return url;
-        }
+        return new RawUrl(redirectedUrl, url.getScore());
 	}
 
 	@Override

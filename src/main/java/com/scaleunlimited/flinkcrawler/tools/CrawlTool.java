@@ -6,6 +6,9 @@ import java.net.URL;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.apache.flink.runtime.state.filesystem.FsStateBackend;
+import org.apache.flink.streaming.api.CheckpointingMode;
+import org.apache.flink.streaming.api.TimeCharacteristic;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.http.HttpStatus;
 import org.apache.tika.mime.MediaType;
@@ -53,6 +56,8 @@ public class CrawlTool {
         private int _parallelism = CrawlTopologyBuilder.DEFAULT_PARALLELISM;
         private String _outputFile = null;
         private boolean _htmlOnly = false;
+        private int _crawlDbParallelism = 1;
+        private String _checkpointDir = null;
         
         private String _cacheDir;
         private String _commonCrawlId = null;
@@ -103,11 +108,16 @@ public class CrawlTool {
 			_defaultCrawlDelayMS = defaultCrawlDelayMS;
 	    }
 		
-		@Option(name = "-maxcontentsize", usage = "maximum content size", required = false)
-	    public void setMaxContentSize(int maxContentSize) {
-			_maxContentSize = maxContentSize;
-	    }
-		
+        @Option(name = "-maxcontentsize", usage = "maximum content size", required = false)
+        public void setMaxContentSize(int maxContentSize) {
+            _maxContentSize = maxContentSize;
+        }
+        
+        @Option(name = "-crawldbparallelism", usage = "parallelism for crawl DB", required = false)
+        public void setCrawlDbParallelism(int parallelism) {
+            _crawlDbParallelism = parallelism;
+        }
+        
 		@Option(name = "-commoncrawl", usage = "crawl id for CommonCrawl.org dataset", required = false)
 	    public void setCommonCrawlId(String commonCrawlId) {
 			_commonCrawlId = commonCrawlId;
@@ -128,10 +138,15 @@ public class CrawlTool {
 			_parallelism = parallelism;
 	    }
 		
-		@Option(name = "-outputfile", usage = "Local file to store fetched content (testing only)", required = false)
-	    public void setOutputFile(String outputFile) {
-			_outputFile = outputFile;
-	    }
+        @Option(name = "-outputfile", usage = "Local file to store fetched content (testing only)", required = false)
+        public void setOutputFile(String outputFile) {
+            _outputFile = outputFile;
+        }
+        
+        @Option(name = "-checkpointdir", usage = "URI to directory to store checkpoint (enables checkpointing)", required = false)
+        public void setCheckpointDir(String checkpointDir) {
+            _checkpointDir = checkpointDir;
+        }
 		
 		@Option(name = "-htmlonly", usage = "Only (fully) fetch and parse HTML pages", required = false)
 	    public void setHtmlOnly(boolean htmlOnly) {
@@ -187,6 +202,10 @@ public class CrawlTool {
 			return _maxContentSize;
 		}
 		
+		public int getCrawlDbParallelism() {
+		    return _crawlDbParallelism;
+		}
+		
 		public boolean isCommonCrawl() {
             validate();
 			return _commonCrawlId != null;
@@ -217,6 +236,11 @@ public class CrawlTool {
 			return _outputFile;
 		}
 		
+        public String getCheckpointDir() {
+            validate();
+            return _checkpointDir;
+        }
+        
 		public boolean isHtmlOnly() {
             validate();
 			return _htmlOnly;
@@ -307,7 +331,16 @@ public class CrawlTool {
 			StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 			// Not really needed, as we are limited by fetch time and parsing CPU
 			// env.getConfig().enableObjectReuse();
-	        run(env, options);
+			
+			if (options.getCheckpointDir() != null) {
+	            // Enable checkpointing every 100 seconds.
+			    env.enableCheckpointing(100_000L, CheckpointingMode.AT_LEAST_ONCE, true);
+			    env.setStateBackend(new FsStateBackend(options.getCheckpointDir()));
+			}
+			
+			env.setStreamTimeCharacteristic(TimeCharacteristic.ProcessingTime);
+			
+			run(env, options);
 		} catch (Throwable t) {
 			System.err.println("Error running CrawlTool: " + t.getMessage());
 			t.printStackTrace(System.err);
@@ -347,18 +380,18 @@ public class CrawlTool {
 			pageFetcherBuilder.setValidMimeTypes(validMimeTypes);
 		}
 
-
 		CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
 		    .setUserAgent(userAgent)
 		    .setUrlLengthener(urlLengthener)
-			.setUrlSource(new SeedUrlSource(options.getSeedUrlsFilename(), RawUrl.DEFAULT_SCORE))
-			.setRobotsFetcherBuilder(robotsFetcherBuilder)
-			.setUrlFilter(urlValidator)
-			.setSiteMapFetcherBuilder(siteMapFetcherBuilder)
-			.setPageFetcherBuilder(pageFetcherBuilder)
-			.setForceCrawlDelay(options.getForceCrawlDelay())
-			.setDefaultCrawlDelay(options.getDefaultCrawlDelay())
-			.setParallelism(options.getParallelism());
+            .setUrlSource(new SeedUrlSource(options.getCrawlDbParallelism(),
+                    options.getSeedUrlsFilename(), RawUrl.DEFAULT_SCORE))
+            .setRobotsFetcherBuilder(robotsFetcherBuilder)
+            .setUrlFilter(urlValidator)
+            .setSiteMapFetcherBuilder(siteMapFetcherBuilder)
+            .setPageFetcherBuilder(pageFetcherBuilder)
+            .setForceCrawlDelay(options.getForceCrawlDelay())
+            .setDefaultCrawlDelay(options.getDefaultCrawlDelay())
+            .setParallelism(options.getParallelism());
 		
 		if (options.getOutputFile() != null) {
 			builder.setContentTextFile(options.getOutputFile());

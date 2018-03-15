@@ -12,9 +12,6 @@ import crawlercommons.domains.EffectiveTldFinder;
 public class ValidUrl extends BaseUrl {
 	private static final Logger LOGGER = LoggerFactory.getLogger(ValidUrl.class);
 
-	// True if all subsequent fields have been set using the BaseUrl's URL
-    private transient boolean _urlParsed = false;
-    
 	private transient String _protocol;
 	private transient String _hostname;
 	private transient String _pld;
@@ -27,6 +24,8 @@ public class ValidUrl extends BaseUrl {
 	}
 	
 	public ValidUrl(String urlAsString) throws MalformedURLException {
+	    super();
+	    
 		setUrl(urlAsString);
 	}
 	
@@ -36,42 +35,46 @@ public class ValidUrl extends BaseUrl {
 		setFrom(base);
 	}
 	
+	protected ValidUrl(BaseUrl base) {
+	    super(base);
+	    
+	    try {
+            parseUrl();
+        } catch (MalformedURLException e) {
+            throw new RuntimeException("Impossible exception", e);
+        }
+	}
+	
 	@Override
 	public void setUrl(String urlAsString) throws MalformedURLException {
 		super.setUrl(urlAsString);
 
-		_urlParsed = false;
 		parseUrl();
 	}
 	
 	private void parseUrl() throws MalformedURLException {
-	    if (!_urlParsed) {
-	        String urlAsString = getUrl();
-	        
-	        if (urlAsString == null) {
-	            _protocol = null;
-	            _hostname = null;
+        String urlAsString = getUrl();
+	    if (urlAsString == null) {
+            _protocol = null;
+            _hostname = null;
+            _port = -1;
+            _path = null;
+            _query = null;
+            _pld = null;
+	    } else if (_pld == null) {
+	        URL url = new URL(urlAsString);
+
+	        _protocol = url.getProtocol();
+	        _hostname = url.getHost();
+	        _port = url.getPort();
+	        if (_port == url.getDefaultPort()) {
 	            _port = -1;
-	            _path = null;
-	            _query = null;
-	            _pld = null;
-	        } else {
-	            URL url = new URL(urlAsString);
-
-	            _protocol = url.getProtocol();
-	            _hostname = url.getHost();
-	            _port = url.getPort();
-	            if (_port == url.getDefaultPort()) {
-	                _port = -1;
-	            }
-	            
-	            _path = url.getPath();
-	            _query = url.getQuery();
-
-	            _pld = extractPld(_hostname);
 	        }
 
-	        _urlParsed = true;
+	        _path = url.getPath();
+	        _query = url.getQuery();
+
+	        _pld = extractPld(_hostname);
 	    }
 	}
 	
@@ -104,7 +107,12 @@ public class ValidUrl extends BaseUrl {
 	// By default we partition by the hash of the pld, but this
 	// can be overridden (e.g. by CrawlStateUrl, for special URLs).
 	public Integer getPartitionKey() {
-		return getPld().hashCode();
+	    String pld = getPld();
+	    if (pld == null) {
+	        throw new RuntimeException("No PLD for URL: " + this);
+	    }
+	    
+		return pld.hashCode();
 	}
 	
 	public int getPort() {
@@ -154,8 +162,6 @@ public class ValidUrl extends BaseUrl {
         _port = url._port;
         _path = url._path;
         _query = url._query;
-        
-        _urlParsed = true;
     }
     
 
@@ -175,4 +181,17 @@ public class ValidUrl extends BaseUrl {
         }
     }
 
+    public static ValidUrl makeTickerUrl(int maxParallelism, int parallelism, int operatorIndex) {
+        return new ValidUrl(BaseUrl.makeTicklerUrl(maxParallelism, parallelism, operatorIndex));
+    }
+
+    public static ValidUrl makeDomainUrl(String domain) throws MalformedURLException {
+        ValidUrl result = new ValidUrl("http://" + domain);
+        result.setUrlType(UrlType.DOMAIN);
+        return result;
+    }
+
+    public static ValidUrl makeTerminateUrl(int maxParallelism, int parallelism, int operatorIndex) {
+        return new ValidUrl(BaseUrl.makeTerminateUrl(maxParallelism, parallelism, operatorIndex));
+    }
 }

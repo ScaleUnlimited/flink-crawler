@@ -34,6 +34,10 @@ public class UrlLogger {
 	}
 	
 	public static void record(Class<?> clazz, int partition, int parallelism, BaseUrl url, String... metaData) {
+	    if (!url.isRegular()) {
+	        return;
+	    }
+	    
 		if (LOGGER.isDebugEnabled()) {
 			StringBuilder msg = new StringBuilder();
 			msg.append(String.format("%s (%d/%d): %s", clazz.getSimpleName(), partition, parallelism, url));
