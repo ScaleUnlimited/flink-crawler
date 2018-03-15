@@ -2,6 +2,7 @@ package com.scaleunlimited.flinkcrawler.functions;
 
 import java.util.Collections;
 
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.functions.async.ResultFuture;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,6 +27,12 @@ public class LengthenUrlsFunction extends BaseAsyncFunction<RawUrl, RawUrl> {
 	}
 
 	@Override
+    public void open(Configuration parameters) throws Exception {
+        super.open(parameters);
+        _lengthener.open();
+    }
+
+    @Override
 	public void asyncInvoke(final RawUrl url, ResultFuture<RawUrl> future) throws Exception {
 		record(this.getClass(), url);
 

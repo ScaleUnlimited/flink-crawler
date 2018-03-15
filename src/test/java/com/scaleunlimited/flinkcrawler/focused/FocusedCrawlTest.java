@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.fetcher.MockRobotsFetcher;
+import com.scaleunlimited.flinkcrawler.fetcher.MockUrlLengthenerFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.SiteMapGraphFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.WebGraphFetcher;
 import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
@@ -77,17 +78,19 @@ public class FocusedCrawlTest {
                 // Explicitly set parallelism so that it doesn't vary based on # of cores
                 .setParallelism(1)
                 .setUrlSource(new SeedUrlSource(crawlDbParallelism, 1.0f, "http://domain1.com"))
-                .setUrlLengthener(new SimpleUrlLengthener())
+                .setUrlLengthener(new SimpleUrlLengthener(new MockUrlLengthenerFetcher.MockUrlLengthenerFetcherBuilder(new MockUrlLengthenerFetcher())))
                 .setRobotsFetcherBuilder(
                         new MockRobotsFetcher.MockRobotsFetcherBuilder(new MockRobotsFetcher()))
                 .setRobotsParser(new SimpleRobotRulesParser())
                 .setPageParser(new FocusedPageParser(new PageNumberScorer()))
                 .setContentSink(new DiscardingSink<ParsedUrl>())
-                .setContentTextFile(contentTextFile.getAbsolutePath()).setUrlNormalizer(normalizer)
+                .setContentTextFile(contentTextFile.getAbsolutePath())
+                .setUrlNormalizer(normalizer)
                 .setUrlFilter(new SimpleUrlValidator())
                 .setSiteMapFetcherBuilder(new SiteMapGraphFetcher.SiteMapGraphFetcherBuilder(
                         new SiteMapGraphFetcher(BaseWebGraph.EMPTY_GRAPH)))
-                .setSiteMapParser(new SimpleSiteMapParser()).setDefaultCrawlDelay(0)
+                .setSiteMapParser(new SimpleSiteMapParser())
+                .setDefaultCrawlDelay(0)
                 .setPageFetcherBuilder(
                         new WebGraphFetcher.WebGraphFetcherBuilder(new WebGraphFetcher(graph)))
                 .setFetchQueue(new FocusedFetchQueue(10_000, minFetchScore));
