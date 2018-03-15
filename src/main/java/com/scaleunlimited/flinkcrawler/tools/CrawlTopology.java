@@ -58,6 +58,7 @@ import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.sources.BaseUrlSource;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
 import com.scaleunlimited.flinkcrawler.sources.TicklerSource;
+import com.scaleunlimited.flinkcrawler.urls.BaseUrlLengthener;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlValidator;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlLengthener;
@@ -169,7 +170,9 @@ public class CrawlTopology {
                 INVALID_USER_AGENT);
         private SimpleRobotRulesParser _robotsParser = new SimpleRobotRulesParser();
 
-        private SimpleUrlLengthener _urlLengthener = new SimpleUrlLengthener(INVALID_USER_AGENT);
+        private BaseHttpFetcherBuilder _lengthenerFetcherBuilder = new SimpleHttpFetcherBuilder(
+                INVALID_USER_AGENT);
+        private BaseUrlLengthener _urlLengthener;
         private SinkFunction<ParsedUrl> _contentSink = new DiscardingSink<ParsedUrl>();
         private SinkFunction<String> _contentTextSink;
         private String _contentTextFilePathString;
@@ -206,8 +209,13 @@ public class CrawlTopology {
             return this;
         }
 
-        public CrawlTopologyBuilder setUrlLengthener(SimpleUrlLengthener lengthener) {
-            _urlLengthener = lengthener;
+        public CrawlTopologyBuilder setUrlLengthener(BaseUrlLengthener urlLengthener) {
+            _urlLengthener = urlLengthener;
+            return this;
+        }
+
+        public CrawlTopologyBuilder setLengthenerFetcherBuilder(BaseHttpFetcherBuilder lengthenerFetcherBuilder) {
+            _lengthenerFetcherBuilder = lengthenerFetcherBuilder;
             return this;
         }
 
@@ -226,7 +234,7 @@ public class CrawlTopology {
             _pageFetcherBuilder.setUserAgent(userAgent);
             _siteMapFetcherBuilder.setUserAgent(userAgent);
             _robotsFetcherBuilder.setUserAgent(userAgent);
-            _urlLengthener.setUserAgent(userAgent);
+            _lengthenerFetcherBuilder.setUserAgent(userAgent);
             return this;
         }
 
@@ -300,9 +308,15 @@ public class CrawlTopology {
             
             if  (   (_robotsFetcherBuilder.getUserAgent() == INVALID_USER_AGENT)
                 ||  (_siteMapFetcherBuilder.getUserAgent() == INVALID_USER_AGENT)
-                ||  (_pageFetcherBuilder.getUserAgent() == INVALID_USER_AGENT)
-                ||  (_urlLengthener.getUserAgent() == INVALID_USER_AGENT)) {
+                ||  (_pageFetcherBuilder.getUserAgent() == INVALID_USER_AGENT)) {
             	throw new IllegalArgumentException("You must define your own UserAgent!");
+            }
+            
+            if (_urlLengthener == null) {
+                if (_lengthenerFetcherBuilder.getUserAgent() == INVALID_USER_AGENT) {
+                    throw new IllegalArgumentException("You must define your own UserAgent!");
+                }
+                _urlLengthener = new SimpleUrlLengthener(_lengthenerFetcherBuilder);
             }
             
             // The Headers class in http-fetcher uses an unmodifiable list, which Kryo can't handle

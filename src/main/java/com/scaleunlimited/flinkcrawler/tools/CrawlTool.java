@@ -43,7 +43,7 @@ public class CrawlTool {
 
 	public static class CrawlToolOptions {
 		
-	    private UserAgent _userAgent;
+	    private UserAgent _userAgent = null;
 		private String _urlsFilename;
 	    private String _singleDomain;
         private long _forceCrawlDelay = CrawlTool.DO_NOT_FORCE_CRAWL_DELAY;
@@ -55,7 +55,7 @@ public class CrawlTool {
         private boolean _htmlOnly = false;
         
         private String _cacheDir;
-        private String _commonCrawlId;
+        private String _commonCrawlId = null;
         
         @Option(name = "-agent", usage = "user agent info, format:'name,email,website'", required = false)
         public void setUserAgent(String agentNameWebsiteEmailString) {
@@ -64,7 +64,8 @@ public class CrawlTool {
             }
             String fields[] = agentNameWebsiteEmailString.split(",", 4);
             if (fields.length != 3) {
-                throw new RuntimeException("Invalid format for user agent (expected 'name,email,website')");
+                throw new RuntimeException("    Invalid format for user agent (expected 'name,email,website'): "
+                                            +   agentNameWebsiteEmailString);
             }
             String agentName = fields[0];
             String agentEmail = fields[1];
@@ -79,9 +80,6 @@ public class CrawlTool {
         }
         
         public void setUserAgent(UserAgent newUserAgent) {
-            if (isCommonCrawl()) {
-                throw new RuntimeException("user agent not used in common crawl mode");
-            }
             _userAgent = newUserAgent;
         }
         
@@ -112,9 +110,6 @@ public class CrawlTool {
 		
 		@Option(name = "-commoncrawl", usage = "crawl id for CommonCrawl.org dataset", required = false)
 	    public void setCommonCrawlId(String commonCrawlId) {
-            if (getUserAgent() != null) {
-                throw new RuntimeException("user agent not used in common crawl mode");
-            }
 			_commonCrawlId = commonCrawlId;
 	    }
 		
@@ -144,59 +139,86 @@ public class CrawlTool {
 	    }
 		
 		
+		public void validate() {
+		    if (_commonCrawlId == null) {
+                if (_userAgent == null) {
+                    throw new RuntimeException("-agent is required (except for common crawl mode)");
+                }
+		    } else {
+                if (_userAgent != null) {
+                    throw new RuntimeException("user agent not used in common crawl mode");
+                }
+		    }
+		}
+		
+		
 		public UserAgent getUserAgent() {
+		    validate();
             return _userAgent;
         }
 
         public String getSeedUrlsFilename() {
+            validate();
 			return _urlsFilename;
 		}
 		
 		public boolean isSingleDomain() {
+            validate();
 			return (_singleDomain != null);
 		}
 		
 		public String getSingleDomain() {
+            validate();
 			return _singleDomain;
 		}
 		
 		public long getForceCrawlDelay() {
+            validate();
 			return _forceCrawlDelay;
 		}
 
 		public long getDefaultCrawlDelay() {
+            validate();
 			return _defaultCrawlDelayMS;
 		}
 
 		public int getMaxContentSize() {
+            validate();
 			return _maxContentSize;
 		}
 		
 		public boolean isCommonCrawl() {
+            validate();
 			return _commonCrawlId != null;
 		}
 		
 		public String getCommonCrawlId() {
+            validate();
 			return _commonCrawlId;
 		}
 		
 		public String getCommonCrawlCacheDir() {
+            validate();
 			return _cacheDir;
 		}
 		
 		public int getFetchersPerTask() {
+            validate();
 			return _fetchersPerTask;
 		}
 		
 		public int getParallelism() {
+            validate();
 			return _parallelism;
 		}
 		
 		public String getOutputFile() {
+            validate();
 			return _outputFile;
 		}
 		
 		public boolean isHtmlOnly() {
+            validate();
 			return _htmlOnly;
 		}
 	}
