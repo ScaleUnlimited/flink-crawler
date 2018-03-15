@@ -6,7 +6,7 @@ import crawlercommons.fetcher.http.UserAgent;
 
 public class FetchUtils {
     
-    private static final int URL_LENGTHENER_SITE_TIMEOUT_SECS = 2;
+    private static final int URL_LENGTHENER_SITE_TIMEOUT_SECS = 20;
 
     /**
      * @param userAgent for the fetcher that the builder will construct
