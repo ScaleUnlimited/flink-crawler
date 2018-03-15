@@ -279,15 +279,6 @@ public class CrawlTool {
 	            // Enable checkpointing every 100 seconds.
 			    env.enableCheckpointing(100_000L, CheckpointingMode.AT_LEAST_ONCE, true);
 			    env.setStateBackend(new FsStateBackend(options.getCheckpointDir()));
-			} else {
-			    // First confirm we're running locally, as otherwise checking-pointing to a local
-			    // temp dir isn't going to work well.
-			    if (env instanceof RemoteStreamEnvironment) {
-			        throw new IllegalStateException("A checkpoint URI must be specified when running Flink remotedly");
-			    }
-			    
-			    Path checkpointDir = Files.createTempDirectory("flink-checkpoint");
-                env.setStateBackend(new FsStateBackend(checkpointDir.toUri()));
 			}
 			
 			env.setStreamTimeCharacteristic(TimeCharacteristic.ProcessingTime);
