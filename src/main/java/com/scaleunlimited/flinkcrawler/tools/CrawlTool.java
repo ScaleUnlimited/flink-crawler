@@ -46,6 +46,8 @@ public class CrawlTool {
 
 	public static class CrawlToolOptions {
 		
+	    public static final int DEFAULT_MAX_OUTLINKS_PER_PAGE = 50;
+
 	    private UserAgent _userAgent = null;
 		private String _urlsFilename;
 	    private String _singleDomain;
@@ -58,6 +60,7 @@ public class CrawlTool {
         private boolean _htmlOnly = false;
         private int _crawlDbParallelism = 1;
         private String _checkpointDir = null;
+        private int _maxOutlinksPerPage = DEFAULT_MAX_OUTLINKS_PER_PAGE;
         
         private String _cacheDir;
         private String _commonCrawlId = null;
@@ -153,6 +156,10 @@ public class CrawlTool {
 			_htmlOnly = htmlOnly;
 	    }
 		
+        @Option(name = "-maxoutlinks", usage = "maximum coutlinks per page that are extracted (default:50)", required = false)
+        public void setMaxOutlinksPerPage(int maxOutlinksPerPage) {
+            _maxOutlinksPerPage = maxOutlinksPerPage;
+        }
 		
 		public void validate() {
 		    if (_commonCrawlId == null) {
@@ -245,6 +252,10 @@ public class CrawlTool {
             validate();
 			return _htmlOnly;
 		}
+
+        public int getMaxOutlinksPerPage() {
+            return _maxOutlinksPerPage;
+        }
 	}
 	
 	@SuppressWarnings("serial")
@@ -380,18 +391,19 @@ public class CrawlTool {
 			pageFetcherBuilder.setValidMimeTypes(validMimeTypes);
 		}
 
-		CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
+        CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
 		    .setUserAgent(userAgent)
 		    .setUrlLengthener(urlLengthener)
-            .setUrlSource(new SeedUrlSource(options.getCrawlDbParallelism(),
-                    options.getSeedUrlsFilename(), RawUrl.DEFAULT_SCORE))
-            .setRobotsFetcherBuilder(robotsFetcherBuilder)
-            .setUrlFilter(urlValidator)
-            .setSiteMapFetcherBuilder(siteMapFetcherBuilder)
-            .setPageFetcherBuilder(pageFetcherBuilder)
-            .setForceCrawlDelay(options.getForceCrawlDelay())
-            .setDefaultCrawlDelay(options.getDefaultCrawlDelay())
-            .setParallelism(options.getParallelism());
+                .setUrlSource(new SeedUrlSource(options.getCrawlDbParallelism(),
+                        options.getSeedUrlsFilename(), RawUrl.DEFAULT_SCORE))
+                .setRobotsFetcherBuilder(robotsFetcherBuilder)
+                .setUrlFilter(urlValidator)
+                .setSiteMapFetcherBuilder(siteMapFetcherBuilder)
+                .setPageFetcherBuilder(pageFetcherBuilder)
+                .setForceCrawlDelay(options.getForceCrawlDelay())
+                .setDefaultCrawlDelay(options.getDefaultCrawlDelay())
+                .setParallelism(options.getParallelism())
+                .setMaxOutlinksPerPage(options.getMaxOutlinksPerPage());
 		
 		if (options.getOutputFile() != null) {
 			builder.setContentTextFile(options.getOutputFile());
