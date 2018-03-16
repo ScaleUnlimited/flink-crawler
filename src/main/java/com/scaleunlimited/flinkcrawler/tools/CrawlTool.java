@@ -3,15 +3,12 @@ package com.scaleunlimited.flinkcrawler.tools;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
 
 import org.apache.flink.runtime.state.filesystem.FsStateBackend;
 import org.apache.flink.streaming.api.CheckpointingMode;
 import org.apache.flink.streaming.api.TimeCharacteristic;
-import org.apache.flink.streaming.api.environment.RemoteStreamEnvironment;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.http.HttpStatus;
 import org.apache.tika.mime.MediaType;
@@ -48,6 +45,8 @@ public class CrawlTool {
 
 	public static class CrawlToolOptions {
 		
+	    public static final int DEFAULT_MAX_OUTLINKS_PER_PAGE = 50;
+
 		private String _urlsFilename;
 	    private String _singleDomain;
         private long _forceCrawlDelay = CrawlTool.DO_NOT_FORCE_CRAWL_DELAY;
@@ -59,6 +58,7 @@ public class CrawlTool {
         private boolean _htmlOnly = false;
         private int _crawlDbParallelism = 1;
         private String _checkpointDir = null;
+        private int _maxOutlinksPerPage = DEFAULT_MAX_OUTLINKS_PER_PAGE;
         
         private String _cacheDir;
         private String _commonCrawlId;
@@ -128,6 +128,10 @@ public class CrawlTool {
 			_htmlOnly = htmlOnly;
 	    }
 		
+        @Option(name = "-maxoutlinks", usage = "maximum coutlinks per page that are extracted (default:50)", required = false)
+        public void setMaxOutlinksPerPage(int maxOutlinksPerPage) {
+            _maxOutlinksPerPage = maxOutlinksPerPage;
+        }
 		
 		public String getSeedUrlsFilename() {
 			return _urlsFilename;
@@ -188,6 +192,10 @@ public class CrawlTool {
 		public boolean isHtmlOnly() {
 			return _htmlOnly;
 		}
+
+        public int getMaxOutlinksPerPage() {
+            return _maxOutlinksPerPage;
+        }
 	}
 	
 	@SuppressWarnings("serial")
@@ -325,7 +333,8 @@ public class CrawlTool {
                 .setPageFetcherBuilder(pageFetcherBuilder)
                 .setForceCrawlDelay(options.getForceCrawlDelay())
                 .setDefaultCrawlDelay(options.getDefaultCrawlDelay())
-                .setParallelism(options.getParallelism());
+                .setParallelism(options.getParallelism())
+                .setMaxOutlinksPerPage(options.getMaxOutlinksPerPage());
 		
 		if (options.getOutputFile() != null) {
 			builder.setContentTextFile(options.getOutputFile());
