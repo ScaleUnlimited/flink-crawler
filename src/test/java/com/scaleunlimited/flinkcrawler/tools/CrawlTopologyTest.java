@@ -1,5 +1,7 @@
 package com.scaleunlimited.flinkcrawler.tools;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
@@ -38,7 +40,6 @@ import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 import com.scaleunlimited.flinkcrawler.webgraph.SimpleWebGraph;
 
 import crawlercommons.robots.SimpleRobotRulesParser;
-import static org.assertj.core.api.Assertions.*;
 
 public class CrawlTopologyTest {
 	static final Logger LOGGER = LoggerFactory.getLogger(CrawlTopologyTest.class);
