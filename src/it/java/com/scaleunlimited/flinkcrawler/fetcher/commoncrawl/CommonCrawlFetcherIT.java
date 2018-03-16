@@ -1,6 +1,8 @@
 package com.scaleunlimited.flinkcrawler.fetcher.commoncrawl;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 import org.apache.http.HttpStatus;
 import org.junit.Ignore;
@@ -23,10 +25,7 @@ public class CommonCrawlFetcherIT {
 
 	@Test
 	public void testSingleUrlFetchWithRedirects() throws Exception {
-		CommonCrawlFetcherBuilder builder = new CommonCrawlFetcherBuilder(1, new UserAgent("", "", ""))
-			.setCrawlId("2017-17")
-			.setCacheDir(CACHE_DIR);
-		BaseHttpFetcher fetcher = builder.build();
+        BaseHttpFetcher fetcher = makeFetcher(1);
 		
 		FetchedResult result = fetcher.get("http://cloudera.com/");
 		
@@ -52,10 +51,7 @@ public class CommonCrawlFetcherIT {
 	@Test
 	// Enable this test to try pulling a particular URL out of the common crawl dataset.
 	public void testSpecificUrl() throws Exception {
-        CommonCrawlFetcherBuilder builder = new CommonCrawlFetcherBuilder(1, new UserAgent("", "", ""))
-            .setCrawlId("2017-17")
-            .setCacheDir(CACHE_DIR);
-        BaseHttpFetcher fetcher = builder.build();
+        BaseHttpFetcher fetcher = makeFetcher(1);
         
         FetchedResult result = fetcher.get("http://www.ghandalf.org/actividades/");
         
@@ -66,10 +62,7 @@ public class CommonCrawlFetcherIT {
 
 	@Test
 	public void testTwitter() throws Exception {
-		CommonCrawlFetcherBuilder builder = new CommonCrawlFetcherBuilder(1, new UserAgent("", "", ""))
-				.setCrawlId("2017-17")
-				.setCacheDir(CACHE_DIR);
-			BaseHttpFetcher fetcher = builder.build();
+        BaseHttpFetcher fetcher = makeFetcher(1);
 		
 		FetchedResult result = fetcher.get("http://www.twitter.com/");
 		
@@ -80,11 +73,7 @@ public class CommonCrawlFetcherIT {
 	
 	@Test
 	public void testMultiThreading() throws Exception {
-		final int numThreads = 3;
-		CommonCrawlFetcherBuilder builder = new CommonCrawlFetcherBuilder(numThreads, new UserAgent("", "", ""))
-				.setCrawlId("2017-22")
-				.setCacheDir(CACHE_DIR);
-		BaseHttpFetcher fetcher = builder.build();
+        BaseHttpFetcher fetcher = makeFetcher(3);
 		
 		final String[] urlsToFetch = normalize("http://cloudera.com/",
 				"http://cnn.com/",
@@ -151,6 +140,13 @@ public class CommonCrawlFetcherIT {
 		return result;
 	}
 
-
-
+    private BaseHttpFetcher makeFetcher(int numThreads) throws Exception {
+        CommonCrawlFetcherBuilder builder =
+            new CommonCrawlFetcherBuilder(  numThreads, 
+                                            new UserAgent("", "", ""),
+                                            "2017-17",
+                                            CACHE_DIR);
+        BaseHttpFetcher fetcher = builder.build();
+        return fetcher;
+    }
 }

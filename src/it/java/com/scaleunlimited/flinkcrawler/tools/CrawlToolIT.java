@@ -7,7 +7,7 @@ import org.junit.Test;
 
 import com.scaleunlimited.flinkcrawler.tools.CrawlTool.CrawlToolOptions;
 
-public class CrawlToolTest {
+public class CrawlToolIT {
 
 	// TODO when the test gets terminated, we can re-enable this.
 	@Ignore

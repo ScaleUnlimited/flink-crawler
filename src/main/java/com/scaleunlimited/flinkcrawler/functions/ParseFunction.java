@@ -1,5 +1,8 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
+import java.util.Arrays;
+import java.util.Comparator;
+
 import org.apache.flink.api.common.functions.RuntimeContext;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.configuration.Configuration;
@@ -20,9 +23,11 @@ public class ParseFunction extends BaseFlatMapFunction<FetchedUrl, Tuple3<Extrac
 
     private static final String TABS_AND_RETURNS_PATTERN = "[\t\r\n]";
 	private BasePageParser _parser;
+    private int _maxOutlinksPerPage;
 
-	public ParseFunction(BasePageParser parser) {
+	public ParseFunction(BasePageParser parser, int maxOutlinksPerPage) {
         _parser = parser;
+        _maxOutlinksPerPage = maxOutlinksPerPage;
     }
 
 	@Override
@@ -57,14 +62,27 @@ public class ParseFunction extends BaseFlatMapFunction<FetchedUrl, Tuple3<Extrac
 			collector.collect(new Tuple3<ExtractedUrl, ParsedUrl, String>(null, result.getParsedUrl(), null));
 		}
 		
-		// However, output all the links (irrespective of score) - we'll ignore fetching the 0 score ones
-		for (ExtractedUrl outlink : result.getExtractedUrls()) {
+        // Since we are limiting the number of outlinks, first sort by score and then limit.
+        ExtractedUrl[] extractedUrls = result.getExtractedUrls();
+        Arrays.sort(extractedUrls, new Comparator<ExtractedUrl>() {
+
+            @Override
+            public int compare(ExtractedUrl o1, ExtractedUrl o2) {
+                return (int) (o1.getScore() - o2.getScore());
+            }
+        });
+        int count = 0;
+		for (ExtractedUrl outlink : extractedUrls) {
 			String message =
 				String.format(	"Extracted '%s' from '%s'",
 								outlink.getUrl(),
 								fetchedUrl.getUrl());
 			LOGGER.trace(message);
 			collector.collect(new Tuple3<ExtractedUrl, ParsedUrl, String>(outlink, null, null));
+			count++;
+			if (count >= _maxOutlinksPerPage) {
+			    break;
+			}
 		}
 		
 		// Output the text version of the content
