@@ -1,11 +1,6 @@
 package com.scaleunlimited.flinkcrawler.tools;
 
 import java.io.IOException;
-<<<<<<< HEAD
-=======
-import java.net.MalformedURLException;
-import java.net.URL;
->>>>>>> master
 import java.util.HashSet;
 import java.util.Set;
 
@@ -26,12 +21,8 @@ import com.scaleunlimited.flinkcrawler.fetcher.SimpleHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.fetcher.commoncrawl.CommonCrawlFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
-<<<<<<< HEAD
 import com.scaleunlimited.flinkcrawler.topology.CrawlTopologyBuilder;
-=======
-import com.scaleunlimited.flinkcrawler.tools.CrawlTopology.CrawlTopologyBuilder;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlLengthener;
->>>>>>> master
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlValidator;
 import com.scaleunlimited.flinkcrawler.urls.SingleDomainUrlValidator;
 

@@ -68,7 +68,8 @@ public class CrawlTopologyBuilder {
 						"https://github.com/ScaleUnlimited/flink-crawler/wiki/Crawler-Policy");
 
 	public static final int DEFAULT_PARALLELISM = -1;
-
+	public static final int DEFAULT_MAX_OUTLINKS_PER_PAGE = 50;
+	
     private StreamExecutionEnvironment _env;
     private String _jobName = "flink-crawler";
     private int _parallelism = DEFAULT_PARALLELISM;
@@ -91,7 +92,8 @@ public class CrawlTopologyBuilder {
     private BaseHttpFetcherBuilder _siteMapFetcherBuilder = new SimpleHttpFetcherBuilder(INVALID_USER_AGENT);
     private BasePageParser _pageParser = new SimplePageParser();
 	private BasePageParser _siteMapParser = new SimpleSiteMapParser();
-
+	private int _maxOutlinksPerPage = DEFAULT_MAX_OUTLINKS_PER_PAGE;
+	
     public CrawlTopologyBuilder(StreamExecutionEnvironment env) {
         _env = env;
     }
@@ -150,6 +152,11 @@ public class CrawlTopologyBuilder {
 
     public CrawlTopologyBuilder setPageParser(BasePageParser pageParser) {
         _pageParser = pageParser;
+        return this;
+    }
+
+    public CrawlTopologyBuilder setMaxOutlinksPerPage(int maxOutlinksPerPage) {
+        _maxOutlinksPerPage = maxOutlinksPerPage;
         return this;
     }
 
@@ -362,7 +369,8 @@ public class CrawlTopologyBuilder {
         DataStream<CrawlStateUrl> fetchStatusUrls = selectFetchStatus(fetchAttemptedUrls);
 
         DataStream<Tuple3<ExtractedUrl, ParsedUrl, String>> parsedUrls = selectFetchedUrls(fetchAttemptedUrls)
-        														.flatMap(new ParseFunction(_pageParser))
+        														.flatMap(new ParseFunction(_pageParser,
+        														        _maxOutlinksPerPage))
         														.name("ParseFunction");
         
 
