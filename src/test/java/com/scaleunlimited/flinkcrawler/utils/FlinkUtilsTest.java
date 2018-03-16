@@ -1,6 +1,5 @@
 package com.scaleunlimited.flinkcrawler.utils;
 
-import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.client.JobExecutionException;
@@ -23,28 +22,15 @@ public class FlinkUtilsTest {
 
 		DataStreamSource<Tuple2<String, Float>> pages = env.fromElements(Tuple2.of("page0", 0.0f), Tuple2.of("page0", 1.0f), Tuple2.of("page1", 10.0f), Tuple2.of("page666", 6660.0f));
 		DataStreamSource<Tuple2<String, Float>> epsilon = env.fromElements(
-				Tuple2.of("task:" + FlinkUtils.makeKeyForOperatorIndex(maxParallelism, parallelism, 0), 0.5f), 
-				Tuple2.of("task:" + FlinkUtils.makeKeyForOperatorIndex(maxParallelism, parallelism, 1), 0.25f));
+				Tuple2.of(FlinkUtils.makeKeyForOperatorIndex("task:%d", maxParallelism, parallelism, 0), 0.5f), 
+				Tuple2.of(FlinkUtils.makeKeyForOperatorIndex("task:%d", maxParallelism, parallelism, 1), 0.25f));
 		
-		pages.union(epsilon).keyBy(new MyKeySelector()).process(new MyProcessFunction()).print();
+		pages.union(epsilon).keyBy(0).process(new MyProcessFunction()).print();
 		
 		try {
 			env.execute();
 		} catch (JobExecutionException e) {
 			Assert.fail(e.getCause().getMessage());
-		}
-	}
-	
-	@SuppressWarnings("serial")
-	private static class MyKeySelector implements KeySelector<Tuple2<String, Float>, Integer> {
-
-		@Override
-		public Integer getKey(Tuple2<String, Float> tuple) throws Exception {
-			if (tuple.f0.startsWith("task:")) {
-				return Integer.parseInt(tuple.f0.substring("task:".length()));
-			} else {
-				return tuple.f0.hashCode();
-			}
 		}
 	}
 	

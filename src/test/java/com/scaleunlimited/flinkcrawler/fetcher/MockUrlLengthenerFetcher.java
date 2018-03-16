@@ -8,8 +8,6 @@ import org.apache.http.HttpStatus;
 import crawlercommons.fetcher.BaseFetchException;
 import crawlercommons.fetcher.FetchedResult;
 import crawlercommons.fetcher.Payload;
-import crawlercommons.fetcher.RedirectFetchException;
-import crawlercommons.fetcher.RedirectFetchException.RedirectExceptionReason;
 import crawlercommons.fetcher.http.BaseHttpFetcher;
 import crawlercommons.fetcher.http.UserAgent;
 import crawlercommons.util.Headers;
@@ -48,29 +46,36 @@ public class MockUrlLengthenerFetcher extends BaseHttpFetcher {
     
     @Override
     public FetchedResult get(String originalUrl, Payload payload) throws BaseFetchException {
-        String redirectedUrl = _redirections.get(originalUrl);
         
         final int responseRate = 1000;
+        final String mimeType = "text/plain";
         
+        Headers headers = new Headers();
+        int statusCode = HttpStatus.SC_MOVED_PERMANENTLY;
+        String redirectedUrl = _redirections.get(originalUrl);
         if (redirectedUrl == null) {
-            return new FetchedResult(   originalUrl, 
-                                        originalUrl, 
-                                        0, 
-                                        new Headers(), 
-                                        new byte[0], 
-                                        "text/plain", 
-                                        responseRate, 
-                                        payload, 
-                                        originalUrl, 
-                                        0, 
-                                        "192.168.1.1", 
-                                        HttpStatus.SC_NOT_FOUND, 
-                                        null);
+            redirectedUrl = originalUrl;
+            statusCode = HttpStatus.SC_NOT_FOUND;
         } else {
-            throw new RedirectFetchException(   originalUrl, 
-                                                redirectedUrl, 
-                                                RedirectExceptionReason.TOO_MANY_REDIRECTS);
+            headers.add(Headers.LOCATION, redirectedUrl);
         }
+        
+        // With max redirects set to 0, we don't get the redirected URL in the "actually fetched"
+        // field of the FetchedResult (it's in the headers Location:xxx entry).
+        FetchedResult result = new FetchedResult(   originalUrl, 
+                                                    originalUrl, 
+                                                    0, 
+                                                    headers, 
+                                                    new byte[0], 
+                                                    mimeType, 
+                                                    responseRate, 
+                                                    payload, 
+                                                    originalUrl, 
+                                                    0, 
+                                                    "192.168.1.1", 
+                                                    statusCode, 
+                                                    null);
+        return result;
     }
 
     @Override

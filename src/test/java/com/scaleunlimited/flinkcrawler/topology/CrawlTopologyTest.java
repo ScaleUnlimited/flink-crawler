@@ -1,4 +1,4 @@
-package com.scaleunlimited.flinkcrawler.tools;
+package com.scaleunlimited.flinkcrawler.topology;
 
 import java.io.File;
 import java.util.HashMap;
@@ -28,7 +28,8 @@ import com.scaleunlimited.flinkcrawler.parser.SimpleSiteMapParser;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
-import com.scaleunlimited.flinkcrawler.tools.CrawlTopology.CrawlTopologyBuilder;
+import com.scaleunlimited.flinkcrawler.tools.CrawlTool;
+import com.scaleunlimited.flinkcrawler.topology.CrawlTopology;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlLengthener;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlValidator;
@@ -178,11 +179,4 @@ public class CrawlTopologyTest {
 			;
 	}
 
-	@Test
-	public void testSingleDomainUrlValidator() {
-		SimpleUrlValidator validator = 
-			new CrawlTool.SingleDomainUrlValidator("scaleunlimited.com");
-        assertThat(validator.isValid("http://transpac.com")).isFalse();
-        assertThat(validator.isValid("http://scaleunlimited.com")).isTrue();
-	}
 }

@@ -1,7 +1,5 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -59,9 +57,6 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
     private transient Random _rand;
 
     private transient CrawlStateUrl _mergedUrlState;
-
-    // TODO remove this debugging code.
-    private transient Map<String, Long> _inFlightUrls;
     
     public UrlDBFunction(BaseUrlStateMerger merger, FetchQueue fetchQueue) {
         _merger = merger;
@@ -123,17 +118,10 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
         MapStateDescriptor<Integer, Long> activeUrlsIndexStateDescriptor = new MapStateDescriptor<>("active-urls-index",
                 Integer.class, Long.class);
         _activeUrlsIndex = getRuntimeContext().getMapState(activeUrlsIndexStateDescriptor);
-        
-        _inFlightUrls = new HashMap<>();
     }
 
     @Override
     public void close() throws Exception {
-        
-        for (String url : _inFlightUrls.keySet()) {
-            LOGGER.debug(String.format("%d\t%s", _inFlightUrls.get(url), url));
-        }
-        
         super.close();
     }
 
@@ -249,8 +237,6 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
                 int nowActive = _numInFlightUrls.incrementAndGet();
                 LOGGER.debug(String.format("UrlDBFunction (%d/%d) emitted URL %s (%d active)", _partition,
                         _parallelism, fetchUrl, nowActive));
-                
-                _inFlightUrls.put(fetchUrl.getUrl(), System.currentTimeMillis());
             } else {
                 break;
             }
@@ -273,13 +259,6 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
             if (url.getStatusTime() == 0) {
                 throw new RuntimeException(String.format("UrlDBFunction (%d/%d) got URL with invalid status time: %s", _partition, _parallelism, url));
             }
-            
-            Long startTime = _inFlightUrls.remove(url.getUrl());
-            if (startTime == null) {
-                throw new RuntimeException(String.format("UrlDBFunction (%d/%d) got URL not in active state: %s", _partition, _parallelism, url));
-            }
-            
-            LOGGER.debug(String.format("%dms to process '%s'", System.currentTimeMillis() - startTime, url));
             
             int nowActive = _numInFlightUrls.decrementAndGet();
             LOGGER.debug(String.format("UrlDBFunction (%d/%d) receiving URL %s (%d active)", _partition,

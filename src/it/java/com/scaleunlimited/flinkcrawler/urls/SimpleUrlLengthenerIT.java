@@ -5,6 +5,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.scaleunlimited.flinkcrawler.fetcher.BaseHttpFetcherBuilder;
+import com.scaleunlimited.flinkcrawler.fetcher.FetchUtils;
 import com.scaleunlimited.flinkcrawler.fetcher.SimpleHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 
@@ -24,7 +25,7 @@ public class SimpleUrlLengthenerIT {
                             "flink-crawler@scaleunlimited.com",
                             "https://github.com/ScaleUnlimited/flink-crawler/wiki/Crawler-Policy");
         BaseHttpFetcherBuilder fetcherBuilder = 
-            new SimpleHttpFetcherBuilder(userAgent);
+            FetchUtils.makeRedirectFetcherBuilder(userAgent);
         _lengthener = new SimpleUrlLengthener(fetcherBuilder);
         _lengthener.open();
     }

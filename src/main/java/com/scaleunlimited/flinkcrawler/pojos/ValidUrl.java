@@ -104,17 +104,6 @@ public class ValidUrl extends BaseUrl {
 		return _pld;
 	}
 
-	// By default we partition by the hash of the pld, but this
-	// can be overridden (e.g. by CrawlStateUrl, for special URLs).
-	public Integer getPartitionKey() {
-	    String pld = getPld();
-	    if (pld == null) {
-	        throw new RuntimeException("No PLD for URL: " + this);
-	    }
-	    
-		return pld.hashCode();
-	}
-	
 	public int getPort() {
         checkUrl();
         
