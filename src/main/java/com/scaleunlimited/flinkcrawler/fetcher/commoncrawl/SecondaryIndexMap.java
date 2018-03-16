@@ -12,6 +12,8 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
+
 /**
  * Map from (reversed) URL to information about the primary index file (and offset/length of segment
  * in that file) where the URL would have to be found.
@@ -25,6 +27,11 @@ import org.slf4j.LoggerFactory;
 
 public class SecondaryIndexMap {
 	static final Logger LOGGER = LoggerFactory.getLogger(SecondaryIndexMap.class);
+
+	// We use negative versions here to avoid false positives with previously
+	// serialized versions of this map. This version also has to apply to the
+	// SecondaryIndex serialization format.
+    static private int SERIALIZED_VERSION = -1;
 
     private String[] _secondaryIndexUrls;
     private SecondaryIndex[] _secondaryIndex;
@@ -73,6 +80,7 @@ public class SecondaryIndexMap {
 	}
 	
 	public void write(DataOutput out) throws IOException {
+	    out.writeInt(SERIALIZED_VERSION);
 		out.writeInt(_secondaryIndexUrls.length);
 		for (String url : _secondaryIndexUrls) {
 			out.writeUTF(url);
@@ -84,6 +92,11 @@ public class SecondaryIndexMap {
 	}
 	
 	public void read(DataInput in) throws IOException {
+	    int version = in.readInt();
+	    if (version != SERIALIZED_VERSION) {
+	        throw new IOException(String.format("Invalid version, expected %d, got %d", SERIALIZED_VERSION, version));
+	    }
+	    
 		int numEntries = in.readInt();
 		_secondaryIndexUrls = new String[numEntries];
 		_secondaryIndex = new SecondaryIndex[numEntries];

@@ -20,7 +20,7 @@ public class CrawlToolTest {
 
     @Test
     public void testOptionsParsing() throws Throwable {
-        CrawlTool.CrawlToolOptions options = new CrawlTool.CrawlToolOptions();
+        CrawlToolOptions options = new CrawlToolOptions();
         try {
             options.validate();
         } catch (RuntimeException e) {

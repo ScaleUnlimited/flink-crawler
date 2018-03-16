@@ -27,9 +27,12 @@ public class NormalizeUrlsFunction extends BaseFlatMapFunction<RawUrl, RawUrl> {
 
 		String rawUrl = url.getUrl();
 		String normalizedUrl = _normalizer.normalize(rawUrl);
-
-		RawUrl output = new RawUrl(normalizedUrl, url.getScore());
-		collector.collect(output);
+		if (rawUrl.equals(normalizedUrl)) {
+		    collector.collect(url);
+		} else {
+		    RawUrl output = new RawUrl(normalizedUrl, url.getScore());
+		    collector.collect(output);
+		}
 	}
 
 }
