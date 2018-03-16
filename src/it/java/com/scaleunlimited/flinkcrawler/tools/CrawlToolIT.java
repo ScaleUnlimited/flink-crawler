@@ -5,8 +5,6 @@ import org.apache.flink.streaming.api.environment.LocalStreamEnvironmentWithAsyn
 import org.junit.Ignore;
 import org.junit.Test;
 
-import com.scaleunlimited.flinkcrawler.tools.CrawlTool.CrawlToolOptions;
-
 public class CrawlToolIT {
 
 	// TODO when the test gets terminated, we can re-enable this.

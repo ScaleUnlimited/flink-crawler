@@ -99,7 +99,11 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
             }
             
             FetchedResult result = fetch(realUrl, realUrl, payload, 0);
-        	LOGGER.debug(String.format("Fetched '%s' (%d)", url, result.getStatusCode()));
+            if (result.getStatusCode() == HttpStatus.SC_NOT_FOUND) {
+                LOGGER.debug(String.format("Didn't find '%s'", url));
+            } else {
+                LOGGER.debug(String.format("Fetched '%s' (%d)", url, result.getStatusCode()));
+            }
             return result;
         } catch (MalformedURLException e) {
             throw new UrlFetchException(url, e.getMessage());
@@ -257,13 +261,8 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
             }
             
 			if (followRedirect) {
-				newRedirectUrlAsStr = pageRecord.getHttpHeader("Location");
-				if (newRedirectUrlAsStr != null) {
-				    // TODO - need to handle path-only case (e.g. "/ignite/"), where we then build the
-				    // URL from the original hostname plus this path. Otherwise we get a MalformedUrlException
-				    // here due to no protocol. Specific case is https://blogs.apache.org/ignite, which
-				    // redirects to (effectively) https://blogs.apache.org/ignite/ via the "/ignite/" path.
-					URL newRedirectUrl = new URL(newRedirectUrlAsStr);
+			    URL newRedirectUrl = getRedirectUrl(originalUrl, pageRecord.getHttpHeader(Headers.LOCATION));
+				if (newRedirectUrl != null) {
 					return fetch(originalUrl, newRedirectUrl, payload, numRedirects + 1);
 				} else {
 					LOGGER.warn("Got redirect status but no page record HTTP header == Location");
@@ -307,7 +306,30 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 		}
 	}
 
-	private JsonObject findUrlInSegment(URL url, String targetKey, SecondaryIndex indexEntry) throws IOFetchException {
+	private URL getRedirectUrl(URL originalUrl, String locationFromHeader) {
+        if (locationFromHeader == null) {
+            return null;
+        }
+        
+        try {
+            return new URL(locationFromHeader);
+        } catch (MalformedURLException e) {
+            // Might be a path-only location (e.g. "/ignite/"). This is from
+            // https://blogs.apache.org/ignite, which redirects to (effectively) 
+            // https://blogs.apache.org/ignite/ via the "/ignite/" path.
+        }
+        
+        try {
+            return new URL(originalUrl.getProtocol(),
+                    originalUrl.getHost(),
+                    originalUrl.getPort(),
+                    locationFromHeader);
+        } catch (MalformedURLException e) {
+            return null;
+        }
+    }
+
+    private JsonObject findUrlInSegment(URL url, String targetKey, SecondaryIndex indexEntry) throws IOFetchException {
 		byte[] segmentData = getSegmentData(url, indexEntry);
 		JsonObject result = null;
 		String urlAsStr = url.toString();

@@ -130,8 +130,9 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
     @Override
     public void close() throws Exception {
         
+        long curTime = System.currentTimeMillis();
         for (String url : _inFlightUrls.keySet()) {
-            LOGGER.debug(String.format("%d\t%s", _inFlightUrls.get(url), url));
+            LOGGER.debug(String.format("%d\t%s", curTime - _inFlightUrls.get(url), url));
         }
         
         super.close();
