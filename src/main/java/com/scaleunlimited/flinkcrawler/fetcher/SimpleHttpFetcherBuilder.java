@@ -10,18 +10,12 @@ public class SimpleHttpFetcherBuilder extends BaseHttpFetcherBuilder {
 	public static final int DEFAULT_MAX_SIMULTANEOUS_REQUESTS = 1;
 
 	public SimpleHttpFetcherBuilder(UserAgent userAgent) {
-		super(DEFAULT_MAX_SIMULTANEOUS_REQUESTS, userAgent);
+		this(DEFAULT_MAX_SIMULTANEOUS_REQUESTS, userAgent);
 	}
 
 	public SimpleHttpFetcherBuilder(int maxSimultaneousRequests, UserAgent userAgent) {
 		super(maxSimultaneousRequests, userAgent);
 	}
-
-	public SimpleHttpFetcherBuilder(int maxThreads, int fetchDurationTimeoutInSeconds, UserAgent userAgent) {
-		super(maxThreads, userAgent);
-		setFetchDurationTimeoutInSeconds(fetchDurationTimeoutInSeconds);
-	}
-
 
 	@Override
 	public BaseHttpFetcher build() {

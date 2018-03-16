@@ -38,10 +38,6 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
         _userAgent = userAgent;
         _fetchDurationTimeoutInSeconds = DEFAULT_FETCH_TIMEOUT;
     }
-    
-	public int getMaxSimultaneousRequests() {
-		return _maxSimultaneousRequests;
-	}
 
 	// From BaseFetcher:
     
@@ -87,14 +83,19 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
         return this;
     }
     
+    public BaseHttpFetcherBuilder setFetchDurationTimeoutInSeconds(int fetchDurationTimeoutInSeconds) {
+        _fetchDurationTimeoutInSeconds = fetchDurationTimeoutInSeconds;
+        return this;
+    }
+    
     /**
      * @return a new BaseHttpFetcher instance configured to match how this
      * builder was configured
      */
     public abstract BaseHttpFetcher build() throws Exception;
     
-    public void setFetchDurationTimeoutInSeconds(int fetchDurationTimeoutInSeconds) {
-        _fetchDurationTimeoutInSeconds = fetchDurationTimeoutInSeconds;
+    public int getMaxSimultaneousRequests() {
+        return _maxSimultaneousRequests;
     }
     
     public int getFetchDurationTimeoutInSeconds() {

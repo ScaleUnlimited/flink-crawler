@@ -335,16 +335,17 @@ public class CrawlTool {
         CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
 		    .setUserAgent(userAgent)
 		    .setUrlLengthener(urlLengthener)
-                .setUrlSource(new SeedUrlSource(options.getCrawlDbParallelism(),
-                        options.getSeedUrlsFilename(), RawUrl.DEFAULT_SCORE))
-                .setRobotsFetcherBuilder(robotsFetcherBuilder)
-                .setUrlFilter(urlValidator)
-                .setSiteMapFetcherBuilder(siteMapFetcherBuilder)
-                .setPageFetcherBuilder(pageFetcherBuilder)
-                .setForceCrawlDelay(options.getForceCrawlDelay())
-                .setDefaultCrawlDelay(options.getDefaultCrawlDelay())
-                .setParallelism(options.getParallelism())
-                .setMaxOutlinksPerPage(options.getMaxOutlinksPerPage());
+            .setUrlSource(new SeedUrlSource(options.getCrawlDbParallelism(),
+                                            options.getSeedUrlsFilename(), 
+                                            RawUrl.DEFAULT_SCORE))
+            .setRobotsFetcherBuilder(robotsFetcherBuilder)
+            .setUrlFilter(urlValidator)
+            .setSiteMapFetcherBuilder(siteMapFetcherBuilder)
+            .setPageFetcherBuilder(pageFetcherBuilder)
+            .setForceCrawlDelay(options.getForceCrawlDelay())
+            .setDefaultCrawlDelay(options.getDefaultCrawlDelay())
+            .setParallelism(options.getParallelism())
+            .setMaxOutlinksPerPage(options.getMaxOutlinksPerPage());
 		
 		if (options.getOutputFile() != null) {
 			builder.setContentTextFile(options.getOutputFile());
@@ -353,18 +354,25 @@ public class CrawlTool {
 		builder.build().execute();
 	}
 
+    /**
+     * @param options from command line
+     * @param userAgent from command line (or fake one for Common Crawl mode)
+     * @return URL lengthener configured to use as many connections/host as
+     * there are fetcher tasks (or a fake lengthener for Common Crawl mode) 
+     */
     private static SimpleUrlLengthener getUrlLengthener(CrawlToolOptions options, UserAgent userAgent) {
         if (options.isCommonCrawl()) {
             return new CommonCrawlUrlLengthener(userAgent);
         }
-        return new SimpleUrlLengthener(userAgent);
+        int maxConnectionsPerHost = options.getFetchersPerTask();
+        return new SimpleUrlLengthener(userAgent, maxConnectionsPerHost);
     }
     
     @SuppressWarnings("serial")
     private static class CommonCrawlUrlLengthener extends SimpleUrlLengthener {
 
         public CommonCrawlUrlLengthener(UserAgent userAgent) {
-            super(userAgent);
+            super(userAgent, 1);
         }
 
         @Override

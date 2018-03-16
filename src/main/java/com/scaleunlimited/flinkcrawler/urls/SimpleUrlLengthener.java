@@ -35,8 +35,10 @@ public class SimpleUrlLengthener extends BaseUrlLengthener {
     private transient BaseHttpFetcher _fetcher;
     private transient Set<String> _urlShorteners;
     
-    public SimpleUrlLengthener(UserAgent userAgent) {
-        this(FetchUtils.makeRedirectFetcherBuilder(userAgent));
+    public SimpleUrlLengthener( UserAgent userAgent, 
+                                int maxConnectionsPerHost) {
+        this(FetchUtils.makeRedirectFetcherBuilder(maxConnectionsPerHost, userAgent)
+                .setMaxConnectionsPerHost(maxConnectionsPerHost));
     }
 
     public SimpleUrlLengthener(BaseHttpFetcherBuilder fetcherBuilder) {
