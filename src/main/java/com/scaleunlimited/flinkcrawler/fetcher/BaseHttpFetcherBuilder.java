@@ -130,7 +130,8 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
 		fetcher.setMaxRedirects(_maxRedirects);
 		fetcher.setRedirectMode(_redirectMode);
 		fetcher.setFetchDurationTimeoutInSeconds(_fetchDurationTimeoutInSeconds);
-    	    return fetcher;
+		
+    	return fetcher;
     }
 
 }

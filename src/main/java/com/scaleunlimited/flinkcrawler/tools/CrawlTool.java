@@ -1,8 +1,6 @@
 package com.scaleunlimited.flinkcrawler.tools;
 
 import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -23,11 +21,11 @@ import com.scaleunlimited.flinkcrawler.fetcher.SimpleHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.fetcher.commoncrawl.CommonCrawlFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
-import com.scaleunlimited.flinkcrawler.tools.CrawlTopology.CrawlTopologyBuilder;
+import com.scaleunlimited.flinkcrawler.topology.CrawlTopologyBuilder;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlLengthener;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlValidator;
+import com.scaleunlimited.flinkcrawler.urls.SingleDomainUrlValidator;
 
-import crawlercommons.domains.PaidLevelDomain;
 import crawlercommons.fetcher.BaseFetchException;
 import crawlercommons.fetcher.FetchedResult;
 import crawlercommons.fetcher.Payload;
@@ -258,63 +256,6 @@ public class CrawlTool {
         }
 	}
 	
-	@SuppressWarnings("serial")
-	static class SingleDomainUrlValidator extends SimpleUrlValidator {
-	    private String _singleDomain;
-	    
-		public SingleDomainUrlValidator(String singleDomain) {
-			super();
-			_singleDomain = singleDomain;
-		}
-
-		@Override
-		public boolean isValid(String urlString) {
-			if (!(super.isValid(urlString))) {
-				return false;
-			}
-			return isUrlWithinDomain(urlString, _singleDomain);
-		}
-	}
-
-    /**
-     * Check whether the domain of the URL is the given domain or a subdomain
-     * of the given domain.
-     * 
-     * @param url
-     * @param domain
-     * @return true iff url is "within" domain
-     */
-    public static boolean isUrlWithinDomain(String url, String domain) {
-        try {
-            for (   String urlDomain = new URL(url).getHost();
-                    urlDomain != null;
-                    urlDomain = getSuperDomain(urlDomain)) {
-                if (urlDomain.equalsIgnoreCase(domain)) {
-                    return true;
-                }
-            }
-        } catch (MalformedURLException e) {
-            return false;
-        }
-        
-        return false;
-    }
-    
-    /**
-     * Extract the domain immediately containing this subdomain.
-     * 
-     * @param hostname 
-     * @return immediate super domain of hostname, or null if hostname
-     * is already a paid-level domain (i.e., not really a subdomain).
-     */
-    public static String getSuperDomain(String hostname) {
-        String pld = PaidLevelDomain.getPLD(hostname);
-        if (hostname.equalsIgnoreCase(pld)) {
-            return null;
-        }
-        return hostname.substring(hostname.indexOf(".")+1);
-    }
-    
     private static void printUsageAndExit(CmdLineParser parser) {
         parser.printUsage(System.err);
         System.exit(-1);

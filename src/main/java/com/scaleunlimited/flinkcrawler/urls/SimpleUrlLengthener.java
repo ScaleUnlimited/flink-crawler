@@ -2,6 +2,7 @@ package com.scaleunlimited.flinkcrawler.urls;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -19,9 +20,9 @@ import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 
 import crawlercommons.fetcher.BaseFetchException;
 import crawlercommons.fetcher.FetchedResult;
-import crawlercommons.fetcher.RedirectFetchException;
 import crawlercommons.fetcher.http.BaseHttpFetcher;
 import crawlercommons.fetcher.http.UserAgent;
+import crawlercommons.util.Headers;
 
 @SuppressWarnings("serial")
 public class SimpleUrlLengthener extends BaseUrlLengthener {
@@ -67,31 +68,25 @@ public class SimpleUrlLengthener extends BaseUrlLengthener {
         }
         
         String redirectedUrl = urlString;
+        LOGGER.debug(String.format("Checking redirection of '%s'", urlString));
 
         try {
             FetchedResult fr = _fetcher.get(urlString);
             int statusCode = fr.getStatusCode();
             if (statusCode == HttpStatus.SC_OK) {
                 // This will happen if we're using a fetcher configured to
-                // follow redirects (rather than one configured to throw a
-                // RedirectFetchException with the details).  This isn't very
-                // nice, since we're fetching content from the target site
-                // without checking its robot rules, but the caller knows best.
+                // follow redirects (rather than one configured to immediately
+                // return a 301).  This isn't very nice, since we're fetching
+                // content from the target site without checking its robot rules, 
+                // but the caller knows best.
                 redirectedUrl = fr.getFetchedUrl();
                 LOGGER.debug(String.format("Normal redirection of %s to %s", urlString, redirectedUrl));
+            } else if (statusCode == HttpStatus.SC_MOVED_PERMANENTLY) {
+                redirectedUrl = extractRedirectUrl(fr, urlString);
+                LOGGER.debug(String.format("Redirecting %s to %s", urlString, redirectedUrl));
             } else {
-                LOGGER.trace("Status code " + statusCode + " processing redirect for " + urlString);
+                LOGGER.debug(String.format("Status code %d processing redirect for '%s'", statusCode, urlString));
             }
-        } catch (RedirectFetchException e) {
-            // We'll get this exception if our fetcher has been configured with
-            // zero redirects to avoid fetching any content from the target URL
-            // (as it should be).  (We'll also get this if we're using a fetcher
-            // configured to follow redirects, and the target of the link
-            // shortening site's redirection is itself redirected).
-            // In this case, we've captured the final URL in the exception,
-            // so use that for downstream fetching.
-            redirectedUrl = e.getRedirectedUrl();
-            LOGGER.trace(String.format("Redirecting %s to %s", urlString, redirectedUrl));
         } catch (BaseFetchException e) {
             // The site doesn't seem to like the way we're forcing it to redirect,
             // so just emit the same URL for downstream fetching.
@@ -101,7 +96,23 @@ public class SimpleUrlLengthener extends BaseUrlLengthener {
         return new RawUrl(redirectedUrl, url.getScore());
 	}
 
-	@Override
+	private String extractRedirectUrl(FetchedResult fr, String originalUrlAsString) {
+        String redirectUrlAsString = fr.getHeaders().get(Headers.LOCATION);
+        if (redirectUrlAsString == null) {
+            LOGGER.warn("No redirect location available for: " + originalUrlAsString);
+            return originalUrlAsString;
+        }
+        
+        try {
+            new URL(redirectUrlAsString);
+            return redirectUrlAsString;
+        } catch (MalformedURLException e) {
+            LOGGER.warn("Malformed location for redirect: " + redirectUrlAsString);
+            return originalUrlAsString;
+        }
+    }
+
+    @Override
 	public int getTimeoutInSeconds() {
 	    if (_fetcher == null) {
 	        return _fetcherBuilder.getFetchDurationTimeoutInSeconds();

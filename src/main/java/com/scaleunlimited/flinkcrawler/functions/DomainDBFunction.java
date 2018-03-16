@@ -5,12 +5,15 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.apache.flink.api.common.functions.RuntimeContext;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.metrics.Gauge;
 import org.apache.flink.streaming.api.checkpoint.ListCheckpointed;
 import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.scaleunlimited.flinkcrawler.metrics.CrawlerMetrics;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.UrlType;
 
@@ -46,11 +49,21 @@ public class DomainDBFunction extends BaseFlatMapFunction<CrawlStateUrl, CrawlSt
         _domains = new ArrayList<>();
         _urls = new ArrayList<>();
         _domainIndex = 0;
+        
+        RuntimeContext context = getRuntimeContext();
+
+        context.getMetricGroup().gauge(CrawlerMetrics.GAUGE_UNIQUE_PLDS.toString(), new Gauge<Integer>() {
+            @Override
+            public Integer getValue() {
+                return _domains.size();
+            }
+        });
+
     }
 
     @Override
     public void flatMap(CrawlStateUrl url, Collector<CrawlStateUrl> collector) throws Exception {
-        // Emit the url we were passed.
+        // Emit the URL we were passed.
         collector.collect(url);
 
         String domain = url.getPld();

@@ -176,6 +176,10 @@ public class FlinkUtils {
      * @return Integer suitable for use in a record as the key.
      */
     public static String makeKeyForOperatorIndex(String format, int maxParallelism, int parallelism, int operatorIndex) {
+        if (!format.contains("%d")) {
+            throw new IllegalArgumentException("Format string must contain %d");
+        }
+        
         if (maxParallelism == ExecutionJobVertex.VALUE_NOT_SET) {
             maxParallelism = KeyGroupRangeAssignment.computeDefaultMaxParallelism(parallelism);
         }
