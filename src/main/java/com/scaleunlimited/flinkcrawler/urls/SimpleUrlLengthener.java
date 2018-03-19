@@ -4,7 +4,9 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -30,10 +32,15 @@ public class SimpleUrlLengthener extends BaseUrlLengthener {
 
     private static final Pattern HOSTNAME_PATTERN = Pattern.compile("^https?://([^/:?]{3,})");
 
+    private static final int LRU_CACHE_CAPACITY = 10_000;
+
+    private static final float LRU_CACHE_LOAD_FACTOR = 0.75f;
+
     private BaseHttpFetcherBuilder _fetcherBuilder;
 
     private transient BaseHttpFetcher _fetcher;
     private transient Set<String> _urlShorteners;
+    private transient Map<RawUrl, RawUrl> _lengthenedUrlMap;
 
     public SimpleUrlLengthener(UserAgent userAgent, int maxConnectionsPerHost) {
         this(FetchUtils.makeRedirectFetcherBuilder(maxConnectionsPerHost, userAgent)
@@ -49,14 +56,22 @@ public class SimpleUrlLengthener extends BaseUrlLengthener {
     public void open() throws Exception {
         _fetcher = _fetcherBuilder.build();
         _urlShorteners = loadUrlShorteners();
+        _lengthenedUrlMap = new LinkedHashMap<RawUrl, RawUrl>(  (LRU_CACHE_CAPACITY * 4/3),
+                                                                LRU_CACHE_LOAD_FACTOR, 
+                                                                true); // LRU
     }
 
     @Override
     public RawUrl lengthen(RawUrl url) {
+        
+        if (_lengthenedUrlMap.containsKey(url)) {
+            return _lengthenedUrlMap.get(url);
+        }
+
         // If the domain is a link shortener, lengthen it.
 
         String urlString = url.getUrl();
-
+        
         Matcher m = HOSTNAME_PATTERN.matcher(urlString);
         if (!m.find()) {
             return url;
@@ -97,7 +112,9 @@ public class SimpleUrlLengthener extends BaseUrlLengthener {
                     e);
         }
 
-        return new RawUrl(redirectedUrl, url.getScore());
+        RawUrl result = new RawUrl(redirectedUrl, url.getScore());
+        _lengthenedUrlMap.put(url, result);
+        return result;
     }
 
     private String extractRedirectUrl(FetchedResult fr, String originalUrlAsString) {
