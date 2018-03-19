@@ -20,60 +20,53 @@ package com.scaleunlimited.flinkcrawler.pojos;
 // and permanent failures (skip forever)?
 
 public enum FetchStatus {
-    
+
     // Not fetched due to pre-fetch operations
-    SKIPPED_BLOCKED,            // Blocked by robots.txt
-    SKIPPED_INVALID_URL,        // URL invalid
-    SKIPPED_DEFERRED,           // Deferred because robots.txt couldn't be processed.
-    SKIPPED_BY_SCORE,           // Skipped because score wasn't high enough
-    SKIPPED_FILTERED,           // Filtered out during processing
-    SKIPPED_PER_SERVER_LIMIT,   // Too many URLs per server
-    SKIPPED_CRAWLDELAY,			// Skipped because URL showed up too quickly after last one we processed
-    
+    SKIPPED_BLOCKED, // Blocked by robots.txt
+    SKIPPED_INVALID_URL, // URL invalid
+    SKIPPED_DEFERRED, // Deferred because robots.txt couldn't be processed.
+    SKIPPED_BY_SCORE, // Skipped because score wasn't high enough
+    SKIPPED_FILTERED, // Filtered out during processing
+    SKIPPED_PER_SERVER_LIMIT, // Too many URLs per server
+    SKIPPED_CRAWLDELAY, // Skipped because URL showed up too quickly after last one we processed
+
     // Not fetched due to mid-fetch issues
-    SKIPPED_INTERRUPTED,        // Fetch process was interrupted.
-    SKIPPED_INEFFICIENT,        // Skipped because we were blocked on domain (running with skip-blocked fetch policy)
-    ABORTED_SLOW_RESPONSE,      // Response rate < min set in fetch policy
-    ABORTED_FETCH_SETTINGS,     // Mime type != policy's valid types, content length exceeds policy's max length, etc.
-    
+    SKIPPED_INTERRUPTED, // Fetch process was interrupted.
+    SKIPPED_INEFFICIENT, // Skipped because we were blocked on domain (running with skip-blocked fetch policy)
+    ABORTED_SLOW_RESPONSE, // Response rate < min set in fetch policy
+    ABORTED_FETCH_SETTINGS, // Mime type != policy's valid types, content length exceeds policy's max length, etc.
+
     // Not fetched during fetch operation, due to HTTP status code error
-    HTTP_REDIRECTION_ERROR,
-    HTTP_TOO_MANY_REDIRECTS,
-    HTTP_MOVED_PERMANENTLY,
-    
-    HTTP_CLIENT_ERROR,
-    HTTP_UNAUTHORIZED,
-    HTTP_FORBIDDEN,
-    HTTP_NOT_FOUND,
-    HTTP_GONE,
-        
+    HTTP_REDIRECTION_ERROR, HTTP_TOO_MANY_REDIRECTS, HTTP_MOVED_PERMANENTLY,
+
+    HTTP_CLIENT_ERROR, HTTP_UNAUTHORIZED, HTTP_FORBIDDEN, HTTP_NOT_FOUND, HTTP_GONE,
+
     HTTP_SERVER_ERROR,
 
     // Not fetched during fetch operation, due to error
-    ERROR_INVALID_URL,
-    ERROR_IOEXCEPTION,
-    
-    UNFETCHED(0),               	// Never processed.
-    FETCHING(10),					// Being fetched
-    FETCHED(25);    				// Successfully fetched
+    ERROR_INVALID_URL, ERROR_IOEXCEPTION,
+
+    UNFETCHED(0), // Never processed.
+    FETCHING(10), // Being fetched
+    FETCHED(25); // Successfully fetched
 
     // Priority is used when merging two entries for the same URL. We'll use the
     // timestamp to pick the more recent update, unless both times are the same,
     // in which case we use priority to break the tie.
     private static final int DEFAULT_PRIORITY = 50;
-    
+
     private int _priority;
-    
+
     private FetchStatus() {
-    	this(DEFAULT_PRIORITY);
+        this(DEFAULT_PRIORITY);
     }
-    
+
     private FetchStatus(int priority) {
-    	_priority = priority;
+        _priority = priority;
     }
-    
+
     public int getPriority() {
-    	return _priority;
+        return _priority;
     }
-    
+
 }

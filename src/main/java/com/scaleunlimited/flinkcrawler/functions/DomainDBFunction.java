@@ -49,15 +49,16 @@ public class DomainDBFunction extends BaseFlatMapFunction<CrawlStateUrl, CrawlSt
         _domains = new ArrayList<>();
         _urls = new ArrayList<>();
         _domainIndex = 0;
-        
+
         RuntimeContext context = getRuntimeContext();
 
-        context.getMetricGroup().gauge(CrawlerMetrics.GAUGE_UNIQUE_PLDS.toString(), new Gauge<Integer>() {
-            @Override
-            public Integer getValue() {
-                return _domains.size();
-            }
-        });
+        context.getMetricGroup().gauge(CrawlerMetrics.GAUGE_UNIQUE_PLDS.toString(),
+                new Gauge<Integer>() {
+                    @Override
+                    public Integer getValue() {
+                        return _domains.size();
+                    }
+                });
 
     }
 
@@ -123,16 +124,16 @@ public class DomainDBFunction extends BaseFlatMapFunction<CrawlStateUrl, CrawlSt
 
     @Override
     public List<String> snapshotState(long checkpointId, long timestamp) throws Exception {
-        LOGGER.debug(String.format("Checkpointing DomainDBFunction (id %d at %d)",
-                checkpointId, timestamp));
+        LOGGER.debug(String.format("Checkpointing DomainDBFunction (id %d at %d)", checkpointId,
+                timestamp));
 
         return _domains;
     }
 
     @Override
     public void restoreState(List<String> state) throws Exception {
-        LOGGER.debug(String.format("Restoring DomainDBFunction state with %d entries",
-                state.size()));
+        LOGGER.debug(
+                String.format("Restoring DomainDBFunction state with %d entries", state.size()));
 
         if (_domains == null) {
             LOGGER.warn("Restoring DomainDBFunction state but _domains is null!");
@@ -141,7 +142,7 @@ public class DomainDBFunction extends BaseFlatMapFunction<CrawlStateUrl, CrawlSt
             _domains.clear();
             _domains.addAll(state);
         }
-        
+
         Collections.sort(_domains);
         _domainIndex = 0;
 

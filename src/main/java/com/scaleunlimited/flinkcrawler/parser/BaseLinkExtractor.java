@@ -14,18 +14,18 @@ import com.scaleunlimited.flinkcrawler.config.ParserPolicy;
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 
-
 @SuppressWarnings("serial")
 public abstract class BaseLinkExtractor extends DefaultHandler implements Serializable {
     static final Logger LOGGER = LoggerFactory.getLogger(BaseLinkExtractor.class);
 
-    public static final Set<String> DEFAULT_LINK_TAGS =
-        new HashSet<String>() {{
+    public static final Set<String> DEFAULT_LINK_TAGS = new HashSet<String>() {
+        {
             add("a");
-        }};
-    
-    public static final Set<String> ALL_LINK_TAGS =
-        new HashSet<String>() {{
+        }
+    };
+
+    public static final Set<String> ALL_LINK_TAGS = new HashSet<String>() {
+        {
             add("a");
             add("img");
             add("frame");
@@ -40,22 +40,25 @@ public abstract class BaseLinkExtractor extends DefaultHandler implements Serial
             add("ins");
             add("del");
             add("embed");
-        }};
-        
-    public static final Set<String> DEFAULT_LINK_ATTRIBUTE_TYPES =
-        new HashSet<String>() {{
+        }
+    };
+
+    public static final Set<String> DEFAULT_LINK_ATTRIBUTE_TYPES = new HashSet<String>() {
+        {
             add("href");
-        }};
-            
-    public static final Set<String> ALL_LINK_ATTRIBUTE_TYPES =
-        new HashSet<String>() {{
+        }
+    };
+
+    public static final Set<String> ALL_LINK_ATTRIBUTE_TYPES = new HashSet<String>() {
+        {
             add("href");
             add("src");
             add("data");
             add("cite");
-        }};
+        }
+    };
 
-    protected String _inAnchorTag;        
+    protected String _inAnchorTag;
     protected String _curUrl;
     protected String _curRelAttributes;
     protected StringBuilder _curAnchor = new StringBuilder();
@@ -63,12 +66,11 @@ public abstract class BaseLinkExtractor extends DefaultHandler implements Serial
     protected Set<String> _linkAttributeTypes = DEFAULT_LINK_ATTRIBUTE_TYPES;
 
     /**
-     * @param linkTags to collect {@link ExtractedUrl}s from
-     * (defaults to {@link BaseLinkExtractor#DEFAULT_LINK_TAGS})
-     * <BR><BR><B>Note:</B> There is no need to construct your own
-     * {@link SimpleLinkExtractor} simply to control the set of link tags
-     * it processes. Instead, provide this set of link tags to
-     * {@link ParserPolicy}.
+     * @param linkTags
+     *            to collect {@link ExtractedUrl}s from (defaults to {@link BaseLinkExtractor#DEFAULT_LINK_TAGS}) <BR>
+     *            <BR>
+     *            <B>Note:</B> There is no need to construct your own {@link SimpleLinkExtractor} simply to control the
+     *            set of link tags it processes. Instead, provide this set of link tags to {@link ParserPolicy}.
      */
     public void setLinkTags(Set<String> linkTags) {
         _linkTags = linkTags;
@@ -77,14 +79,14 @@ public abstract class BaseLinkExtractor extends DefaultHandler implements Serial
     public Set<String> getLinkTags() {
         return _linkTags;
     }
-    
+
     /**
-     * @param linkAttributeTypes to collect {@link ExtractedUrl}s from
-     * (defaults to {@link BaseLinkExtractor#DEFAULT_LINK_ATTRIBUTE_TYPES})
-     * <BR><BR><B>Note:</B> There is no need to construct your own
-     * {@link SimpleLinkExtractor} simply to control the set of link attributes
-     * it processes. Instead, provide this set of attributes to
-     * {@link ParserPolicy}.
+     * @param linkAttributeTypes
+     *            to collect {@link ExtractedUrl}s from (defaults to
+     *            {@link BaseLinkExtractor#DEFAULT_LINK_ATTRIBUTE_TYPES}) <BR>
+     *            <BR>
+     *            <B>Note:</B> There is no need to construct your own {@link SimpleLinkExtractor} simply to control the
+     *            set of link attributes it processes. Instead, provide this set of attributes to {@link ParserPolicy}.
      */
     public void setLinkAttributeTypes(Set<String> linkAttributeTypes) {
         _linkAttributeTypes = linkAttributeTypes;
@@ -93,21 +95,23 @@ public abstract class BaseLinkExtractor extends DefaultHandler implements Serial
     public Set<String> getLinkAttributeTypes() {
         return _linkAttributeTypes;
     }
-    
+
     public void reset() {
         _inAnchorTag = null;
     }
-    
-    public void addLink(ExtractedUrl link) {};
-    
+
+    public void addLink(ExtractedUrl link) {
+    };
+
     public abstract ExtractedUrl[] getLinks();
-    
+
     @Override
-    public void startElement(String uri, String localName, String qName, Attributes attributes) throws SAXException {
+    public void startElement(String uri, String localName, String qName, Attributes attributes)
+            throws SAXException {
         super.startElement(uri, localName, qName, attributes);
 
         String tag = localName.toLowerCase();
-        
+
         if ((_inAnchorTag == null) && _linkTags.contains(tag)) {
             for (String linkAttributeType : _linkAttributeTypes) {
                 String attrValue = attributes.getValue(linkAttributeType);
@@ -124,7 +128,7 @@ public abstract class BaseLinkExtractor extends DefaultHandler implements Serial
     @Override
     public void characters(char[] ch, int start, int length) throws SAXException {
         super.characters(ch, start, length);
-        
+
         if (_inAnchorTag != null) {
             _curAnchor.append(ch, start, length);
         }
@@ -135,8 +139,9 @@ public abstract class BaseLinkExtractor extends DefaultHandler implements Serial
         super.endElement(uri, localName, name);
 
         if (localName.equalsIgnoreCase(_inAnchorTag)) {
-        	addLink(new ExtractedUrl(_curUrl, _curAnchor.toString(), _curRelAttributes, RawUrl.DEFAULT_SCORE));
-        	_inAnchorTag = null;
+            addLink(new ExtractedUrl(_curUrl, _curAnchor.toString(), _curRelAttributes,
+                    RawUrl.DEFAULT_SCORE));
+            _inAnchorTag = null;
         }
     }
 

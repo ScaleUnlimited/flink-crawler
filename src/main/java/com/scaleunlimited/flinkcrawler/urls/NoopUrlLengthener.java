@@ -3,8 +3,8 @@ package com.scaleunlimited.flinkcrawler.urls;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 
 /**
- * Implementation of BaseUrlLengthener that does nothing. This lets
- * us easily skip lengthening without modifying the CrawlTopology.
+ * Implementation of BaseUrlLengthener that does nothing. This lets us easily skip lengthening without modifying the
+ * CrawlTopology.
  *
  */
 @SuppressWarnings("serial")

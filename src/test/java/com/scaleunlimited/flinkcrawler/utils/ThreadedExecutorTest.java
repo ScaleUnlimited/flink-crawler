@@ -36,7 +36,7 @@ public class ThreadedExecutorTest {
                 Runnable cmd = new Runnable() {
                     public void run() {
                         try {
-                            Thread.sleep(timeoutInMS/4);
+                            Thread.sleep(timeoutInMS / 4);
                         } catch (InterruptedException e) {
                             // Terminate the run
                         }
@@ -49,12 +49,12 @@ public class ThreadedExecutorTest {
             }
         }
     }
-    
+
     @Test
     public void testNoRejectionMultiThreaded() {
         final long timeoutInMS = 10;
         final int numThreads = 2;
-        
+
         ThreadedExecutor executor = new ThreadedExecutor(numThreads, timeoutInMS);
         for (int i = 0; i < (numThreads + 1); i++) {
             try {
@@ -70,7 +70,7 @@ public class ThreadedExecutorTest {
                         }
                     }
                 };
-                
+
                 // The key is the <numThreads + 1> request. This should block
                 // until one of the threads has completed.
                 executor.execute(cmd);
@@ -79,13 +79,13 @@ public class ThreadedExecutorTest {
             }
         }
     }
-    
+
     @Test
     public void testRejection() {
         final long timeoutInMS = 4;
-        
+
         ThreadedExecutor executor = new ThreadedExecutor(1, timeoutInMS);
-        
+
         try {
             Runnable cmd = new Runnable() {
                 public void run() {
@@ -96,18 +96,19 @@ public class ThreadedExecutorTest {
                     }
                 }
             };
-            
+
             // This first call should work.
             executor.execute(cmd);
         } catch (RejectedExecutionException e) {
             Assert.fail("Execution was rejected");
         }
-        
+
         try {
             Runnable cmd = new Runnable() {
-                public void run() { }
+                public void run() {
+                }
             };
-            
+
             // This call should fail, since the previous Runnable isn't done yet.
             executor.execute(cmd);
             Assert.fail("Should have failed");
@@ -115,7 +116,7 @@ public class ThreadedExecutorTest {
             // Valid
         }
     }
-    
+
     @Test
     public void testNormalTermination() {
         final int timeoutInMS = 100;
@@ -126,7 +127,7 @@ public class ThreadedExecutorTest {
             Runnable cmd = new Runnable() {
                 public void run() {
                     try {
-                        Thread.sleep(timeoutInMS/2);
+                        Thread.sleep(timeoutInMS / 2);
                     } catch (InterruptedException e) {
                         // Terminate the run
                     }
@@ -134,7 +135,7 @@ public class ThreadedExecutorTest {
             };
 
             executor.execute(cmd);
-            
+
             Assert.assertTrue(executor.terminate(timeoutInMS, TimeUnit.MILLISECONDS));
         } catch (RejectedExecutionException e) {
             Assert.fail("Execution was rejected");
@@ -161,7 +162,7 @@ public class ThreadedExecutorTest {
             };
 
             executor.execute(cmd);
-            
+
             Assert.assertFalse(executor.terminate(timeoutInMS, TimeUnit.MILLISECONDS));
         } catch (RejectedExecutionException e) {
             Assert.fail("Execution was rejected");

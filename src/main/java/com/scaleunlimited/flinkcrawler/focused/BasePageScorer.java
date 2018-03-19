@@ -8,10 +8,11 @@ import com.scaleunlimited.flinkcrawler.parser.ParserResult;
 @SuppressWarnings("serial")
 public abstract class BasePageScorer implements Serializable {
 
-	public BasePageScorer() {
-	}
+    public BasePageScorer() {
+    }
 
     public abstract void open(CrawlerAccumulator crawlerAccumulator) throws Exception;
+
     public abstract void close() throws Exception;
 
     public abstract float score(ParserResult parse);

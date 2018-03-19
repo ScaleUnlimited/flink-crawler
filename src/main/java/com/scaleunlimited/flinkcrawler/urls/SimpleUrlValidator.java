@@ -25,31 +25,31 @@ public class SimpleUrlValidator extends BaseUrlValidator {
     private static final Pattern HTTP_PATTERN = Pattern.compile("^(http|https):");
 
     private Pattern _invalidSuffixes;
-    
+
     public SimpleUrlValidator() {
-    	super();
-    	
-    	_invalidSuffixes = null;
+        super();
+
+        _invalidSuffixes = null;
     }
-    
-    public SimpleUrlValidator(String...suffixes) {
-    	super();
-    	
-    	StringBuilder patternStr = new StringBuilder(".(");
-    	boolean firstSuffix = true;
-    	for (String suffix : suffixes) {
-    		if (firstSuffix) {
-    			firstSuffix = false;
-    		} else {
-    			patternStr.append("|");
-    		}
-    		patternStr.append(suffix);
-    	}
-    	
-    	patternStr.append(")$");
-    	_invalidSuffixes = Pattern.compile(patternStr.toString());
-	}
-    
+
+    public SimpleUrlValidator(String... suffixes) {
+        super();
+
+        StringBuilder patternStr = new StringBuilder(".(");
+        boolean firstSuffix = true;
+        for (String suffix : suffixes) {
+            if (firstSuffix) {
+                firstSuffix = false;
+            } else {
+                patternStr.append("|");
+            }
+            patternStr.append(suffix);
+        }
+
+        patternStr.append(")$");
+        _invalidSuffixes = Pattern.compile(patternStr.toString());
+    }
+
     @Override
     public boolean isValid(String urlString) {
         if (!HTTP_PATTERN.matcher(urlString).find()) {
@@ -62,17 +62,17 @@ public class SimpleUrlValidator extends BaseUrlValidator {
             if ((hostname == null) || (hostname.length() == 0)) {
                 return false;
             }
-            
+
             URI uri = new URI(urlString);
             hostname = uri.getHost();
             if ((hostname == null) || (hostname.length() == 0)) {
                 return false;
             }
-            
+
             if (_invalidSuffixes == null) {
-            	return true;
+                return true;
             } else {
-            	return !_invalidSuffixes.matcher(urlString).find();
+                return !_invalidSuffixes.matcher(urlString).find();
             }
         } catch (Exception e) {
             return false;

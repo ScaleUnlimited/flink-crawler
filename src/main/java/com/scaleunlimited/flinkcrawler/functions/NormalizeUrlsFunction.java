@@ -11,28 +11,28 @@ public class NormalizeUrlsFunction extends BaseFlatMapFunction<RawUrl, RawUrl> {
 
     private final BaseUrlNormalizer _normalizer;
 
-	public NormalizeUrlsFunction() {
+    public NormalizeUrlsFunction() {
         this(new SimpleUrlNormalizer());
-	}
+    }
 
-	public NormalizeUrlsFunction(BaseUrlNormalizer normalizer) {
-		super();
-		
+    public NormalizeUrlsFunction(BaseUrlNormalizer normalizer) {
+        super();
+
         _normalizer = normalizer;
-	}
+    }
 
-	@Override
-	public void flatMap(RawUrl url, Collector<RawUrl> collector) throws Exception {
-		record(this.getClass(), url);
+    @Override
+    public void flatMap(RawUrl url, Collector<RawUrl> collector) throws Exception {
+        record(this.getClass(), url);
 
-		String rawUrl = url.getUrl();
-		String normalizedUrl = _normalizer.normalize(rawUrl);
-		if (rawUrl.equals(normalizedUrl)) {
-		    collector.collect(url);
-		} else {
-		    RawUrl output = new RawUrl(normalizedUrl, url.getScore());
-		    collector.collect(output);
-		}
-	}
+        String rawUrl = url.getUrl();
+        String normalizedUrl = _normalizer.normalize(rawUrl);
+        if (rawUrl.equals(normalizedUrl)) {
+            collector.collect(url);
+        } else {
+            RawUrl output = new RawUrl(normalizedUrl, url.getScore());
+            collector.collect(output);
+        }
+    }
 
 }

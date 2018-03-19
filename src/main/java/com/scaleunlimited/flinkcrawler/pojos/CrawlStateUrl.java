@@ -4,77 +4,76 @@ import java.net.MalformedURLException;
 
 import com.scaleunlimited.flinkcrawler.utils.HashUtils;
 
-
 /**
- * The CrawlStateUrl is the fundamental unit of state in the CrawlDB. It consists of the
- * actual URL, plus other fields necessary to handle merging of URLs and prioritizing of
- * URLs to be fetched.
+ * The CrawlStateUrl is the fundamental unit of state in the CrawlDB. It consists of the actual URL, plus other fields
+ * necessary to handle merging of URLs and prioritizing of URLs to be fetched.
  * 
  */
 @SuppressWarnings("serial")
 public class CrawlStateUrl extends ValidUrl {
 
-	private FetchStatus _status;
-	private long _statusTime;
-	private float _score;
-	private long _nextFetchTime;
-	
+    private FetchStatus _status;
+    private long _statusTime;
+    private float _score;
+    private long _nextFetchTime;
+
     public CrawlStateUrl() {
         // So it's a valid POJO for Flink.
     }
-    
+
     public CrawlStateUrl(RawUrl url) {
         this(new ValidUrl(url), FetchStatus.UNFETCHED, System.currentTimeMillis(), 0.0f, 0);
     }
-    
-	public CrawlStateUrl(FetchUrl url, FetchStatus status, long nextFetchTime) {
-		this(url, status, System.currentTimeMillis(), url.getScore(), nextFetchTime);
-	}
-	
-	public CrawlStateUrl(ValidUrl url, FetchStatus status, long statusTime, float score, long nextFetchTime) {
-		super(url);
 
-		_status = status;
-		_score = score;
-		_statusTime = statusTime;
-		_nextFetchTime = nextFetchTime;
-	}
+    public CrawlStateUrl(FetchUrl url, FetchStatus status, long nextFetchTime) {
+        this(url, status, System.currentTimeMillis(), url.getScore(), nextFetchTime);
+    }
 
-	public long makeKey() {
-		return HashUtils.longHash(getUrl());
-	}
+    public CrawlStateUrl(ValidUrl url, FetchStatus status, long statusTime, float score,
+            long nextFetchTime) {
+        super(url);
 
-	public FetchStatus getStatus() {
-		return _status;
-	}
-	
-	public void setStatus(FetchStatus status) {
-		_status = status;
-	}
+        _status = status;
+        _score = score;
+        _statusTime = statusTime;
+        _nextFetchTime = nextFetchTime;
+    }
 
-	public float getScore() {
-		return _score;
-	}
+    public long makeKey() {
+        return HashUtils.longHash(getUrl());
+    }
 
-	public void setScore(float score) {
-		_score = score;
-	}
+    public FetchStatus getStatus() {
+        return _status;
+    }
 
-	public long getStatusTime() {
-		return _statusTime;
-	}
+    public void setStatus(FetchStatus status) {
+        _status = status;
+    }
 
-	public void setStatusTime(long statusTime) {
-		_statusTime = statusTime;
-	}
+    public float getScore() {
+        return _score;
+    }
 
-	public long getNextFetchTime() {
-		return _nextFetchTime;
-	}
+    public void setScore(float score) {
+        _score = score;
+    }
 
-	public void setNextFetchTime(long nextFetchTime) {
-		_nextFetchTime = nextFetchTime;
-	}
+    public long getStatusTime() {
+        return _statusTime;
+    }
+
+    public void setStatusTime(long statusTime) {
+        _statusTime = statusTime;
+    }
+
+    public long getNextFetchTime() {
+        return _nextFetchTime;
+    }
+
+    public void setNextFetchTime(long nextFetchTime) {
+        _nextFetchTime = nextFetchTime;
+    }
 
     /**
      * Set all fields from url
@@ -83,22 +82,22 @@ public class CrawlStateUrl extends ValidUrl {
      */
     public void setFrom(CrawlStateUrl url) {
         super.setFrom(url);
-        
+
         _nextFetchTime = url._nextFetchTime;
         _score = url._score;
         _status = url._status;
         _statusTime = url._statusTime;
     }
 
-	@Override
-	public String toString() {
-		// TODO add more fields to the response.
-		if (getUrlType() == UrlType.REGULAR) {
-			return String.format("%s (%s at %d)", getUrl(), _status, _statusTime);
-		} else {
-			return String.format("%s", getUrlType());
-		}
-	}
+    @Override
+    public String toString() {
+        // TODO add more fields to the response.
+        if (getUrlType() == UrlType.REGULAR) {
+            return String.format("%s (%s at %d)", getUrl(), _status, _statusTime);
+        } else {
+            return String.format("%s", getUrlType());
+        }
+    }
 
     @Override
     public int hashCode() {
@@ -131,17 +130,21 @@ public class CrawlStateUrl extends ValidUrl {
         return true;
     }
 
-    public static CrawlStateUrl makeTicklerUrl(int maxParallelism, int parallelism, int operatorIndex) {
-        return new CrawlStateUrl(ValidUrl.makeTickerUrl(maxParallelism, parallelism, operatorIndex), 
+    public static CrawlStateUrl makeTicklerUrl(int maxParallelism, int parallelism,
+            int operatorIndex) {
+        return new CrawlStateUrl(ValidUrl.makeTickerUrl(maxParallelism, parallelism, operatorIndex),
                 FetchStatus.UNFETCHED, System.currentTimeMillis(), 0.0f, 0);
     }
 
     public static CrawlStateUrl makeDomainUrl(String domain) throws MalformedURLException {
-        return new CrawlStateUrl(ValidUrl.makeDomainUrl(domain), FetchStatus.UNFETCHED, System.currentTimeMillis(), 0.0f, 0);
+        return new CrawlStateUrl(ValidUrl.makeDomainUrl(domain), FetchStatus.UNFETCHED,
+                System.currentTimeMillis(), 0.0f, 0);
     }
 
-    public static CrawlStateUrl makeTerminateUrl(int maxParallelism, int parallelism, int operatorIndex) {
-        return new CrawlStateUrl(ValidUrl.makeTerminateUrl(maxParallelism, parallelism, operatorIndex),
+    public static CrawlStateUrl makeTerminateUrl(int maxParallelism, int parallelism,
+            int operatorIndex) {
+        return new CrawlStateUrl(
+                ValidUrl.makeTerminateUrl(maxParallelism, parallelism, operatorIndex),
                 FetchStatus.UNFETCHED, System.currentTimeMillis(), 0.0f, 0);
     }
 

@@ -13,10 +13,10 @@ import crawlercommons.fetcher.http.UserAgent;
 
 @SuppressWarnings("serial")
 public abstract class BaseHttpFetcherBuilder implements Serializable {
-	
-	private static final int DEFAULT_FETCH_TIMEOUT = 100;
-	
-	// From BaseFetcher:
+
+    private static final int DEFAULT_FETCH_TIMEOUT = 100;
+
+    // From BaseFetcher:
     protected Map<String, Integer> _maxContentSizes = new HashMap<String, Integer>();
     protected int _defaultMaxContentSize = BaseFetcher.DEFAULT_MAX_CONTENT_SIZE;
     protected Set<String> _validMimeTypes = new HashSet<String>();
@@ -32,20 +32,20 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
     protected RedirectMode _redirectMode = BaseHttpFetcher.DEFAULT_REDIRECT_MODE;
 
     public BaseHttpFetcherBuilder(int maxSimultaneousRequests, UserAgent userAgent) {
-    	super();
-        
+        super();
+
         _maxSimultaneousRequests = maxSimultaneousRequests;
         _userAgent = userAgent;
         _fetchDurationTimeoutInSeconds = DEFAULT_FETCH_TIMEOUT;
     }
 
-	// From BaseFetcher:
-    
+    // From BaseFetcher:
+
     public BaseHttpFetcherBuilder setDefaultMaxContentSize(int defaultMaxContentSize) {
         _defaultMaxContentSize = defaultMaxContentSize;
         return this;
     }
-    
+
     public BaseHttpFetcherBuilder setMaxContentSize(String mimeType, int maxContentSize) {
         _maxContentSizes.put(mimeType, maxContentSize);
         return this;
@@ -57,12 +57,12 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
     }
 
     // From BaseHttpFetcher:
-    
+
     public BaseHttpFetcherBuilder setMaxConnectionsPerHost(int maxConnectionsPerHost) {
         _maxConnectionsPerHost = maxConnectionsPerHost;
         return this;
     }
-    
+
     public BaseHttpFetcherBuilder setMinResponseRate(int minResponseRate) {
         _minResponseRate = minResponseRate;
         return this;
@@ -72,67 +72,66 @@ public abstract class BaseHttpFetcherBuilder implements Serializable {
         _acceptLanguage = acceptLanguage;
         return this;
     }
-    
+
     public BaseHttpFetcherBuilder setMaxRedirects(int maxRedirects) {
         _maxRedirects = maxRedirects;
         return this;
     }
-    
+
     public BaseHttpFetcherBuilder setRedirectMode(RedirectMode mode) {
         _redirectMode = mode;
         return this;
     }
-    
-    public BaseHttpFetcherBuilder setFetchDurationTimeoutInSeconds(int fetchDurationTimeoutInSeconds) {
+
+    public BaseHttpFetcherBuilder setFetchDurationTimeoutInSeconds(
+            int fetchDurationTimeoutInSeconds) {
         _fetchDurationTimeoutInSeconds = fetchDurationTimeoutInSeconds;
         return this;
     }
-    
+
     /**
-     * @return a new BaseHttpFetcher instance configured to match how this
-     * builder was configured
+     * @return a new BaseHttpFetcher instance configured to match how this builder was configured
      */
     public abstract BaseHttpFetcher build() throws Exception;
-    
+
     public int getMaxSimultaneousRequests() {
         return _maxSimultaneousRequests;
     }
-    
+
     public int getFetchDurationTimeoutInSeconds() {
-        	return _fetchDurationTimeoutInSeconds;
+        return _fetchDurationTimeoutInSeconds;
     }
 
     public UserAgent getUserAgent() {
-    	    return _userAgent;
+        return _userAgent;
     }
-    
+
     public void setUserAgent(UserAgent userAgent) {
         _userAgent = userAgent;
     }
-    
+
     /**
-     * Helper method that {@link #build()} can use to configure a newly
-     * constructed BaseHttpFetcher instance
+     * Helper method that {@link #build()} can use to configure a newly constructed BaseHttpFetcher instance
      * 
-     * @param fetcher instance of BaseHttpFetcher that {@link #build()} has
-     * just constructed
-     * @return the same fetcher, after applying all of the configuration
-     * settings from this builder to that BaseHttpFetcher instance
+     * @param fetcher
+     *            instance of BaseHttpFetcher that {@link #build()} has just constructed
+     * @return the same fetcher, after applying all of the configuration settings from this builder to that
+     *         BaseHttpFetcher instance
      */
     protected BaseHttpFetcher configure(BaseHttpFetcher fetcher) {
         fetcher.setDefaultMaxContentSize(_defaultMaxContentSize);
-		for (Map.Entry<String, Integer> entry : _maxContentSizes.entrySet()) {
-			fetcher.setMaxContentSize(entry.getKey(), entry.getValue());
-		}
-		fetcher.setValidMimeTypes(_validMimeTypes);
-		fetcher.setMaxConnectionsPerHost(_maxConnectionsPerHost);
-		fetcher.setMinResponseRate(_minResponseRate);
-		fetcher.setAcceptLanguage(_acceptLanguage);
-		fetcher.setMaxRedirects(_maxRedirects);
-		fetcher.setRedirectMode(_redirectMode);
-		fetcher.setFetchDurationTimeoutInSeconds(_fetchDurationTimeoutInSeconds);
-		
-    	return fetcher;
+        for (Map.Entry<String, Integer> entry : _maxContentSizes.entrySet()) {
+            fetcher.setMaxContentSize(entry.getKey(), entry.getValue());
+        }
+        fetcher.setValidMimeTypes(_validMimeTypes);
+        fetcher.setMaxConnectionsPerHost(_maxConnectionsPerHost);
+        fetcher.setMinResponseRate(_minResponseRate);
+        fetcher.setAcceptLanguage(_acceptLanguage);
+        fetcher.setMaxRedirects(_maxRedirects);
+        fetcher.setRedirectMode(_redirectMode);
+        fetcher.setFetchDurationTimeoutInSeconds(_fetchDurationTimeoutInSeconds);
+
+        return fetcher;
     }
 
 }

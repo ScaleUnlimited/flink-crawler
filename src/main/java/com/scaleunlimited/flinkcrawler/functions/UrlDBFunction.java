@@ -30,12 +30,12 @@ import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
 import com.scaleunlimited.flinkcrawler.utils.FetchQueue.FetchQueueResult;
 
 /**
- * The Flink operator that managed the "crawl DB". Incoming URLs are merged in memory, using MapState
- * with key == URL hash, value = CrawlStateUrl. Whenever we get a "tickler" URL, we emit URLs from the fetch queue
- * (if available). Whenever we get a "domain" URL, we add URLs for that domain to the fetch queue.
+ * The Flink operator that managed the "crawl DB". Incoming URLs are merged in memory, using MapState with key == URL
+ * hash, value = CrawlStateUrl. Whenever we get a "tickler" URL, we emit URLs from the fetch queue (if available).
+ * Whenever we get a "domain" URL, we add URLs for that domain to the fetch queue.
  * 
- * The use of the fetch queue lets us apply some heuristics to fetching the "best" (approximately)
- * URLs, without having to scan every URL.
+ * The use of the fetch queue lets us apply some heuristics to fetching the "best" (approximately) URLs, without having
+ * to scan every URL.
  */
 @SuppressWarnings("serial")
 public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> {
@@ -62,7 +62,7 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
 
     // TODO remove this debugging code.
     private transient Map<String, Long> _inFlightUrls;
-    
+
     public UrlDBFunction(BaseUrlStateMerger merger, FetchQueue fetchQueue) {
         _merger = merger;
         _fetchQueue = fetchQueue;
@@ -74,23 +74,25 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
 
         RuntimeContext context = getRuntimeContext();
 
-        context.getMetricGroup().gauge(CrawlerMetrics.GAUGE_URLS_IN_FETCH_QUEUE.toString(), new Gauge<Integer>() {
-            @Override
-            public Integer getValue() {
-                return _fetchQueue.size();
-            }
-        });
+        context.getMetricGroup().gauge(CrawlerMetrics.GAUGE_URLS_IN_FETCH_QUEUE.toString(),
+                new Gauge<Integer>() {
+                    @Override
+                    public Integer getValue() {
+                        return _fetchQueue.size();
+                    }
+                });
 
         // Track how many URLs we think are being processed.
-        context.getMetricGroup().gauge(CrawlerMetrics.GAUGE_URLS_IN_FLIGHT.toString(), new Gauge<Integer>() {
-            @Override
-            public Integer getValue() {
-                return _numInFlightUrls.get();
-            }
-        });
+        context.getMetricGroup().gauge(CrawlerMetrics.GAUGE_URLS_IN_FLIGHT.toString(),
+                new Gauge<Integer>() {
+                    @Override
+                    public Integer getValue() {
+                        return _numInFlightUrls.get();
+                    }
+                });
 
         _mergedUrlState = new CrawlStateUrl();
-        
+
         _numInFlightUrls = new AtomicInteger(0);
 
         _fetchQueue.open();
@@ -100,19 +102,19 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
         // Create three keyed/managed states
 
         // 1. Active URLs: MapState (key = url hash, value = CrawlStateUrl)
-        MapStateDescriptor<Long, CrawlStateUrl> urlStateDescriptor = new MapStateDescriptor<>("active-urls", Long.class,
-                CrawlStateUrl.class);
+        MapStateDescriptor<Long, CrawlStateUrl> urlStateDescriptor = new MapStateDescriptor<>(
+                "active-urls", Long.class, CrawlStateUrl.class);
         _activeUrls = getRuntimeContext().getMapState(urlStateDescriptor);
 
         // 2. Active URL count: ValueState (value = number of entries in MapState)
-        ValueStateDescriptor<Integer> urlCountDescriptor = new ValueStateDescriptor<>("num-active-urls",
-                TypeInformation.of(new TypeHint<Integer>() {
+        ValueStateDescriptor<Integer> urlCountDescriptor = new ValueStateDescriptor<>(
+                "num-active-urls", TypeInformation.of(new TypeHint<Integer>() {
                 }));
         _numActiveUrls = getRuntimeContext().getState(urlCountDescriptor);
 
         // 3. Archived URLs: MapState (key = url hash, value = CrawlStateUrl)
-        MapStateDescriptor<Long, CrawlStateUrl> archivedUrlsStateDescriptor = new MapStateDescriptor<>("archived-urls",
-                Long.class, CrawlStateUrl.class);
+        MapStateDescriptor<Long, CrawlStateUrl> archivedUrlsStateDescriptor = new MapStateDescriptor<>(
+                "archived-urls", Long.class, CrawlStateUrl.class);
         _archivedUrls = getRuntimeContext().getMapState(archivedUrlsStateDescriptor);
 
         // 4. Index to hash mapping for active URLs (key = index, value = url hash)
@@ -120,21 +122,21 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
         // So if we have an index from 0...<active url count>-1, we can look up the
         // hash, and then use that to find the actual CrawlStateUrl in the active
         // URLs MapState.
-        MapStateDescriptor<Integer, Long> activeUrlsIndexStateDescriptor = new MapStateDescriptor<>("active-urls-index",
-                Integer.class, Long.class);
+        MapStateDescriptor<Integer, Long> activeUrlsIndexStateDescriptor = new MapStateDescriptor<>(
+                "active-urls-index", Integer.class, Long.class);
         _activeUrlsIndex = getRuntimeContext().getMapState(activeUrlsIndexStateDescriptor);
-        
+
         _inFlightUrls = new HashMap<>();
     }
 
     @Override
     public void close() throws Exception {
-        
+
         long curTime = System.currentTimeMillis();
         for (String url : _inFlightUrls.keySet()) {
             LOGGER.debug(String.format("%d\t%s", curTime - _inFlightUrls.get(url), url));
         }
-        
+
         super.close();
     }
 
@@ -149,13 +151,14 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
         } else if (url.getUrlType() == UrlType.TERMINATION) {
             processTerminationUrl();
         } else {
-            throw new RuntimeException(String.format("Unknown URL type '%s' for '%s'", url.getUrlType(), url.getUrl()));
+            throw new RuntimeException(String.format("Unknown URL type '%s' for '%s'",
+                    url.getUrlType(), url.getUrl()));
         }
     }
 
     /**
-     * We got a "termination" URL, which tells us to drain our fetch queue, and not
-     * add any more URLs to this queue (ignore domain URLs).
+     * We got a "termination" URL, which tells us to drain our fetch queue, and not add any more URLs to this queue
+     * (ignore domain URLs).
      */
     private void processTerminationUrl() {
         LOGGER.info(String.format("UrlDBFunction (%d/%d) terminating", _partition, _parallelism));
@@ -173,7 +176,7 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
         if (LOGGER.isTraceEnabled()) {
             LOGGER.trace("Got domain URL for " + pld);
         }
-        
+
         Integer numUrls = _numActiveUrls.value();
         if (numUrls == null) {
             LOGGER.warn("Houston, we have a problem - null active URL count for domain " + pld);
@@ -192,17 +195,16 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
                 if (LOGGER.isTraceEnabled()) {
                     LOGGER.trace(String.format(
                             "UrlDBFunction (%d/%d) got result %s adding '%s' to fetch queue",
-                            _partition, _parallelism,
-                            queueResult, stateUrl));
+                            _partition, _parallelism, queueResult, stateUrl));
                 }
-                
+
                 switch (queueResult) {
                     case QUEUED:
                         stateUrl.setStatus(FetchStatus.FETCHING);
                         // TODO figure out if I have to actually do this put
                         _activeUrls.put(urlHash, stateUrl);
                         urlsAdded += 1;
-                        
+
                         CounterUtils.increment(getRuntimeContext(), FetchStatus.FETCHING);
                         break;
 
@@ -222,24 +224,25 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
     }
 
     /**
-     * We received a tickler URL that triggers emitting of URLs from the fetch queue
-     * to the collector.
+     * We received a tickler URL that triggers emitting of URLs from the fetch queue to the collector.
      * 
      * @param collector
      */
     private void processTicklerUrl(Collector<FetchUrl> collector) {
         if (LOGGER.isTraceEnabled()) {
-            LOGGER.trace(String.format("UrlDBFunction (%d/%d) checking for URLs to emit", _partition, _parallelism));
+            LOGGER.trace(String.format("UrlDBFunction (%d/%d) checking for URLs to emit",
+                    _partition, _parallelism));
         }
 
         for (int i = 0; i < URLS_PER_TICKLE; i++) {
             int activeUrls = _numInFlightUrls.get();
             if (activeUrls > MAX_IN_FLIGHT_URLS) {
                 if (LOGGER.isTraceEnabled()) {
-                    LOGGER.trace(String.format("UrlDBFunction (%d/%d) skipping emit, too many active URLs (%d)",
+                    LOGGER.trace(String.format(
+                            "UrlDBFunction (%d/%d) skipping emit, too many active URLs (%d)",
                             _partition, _parallelism, activeUrls));
                 }
-                
+
                 return;
             }
 
@@ -248,9 +251,9 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
             if (fetchUrl != null) {
                 collector.collect(fetchUrl);
                 int nowActive = _numInFlightUrls.incrementAndGet();
-                LOGGER.debug(String.format("UrlDBFunction (%d/%d) emitted URL %s (%d active)", _partition,
-                        _parallelism, fetchUrl, nowActive));
-                
+                LOGGER.debug(String.format("UrlDBFunction (%d/%d) emitted URL %s (%d active)",
+                        _partition, _parallelism, fetchUrl, nowActive));
+
                 _inFlightUrls.put(fetchUrl.getUrl(), System.currentTimeMillis());
             } else {
                 break;
@@ -265,42 +268,50 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
      * @param collector
      * @throws Exception
      */
-    private void processRegularUrl(CrawlStateUrl url, Collector<FetchUrl> collector) throws Exception {
+    private void processRegularUrl(CrawlStateUrl url, Collector<FetchUrl> collector)
+            throws Exception {
         record(this.getClass(), url, FetchStatus.class.getSimpleName(), url.getStatus().toString());
 
         // If it's not an unfetched URL, we can decrement our active URLs
         FetchStatus newStatus = url.getStatus();
         if (newStatus != FetchStatus.UNFETCHED) {
             if (url.getStatusTime() == 0) {
-                throw new RuntimeException(String.format("UrlDBFunction (%d/%d) got URL with invalid status time: %s", _partition, _parallelism, url));
+                throw new RuntimeException(
+                        String.format("UrlDBFunction (%d/%d) got URL with invalid status time: %s",
+                                _partition, _parallelism, url));
             }
-            
+
             Long startTime = _inFlightUrls.remove(url.getUrl());
             if (startTime == null) {
-                throw new RuntimeException(String.format("UrlDBFunction (%d/%d) got URL not in active state: %s", _partition, _parallelism, url));
+                throw new RuntimeException(
+                        String.format("UrlDBFunction (%d/%d) got URL not in active state: %s",
+                                _partition, _parallelism, url));
             }
-            
-            LOGGER.debug(String.format("%dms to process '%s'", System.currentTimeMillis() - startTime, url));
-            
+
+            LOGGER.debug(String.format("%dms to process '%s'",
+                    System.currentTimeMillis() - startTime, url));
+
             int nowActive = _numInFlightUrls.decrementAndGet();
-            LOGGER.debug(String.format("UrlDBFunction (%d/%d) receiving URL %s (%d active)", _partition,
-                    _parallelism, url, nowActive));
+            LOGGER.debug(String.format("UrlDBFunction (%d/%d) receiving URL %s (%d active)",
+                    _partition, _parallelism, url, nowActive));
 
             if (nowActive < 0) {
-                throw new RuntimeException(String.format("UrlDBFunction (%d/%d) has negative in-flight URLs", _partition, _parallelism));
+                throw new RuntimeException(
+                        String.format("UrlDBFunction (%d/%d) has negative in-flight URLs",
+                                _partition, _parallelism));
             }
         }
 
         Long urlHash = url.makeKey();
         if (_archivedUrls.contains(urlHash)) {
             // It's been archived, ignore...
-            
+
             if (LOGGER.isTraceEnabled()) {
-                LOGGER.trace(String.format(
-                        "UrlDBFunction (%d/%d) ignoring archived URL %s with hash %d",
-                        _partition, _parallelism, url, urlHash));
+                LOGGER.trace(
+                        String.format("UrlDBFunction (%d/%d) ignoring archived URL %s with hash %d",
+                                _partition, _parallelism, url, urlHash));
             }
-            
+
             // If the state is unfetched, we're all good, but if not then that's a logical error
             // as we shouldn't be emitting URLs that are archived.
             if (newStatus != FetchStatus.UNFETCHED) {
@@ -311,12 +322,12 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
         } else {
             CrawlStateUrl stateUrl = _activeUrls.get(urlHash);
             if (stateUrl == null) {
-                
+
                 // We've never seen this URL before.
                 if (LOGGER.isDebugEnabled()) {
-                    LOGGER.debug(String.format(
-                            "UrlDBFunction (%d/%d) adding new URL %s with hash %d",
-                            _partition, _parallelism, url, urlHash));
+                    LOGGER.debug(
+                            String.format("UrlDBFunction (%d/%d) adding new URL %s with hash %d",
+                                    _partition, _parallelism, url, urlHash));
                 }
 
                 // Better be unfetched.
@@ -325,12 +336,12 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
                             "UrlDBFunction (%d/%d) got new URL '%s' with active status %s",
                             _partition, _parallelism, url, newStatus));
                 }
-                
+
                 CounterUtils.increment(getRuntimeContext(), FetchStatus.UNFETCHED);
 
                 // TODO need to copy URL if object reuse enabled?
                 _activeUrls.put(urlHash, url);
-                
+
                 Integer numActiveUrls = _numActiveUrls.value();
                 if (numActiveUrls == null) {
                     numActiveUrls = 0;
@@ -348,20 +359,20 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
                 FetchStatus oldStatus = stateUrl.getStatus();
                 if (mergeUrls(stateUrl, url)) {
                     _activeUrls.put(urlHash, stateUrl);
-                    
+
                     if (LOGGER.isDebugEnabled()) {
                         LOGGER.debug(String.format(
                                 "UrlDBFunction (%d/%d) updated state of URL %s (hash %d)",
                                 _partition, _parallelism, stateUrl, urlHash));
                     }
-                    
+
                     CounterUtils.decrement(getRuntimeContext(), oldStatus);
                     CounterUtils.increment(getRuntimeContext(), newStatus);
                 }
             }
         }
     }
-    
+
     private boolean mergeUrls(CrawlStateUrl stateUrl, CrawlStateUrl newUrl) {
         MergeResult result = _merger.doMerge(stateUrl, newUrl, _mergedUrlState);
 

@@ -8,27 +8,27 @@ import org.xml.sax.SAXException;
 
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
 
-
 @SuppressWarnings("serial")
 public class SimpleLinkExtractor extends BaseLinkExtractor {
     private static final int DEFAULT_MAX_EXTRACTED_LINKS_SIZE = 100;
-    
-	private boolean _inHead;
+
+    private boolean _inHead;
     private boolean _skipLinks;
     private int _maxExtractedLinksSize = DEFAULT_MAX_EXTRACTED_LINKS_SIZE;
-    
+
     private Set<ExtractedUrl> _extractedUrls = new HashSet<ExtractedUrl>();
 
     public SimpleLinkExtractor() {
-    	this(DEFAULT_MAX_EXTRACTED_LINKS_SIZE);
-	}
-    
+        this(DEFAULT_MAX_EXTRACTED_LINKS_SIZE);
+    }
+
     public SimpleLinkExtractor(int maxExtractedLinksSize) {
-    	_maxExtractedLinksSize = maxExtractedLinksSize;
-	}
-    
+        _maxExtractedLinksSize = maxExtractedLinksSize;
+    }
+
     @Override
-    public void startElement(String uri, String localName, String qName, Attributes attributes) throws org.xml.sax.SAXException {
+    public void startElement(String uri, String localName, String qName, Attributes attributes)
+            throws org.xml.sax.SAXException {
         super.startElement(uri, localName, qName, attributes);
 
         if (!_inHead && localName.equalsIgnoreCase("head")) {
@@ -49,7 +49,7 @@ public class SimpleLinkExtractor extends BaseLinkExtractor {
             }
         }
     };
-    
+
     @Override
     public void endElement(String uri, String localName, String name) throws SAXException {
         super.endElement(uri, localName, name);
@@ -66,14 +66,13 @@ public class SimpleLinkExtractor extends BaseLinkExtractor {
         _inHead = false;
         _skipLinks = false;
     }
-    
 
     @Override
     public void addLink(ExtractedUrl link) {
         if (!_skipLinks) {
-        	if (_extractedUrls.size() <= _maxExtractedLinksSize) {
-        		_extractedUrls.add(link);
-        	} 
+            if (_extractedUrls.size() <= _maxExtractedLinksSize) {
+                _extractedUrls.add(link);
+            }
         }
     }
 

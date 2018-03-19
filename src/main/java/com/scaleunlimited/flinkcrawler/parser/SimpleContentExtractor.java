@@ -9,7 +9,7 @@ public class SimpleContentExtractor extends BaseContentExtractor {
         super.reset();
         _content.setLength(0);
     }
-    
+
     @Override
     public void addContent(char[] ch, int start, int length) {
         _content.append(ch, start, length);

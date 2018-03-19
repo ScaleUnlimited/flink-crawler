@@ -14,32 +14,33 @@ import com.scaleunlimited.flinkcrawler.urls.BaseUrlValidator;
 
 @SuppressWarnings("serial")
 public class ValidUrlsFilter extends BaseFlatMapFunction<RawUrl, CrawlStateUrl> {
-	static final Logger LOGGER = LoggerFactory.getLogger(ValidUrlsFilter.class);
-	
-	private BaseUrlValidator _urlValidator;
-	
-	public ValidUrlsFilter(BaseUrlValidator urlValidator) {
-		_urlValidator = urlValidator;
-	}
+    static final Logger LOGGER = LoggerFactory.getLogger(ValidUrlsFilter.class);
 
-	@Override
-	public void flatMap(RawUrl url, Collector<CrawlStateUrl> collector) throws Exception {
-		record(this.getClass(), url);
-		
-		String urlAsString = url.getUrl();
-		if (_urlValidator.isValid(urlAsString)) {
-			try {
-				ValidUrl validatedUrl = new ValidUrl(urlAsString);
-				collector.collect(new CrawlStateUrl(validatedUrl, FetchStatus.UNFETCHED, System.currentTimeMillis(), url.getScore(), 0));
-			} catch (MalformedURLException e) {
-				LOGGER.warn("Filtering malformed URL (not caught by validator!!!) " + urlAsString);
-			} catch (Throwable t) {
-				LOGGER.error("Failure to collect: " + t.getMessage(), t);
-			}
-		} else {
-			// Don't output anything, as we're filtering
-			LOGGER.debug("Filtering invalid URL " + urlAsString);
-		}
-	}
+    private BaseUrlValidator _urlValidator;
+
+    public ValidUrlsFilter(BaseUrlValidator urlValidator) {
+        _urlValidator = urlValidator;
+    }
+
+    @Override
+    public void flatMap(RawUrl url, Collector<CrawlStateUrl> collector) throws Exception {
+        record(this.getClass(), url);
+
+        String urlAsString = url.getUrl();
+        if (_urlValidator.isValid(urlAsString)) {
+            try {
+                ValidUrl validatedUrl = new ValidUrl(urlAsString);
+                collector.collect(new CrawlStateUrl(validatedUrl, FetchStatus.UNFETCHED,
+                        System.currentTimeMillis(), url.getScore(), 0));
+            } catch (MalformedURLException e) {
+                LOGGER.warn("Filtering malformed URL (not caught by validator!!!) " + urlAsString);
+            } catch (Throwable t) {
+                LOGGER.error("Failure to collect: " + t.getMessage(), t);
+            }
+        } else {
+            // Don't output anything, as we're filtering
+            LOGGER.debug("Filtering invalid URL " + urlAsString);
+        }
+    }
 
 }

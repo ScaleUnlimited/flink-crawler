@@ -12,32 +12,36 @@ import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 
 @SuppressWarnings("serial")
-public class ParseSiteMapFunction extends BaseFlatMapFunction<FetchedUrl, Tuple3<ExtractedUrl, ParsedUrl, String>> {
+public class ParseSiteMapFunction
+        extends BaseFlatMapFunction<FetchedUrl, Tuple3<ExtractedUrl, ParsedUrl, String>> {
 
     static final Logger LOGGER = LoggerFactory.getLogger(ParseSiteMapFunction.class);
 
-	private BasePageParser _siteMapParser;
+    private BasePageParser _siteMapParser;
 
-	public ParseSiteMapFunction(BasePageParser siteMapParser) {
-		_siteMapParser = siteMapParser;
+    public ParseSiteMapFunction(BasePageParser siteMapParser) {
+        _siteMapParser = siteMapParser;
     }
 
-	@Override
-	public void flatMap(FetchedUrl fetchedUrl, Collector<Tuple3<ExtractedUrl, ParsedUrl, String>> collector) throws Exception {
-		record(this.getClass(), fetchedUrl);
-		
-		try {
-			ParserResult parserResult = _siteMapParser.parse(fetchedUrl);
-			
-			if (parserResult != null) {
-				for (ExtractedUrl extractedUrl : parserResult.getExtractedUrls()) {
-					LOGGER.debug("Emitting sitemap URL " + extractedUrl);
-					collector.collect(new Tuple3<ExtractedUrl, ParsedUrl, String>(extractedUrl, null, null));
-				}
-			} 
-		} catch (Throwable t ) {
-			LOGGER.info(String.format("Error while parsing sitemap url %s : %s", fetchedUrl.getFetchedUrl(), t.getMessage()), t);
-		}
-	}
+    @Override
+    public void flatMap(FetchedUrl fetchedUrl,
+            Collector<Tuple3<ExtractedUrl, ParsedUrl, String>> collector) throws Exception {
+        record(this.getClass(), fetchedUrl);
+
+        try {
+            ParserResult parserResult = _siteMapParser.parse(fetchedUrl);
+
+            if (parserResult != null) {
+                for (ExtractedUrl extractedUrl : parserResult.getExtractedUrls()) {
+                    LOGGER.debug("Emitting sitemap URL " + extractedUrl);
+                    collector.collect(
+                            new Tuple3<ExtractedUrl, ParsedUrl, String>(extractedUrl, null, null));
+                }
+            }
+        } catch (Throwable t) {
+            LOGGER.info(String.format("Error while parsing sitemap url %s : %s",
+                    fetchedUrl.getFetchedUrl(), t.getMessage()), t);
+        }
+    }
 
 }
