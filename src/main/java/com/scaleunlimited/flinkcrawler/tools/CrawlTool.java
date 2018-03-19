@@ -8,7 +8,6 @@ import org.apache.flink.runtime.state.filesystem.FsStateBackend;
 import org.apache.flink.streaming.api.CheckpointingMode;
 import org.apache.flink.streaming.api.TimeCharacteristic;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.http.HttpStatus;
 import org.apache.tika.mime.MediaType;
 import org.apache.tika.parser.ParseContext;
 import org.apache.tika.parser.html.HtmlParser;
@@ -28,13 +27,8 @@ import com.scaleunlimited.flinkcrawler.urls.SimpleUrlLengthener;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlValidator;
 import com.scaleunlimited.flinkcrawler.urls.SingleDomainUrlValidator;
 
-import crawlercommons.fetcher.BaseFetchException;
-import crawlercommons.fetcher.FetchedResult;
-import crawlercommons.fetcher.Payload;
-import crawlercommons.fetcher.http.BaseHttpFetcher;
 import crawlercommons.fetcher.http.UserAgent;
 import crawlercommons.sitemaps.SiteMapParser;
-import crawlercommons.util.Headers;
 
 public class CrawlTool {
 
@@ -119,16 +113,17 @@ public class CrawlTool {
         CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
 		    .setUserAgent(userAgent)
 		    .setUrlLengthener(urlLengthener)
-                .setUrlSource(new SeedUrlSource(options.getCrawlDbParallelism(),
-                        options.getSeedUrlsFilename(), RawUrl.DEFAULT_SCORE))
-                .setRobotsFetcherBuilder(robotsFetcherBuilder)
-                .setUrlFilter(urlValidator)
-                .setSiteMapFetcherBuilder(siteMapFetcherBuilder)
-                .setPageFetcherBuilder(pageFetcherBuilder)
-                .setForceCrawlDelay(options.getForceCrawlDelay())
-                .setDefaultCrawlDelay(options.getDefaultCrawlDelay())
-                .setParallelism(options.getParallelism())
-                .setMaxOutlinksPerPage(options.getMaxOutlinksPerPage());
+            .setUrlSource(new SeedUrlSource(options.getCrawlDbParallelism(),
+                                            options.getSeedUrlsFilename(), 
+                                            RawUrl.DEFAULT_SCORE))
+            .setRobotsFetcherBuilder(robotsFetcherBuilder)
+            .setUrlFilter(urlValidator)
+            .setSiteMapFetcherBuilder(siteMapFetcherBuilder)
+            .setPageFetcherBuilder(pageFetcherBuilder)
+            .setForceCrawlDelay(options.getForceCrawlDelay())
+            .setDefaultCrawlDelay(options.getDefaultCrawlDelay())
+            .setParallelism(options.getParallelism())
+            .setMaxOutlinksPerPage(options.getMaxOutlinksPerPage());
 		
 		if (options.getOutputFile() != null) {
 			builder.setContentTextFile(options.getOutputFile());
@@ -142,7 +137,8 @@ public class CrawlTool {
             return new NoopUrlLengthener();
         }
         
-        return new SimpleUrlLengthener(userAgent);
+        int maxConnectionsPerHost = options.getFetchersPerTask();
+        return new SimpleUrlLengthener(userAgent, maxConnectionsPerHost);
     }
     
     private static BaseHttpFetcherBuilder getPageFetcherBuilder(CrawlToolOptions options, UserAgent userAgent) throws IOException {
@@ -163,8 +159,11 @@ public class CrawlTool {
             return new NoopHttpFetcherBuilder(userAgent);
         }
         
-        return new SimpleHttpFetcherBuilder(options.getFetchersPerTask(), userAgent)
-                .setDefaultMaxContentSize(SiteMapParser.MAX_BYTES_ALLOWED);
+        // By default, give site map fetcher 20% of #threads page fetcher has
+        int maxSimultaneousRequests = 
+            Math.max(1, options.getFetchersPerTask() / 5);
+        return new SimpleHttpFetcherBuilder(maxSimultaneousRequests, userAgent)
+                    .setDefaultMaxContentSize(SiteMapParser.MAX_BYTES_ALLOWED);
     }
 
 	private static BaseHttpFetcherBuilder getRobotsFetcherBuilder(CrawlToolOptions options, UserAgent userAgent) throws IOException {
@@ -178,8 +177,11 @@ public class CrawlTool {
             return new NoopHttpFetcherBuilder(userAgent);
 		}
 		
-        return new SimpleHttpFetcherBuilder(userAgent)
-                .setDefaultMaxContentSize(MAX_ROBOTS_TXT_SIZE);
+		// By default, give robots fetcher 20% of #threads page fetcher has
+		int maxSimultaneousRequests = 
+	        Math.max(1, options.getFetchersPerTask() / 5);
+        return new SimpleHttpFetcherBuilder(maxSimultaneousRequests, userAgent)
+                    .setDefaultMaxContentSize(MAX_ROBOTS_TXT_SIZE);
 	}
 
 }
