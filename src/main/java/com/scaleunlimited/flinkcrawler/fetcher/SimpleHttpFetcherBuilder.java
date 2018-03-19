@@ -7,12 +7,6 @@ import crawlercommons.fetcher.http.UserAgent;
 @SuppressWarnings("serial")
 public class SimpleHttpFetcherBuilder extends BaseHttpFetcherBuilder {
 	
-	public static final int DEFAULT_MAX_SIMULTANEOUS_REQUESTS = 1;
-
-	public SimpleHttpFetcherBuilder(UserAgent userAgent) {
-		this(DEFAULT_MAX_SIMULTANEOUS_REQUESTS, userAgent);
-	}
-
 	public SimpleHttpFetcherBuilder(int maxSimultaneousRequests, UserAgent userAgent) {
 		super(maxSimultaneousRequests, userAgent);
 	}

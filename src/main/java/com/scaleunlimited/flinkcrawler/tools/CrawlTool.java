@@ -159,8 +159,11 @@ public class CrawlTool {
             return new NoopHttpFetcherBuilder(userAgent);
         }
         
-        return new SimpleHttpFetcherBuilder(options.getFetchersPerTask(), userAgent)
-                .setDefaultMaxContentSize(SiteMapParser.MAX_BYTES_ALLOWED);
+        // By default, give site map fetcher 20% of #threads page fetcher has
+        int maxSimultaneousRequests = 
+            Math.max(1, options.getFetchersPerTask() / 5);
+        return new SimpleHttpFetcherBuilder(maxSimultaneousRequests, userAgent)
+                    .setDefaultMaxContentSize(SiteMapParser.MAX_BYTES_ALLOWED);
     }
 
 	private static BaseHttpFetcherBuilder getRobotsFetcherBuilder(CrawlToolOptions options, UserAgent userAgent) throws IOException {
@@ -174,8 +177,11 @@ public class CrawlTool {
             return new NoopHttpFetcherBuilder(userAgent);
 		}
 		
-        return new SimpleHttpFetcherBuilder(userAgent)
-                .setDefaultMaxContentSize(MAX_ROBOTS_TXT_SIZE);
+		// By default, give robots fetcher 20% of #threads page fetcher has
+		int maxSimultaneousRequests = 
+	        Math.max(1, options.getFetchersPerTask() / 5);
+        return new SimpleHttpFetcherBuilder(maxSimultaneousRequests, userAgent)
+                    .setDefaultMaxContentSize(MAX_ROBOTS_TXT_SIZE);
 	}
 
 }

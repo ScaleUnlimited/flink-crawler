@@ -79,18 +79,18 @@ public class CrawlTopologyBuilder {
     private BaseUrlSource _urlSource = new SeedUrlSource(1, makeDefaultSeedUrl());;
     private FetchQueue _fetchQueue = new FetchQueue(10_000);
     
-    private BaseHttpFetcherBuilder _robotsFetcherBuilder = new SimpleHttpFetcherBuilder(INVALID_USER_AGENT);
+    private BaseHttpFetcherBuilder _robotsFetcherBuilder = new SimpleHttpFetcherBuilder(1, INVALID_USER_AGENT);
     private SimpleRobotRulesParser _robotsParser = new SimpleRobotRulesParser();
 
     private BaseUrlLengthener _urlLengthener = 
-        new SimpleUrlLengthener(INVALID_USER_AGENT, SimpleHttpFetcherBuilder.DEFAULT_MAX_SIMULTANEOUS_REQUESTS);
+        new SimpleUrlLengthener(INVALID_USER_AGENT, 1);
     private SinkFunction<ParsedUrl> _contentSink = new DiscardingSink<ParsedUrl>();
     private SinkFunction<String> _contentTextSink;
     private String _contentTextFilePathString;
     private BaseUrlNormalizer _urlNormalizer = new SimpleUrlNormalizer();
     private BaseUrlValidator _urlFilter = new SimpleUrlValidator();
-    private BaseHttpFetcherBuilder _pageFetcherBuilder = new SimpleHttpFetcherBuilder(INVALID_USER_AGENT);
-    private BaseHttpFetcherBuilder _siteMapFetcherBuilder = new SimpleHttpFetcherBuilder(INVALID_USER_AGENT);
+    private BaseHttpFetcherBuilder _pageFetcherBuilder = new SimpleHttpFetcherBuilder(1, INVALID_USER_AGENT);
+    private BaseHttpFetcherBuilder _siteMapFetcherBuilder = new SimpleHttpFetcherBuilder(1, INVALID_USER_AGENT);
     private BasePageParser _pageParser = new SimplePageParser();
 	private BasePageParser _siteMapParser = new SimpleSiteMapParser();
 	private int _maxOutlinksPerPage = DEFAULT_MAX_OUTLINKS_PER_PAGE;
