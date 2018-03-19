@@ -22,10 +22,9 @@ import com.scaleunlimited.flinkcrawler.utils.S3Utils;
 /**
  * Source for seed URLs.
  * 
- * Generate special CrawlStateUrl values (ticklers) that keep the iteration
- * running, until we're stopped. When that happens, generate termination
- * CrawStateUrls that tell the CrawlDB to flush the fetch queue and not
- * fill it any longer.
+ * Generate special CrawlStateUrl values (ticklers) that keep the iteration running, until we're stopped. When that
+ * happens, generate termination CrawStateUrls that tell the CrawlDB to flush the fetch queue and not fill it any
+ * longer.
  * 
  * TODO add checkpointing - see FromElementsFunction.java
  *
@@ -42,7 +41,7 @@ public class SeedUrlSource extends BaseUrlSource {
     private String _seedUrlsS3Path;
     private float _estimatedScore;
     private int _crawlDbParallelism;
-    
+
     // For when we've read from a local file
     private RawUrl[] _urls;
 
@@ -50,7 +49,7 @@ public class SeedUrlSource extends BaseUrlSource {
     private volatile boolean _keepRunning = false;
     private transient int _seedUrlIndex;
     private transient RawUrl[] _ticklers;
-    
+
     /**
      * Note that we re-order parameters so this doesn't get confused with the constructor that takes a variable length
      * array of urls.
@@ -59,10 +58,11 @@ public class SeedUrlSource extends BaseUrlSource {
      * @param estimatedScore
      * @throws Exception
      */
-    public SeedUrlSource(int crawlDbParallelism, String seedUrlsFilename, float estimatedScore) throws Exception {
+    public SeedUrlSource(int crawlDbParallelism, String seedUrlsFilename, float estimatedScore)
+            throws Exception {
         _crawlDbParallelism = crawlDbParallelism;
         _estimatedScore = estimatedScore;
-        
+
         // If it's an S3 file, we delay processing until we're running, as the file could be really
         // big so we want to incrementally consume it.
         if (S3Utils.isS3File(seedUrlsFilename)) {
@@ -93,7 +93,8 @@ public class SeedUrlSource extends BaseUrlSource {
         }
     }
 
-    public SeedUrlSource(int crawlDbParallelism, float estimatedScore, String... rawUrls) throws Exception {
+    public SeedUrlSource(int crawlDbParallelism, float estimatedScore, String... rawUrls)
+            throws Exception {
         _crawlDbParallelism = crawlDbParallelism;
         _estimatedScore = estimatedScore;
 
@@ -121,7 +122,7 @@ public class SeedUrlSource extends BaseUrlSource {
         for (int i = 0; i < _crawlDbParallelism; i++) {
             _ticklers[i] = RawUrl.makeRawTickerUrl(getMaxParallelism(), _crawlDbParallelism, i);
         }
-        
+
         if (useS3File()) {
             AmazonS3 s3Client = S3Utils.makeS3Client();
             S3Object object = s3Client
@@ -177,17 +178,17 @@ public class SeedUrlSource extends BaseUrlSource {
             } else if (_seedUrlIndex < _urls.length) {
                 collectUrl(_urls[_seedUrlIndex++], context);
             }
-            
+
             // Now see if it's time to emit tickler URLs.
             long curTime = System.currentTimeMillis();
             if (curTime >= nextTickleTime) {
                 for (RawUrl tickler : _ticklers) {
                     collectUrl(tickler, context);
                 }
-                
+
                 nextTickleTime = curTime + TICKLER_INTERVAL;
             }
-            
+
             try {
                 // Sleep so we can be interrupted
                 Thread.sleep(10L);
@@ -199,7 +200,7 @@ public class SeedUrlSource extends BaseUrlSource {
         if (s3FileReader != null) {
             s3FileReader.close();
         }
-        
+
         // TODO(kkrugler) - generate termination URLs, then wait for the configured
         // amount of time before we actually return, and thus really end.
     }
@@ -214,7 +215,7 @@ public class SeedUrlSource extends BaseUrlSource {
                 LOGGER.trace(String.format("Emitting %s", url));
             }
         }
-        
+
         context.collect(url);
     }
 

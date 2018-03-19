@@ -37,111 +37,109 @@ import crawlercommons.robots.SimpleRobotRulesParser;
 
 public class FocusedCrawlTest {
 
-	static final Logger LOGGER = LoggerFactory.getLogger(CrawlTopologyTest.class);
-	
-	@Test
-	public void testFocused() throws Exception {
-		UrlLogger.clear();
+    static final Logger LOGGER = LoggerFactory.getLogger(CrawlTopologyTest.class);
 
-		LocalStreamEnvironment env = new LocalStreamEnvironmentWithAsyncExecution();
+    @Test
+    public void testFocused() throws Exception {
+        UrlLogger.clear();
 
-		final float minFetchScore = 0.75f;
-		SimpleUrlNormalizer normalizer = new SimpleUrlNormalizer();
-		ScoredWebGraph graph = new ScoredWebGraph(normalizer)
-			.add("domain1.com", 2.0f, "domain1.com/page1", "domain1.com/page2")
-			
-			// This page will get fetched right away, because the two links from domain1.com have score of 1.0f
-			.add("domain1.com/page1", 1.0f, "domain1.com/page3", "domain1.com/page4")
-			
-			// This page will get fetched right away, because the two links have score of 1.0f
-			.add("domain1.com/page2", 1.0f, "domain1.com/page5")
-			
-			// This page will never be fetched.
-			.add("domain1.com/page3", 1.0f)
+        LocalStreamEnvironment env = new LocalStreamEnvironmentWithAsyncExecution();
 
-			// This page will eventually be fetched. The first inbound link (from page1) has a score of 0.5,
-			// and then the next link from page5 adds 1.0 to push us over the threshhold
-			.add("domain1.com/page4", 1.0f)
+        final float minFetchScore = 0.75f;
+        SimpleUrlNormalizer normalizer = new SimpleUrlNormalizer();
+        ScoredWebGraph graph = new ScoredWebGraph(normalizer)
+                .add("domain1.com", 2.0f, "domain1.com/page1", "domain1.com/page2")
 
-			// This page will fetched right away, because page2 gives all of its score (1.0) to page5
-			.add("domain1.com/page5", 1.0f, "domain1.com/page4");
-			
-		File testDir = new File("target/FocusedCrawlTest/");
-		testDir.mkdirs();
-		File contentTextFile = new File(testDir, "content.txt");
-		if (contentTextFile.exists()) {
-			FileUtils.deleteFileOrDirectory(contentTextFile);
-		}
+                // This page will get fetched right away, because the two links from domain1.com have score of 1.0f
+                .add("domain1.com/page1", 1.0f, "domain1.com/page3", "domain1.com/page4")
+
+                // This page will get fetched right away, because the two links have score of 1.0f
+                .add("domain1.com/page2", 1.0f, "domain1.com/page5")
+
+                // This page will never be fetched.
+                .add("domain1.com/page3", 1.0f)
+
+                // This page will eventually be fetched. The first inbound link (from page1) has a score of 0.5,
+                // and then the next link from page5 adds 1.0 to push us over the threshhold
+                .add("domain1.com/page4", 1.0f)
+
+                // This page will fetched right away, because page2 gives all of its score (1.0) to page5
+                .add("domain1.com/page5", 1.0f, "domain1.com/page4");
+
+        File testDir = new File("target/FocusedCrawlTest/");
+        testDir.mkdirs();
+        File contentTextFile = new File(testDir, "content.txt");
+        if (contentTextFile.exists()) {
+            FileUtils.deleteFileOrDirectory(contentTextFile);
+        }
 
         final int crawlDbParallelism = 2;
         CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
                 // Explicitly set parallelism so that it doesn't vary based on # of cores
                 .setParallelism(1)
                 .setUrlSource(new SeedUrlSource(crawlDbParallelism, 1.0f, "http://domain1.com"))
-                .setUrlLengthener(new SimpleUrlLengthener(new MockUrlLengthenerFetcher.MockUrlLengthenerFetcherBuilder(new MockUrlLengthenerFetcher())))
+                .setUrlLengthener(new SimpleUrlLengthener(
+                        new MockUrlLengthenerFetcher.MockUrlLengthenerFetcherBuilder(
+                                new MockUrlLengthenerFetcher())))
                 .setRobotsFetcherBuilder(
                         new MockRobotsFetcher.MockRobotsFetcherBuilder(new MockRobotsFetcher()))
                 .setRobotsParser(new SimpleRobotRulesParser())
                 .setPageParser(new FocusedPageParser(new PageNumberScorer()))
                 .setContentSink(new DiscardingSink<ParsedUrl>())
-                .setContentTextFile(contentTextFile.getAbsolutePath())
-                .setUrlNormalizer(normalizer)
+                .setContentTextFile(contentTextFile.getAbsolutePath()).setUrlNormalizer(normalizer)
                 .setUrlFilter(new SimpleUrlValidator())
                 .setSiteMapFetcherBuilder(new SiteMapGraphFetcher.SiteMapGraphFetcherBuilder(
                         new SiteMapGraphFetcher(BaseWebGraph.EMPTY_GRAPH)))
-                .setSiteMapParser(new SimpleSiteMapParser())
-                .setDefaultCrawlDelay(0)
+                .setSiteMapParser(new SimpleSiteMapParser()).setDefaultCrawlDelay(0)
                 .setPageFetcherBuilder(
                         new WebGraphFetcher.WebGraphFetcherBuilder(new WebGraphFetcher(graph)))
                 .setFetchQueue(new FocusedFetchQueue(10_000, minFetchScore));
-			
-		CrawlTopology ct = builder.build();
-		
-		File dotFile = new File(testDir, "topology.dot");
-		ct.printDotFile(dotFile);
-		
-		// Execute for a maximum of 20 seconds, but terminate (successfully)
-		// if there's no activity for 5 seconds.
-		ct.execute(20_000, 5_000);
-		
-		for (Tuple3<Class<?>, String, Map<String, String>> entry : UrlLogger.getLog()) {
-			LOGGER.debug(String.format("%s: %s", entry.f0, entry.f1));
-		}
-		
-		String domain1page1 = normalizer.normalize("domain1.com/page1");
-		String domain1page2 = normalizer.normalize("domain1.com/page2");
-		String domain1page3 = normalizer.normalize("domain1.com/page3");
-		String domain1page4 = normalizer.normalize("domain1.com/page4");
-		String domain1page5 = normalizer.normalize("domain1.com/page5");
 
-		UrlLoggerResults results = new UrlLoggerResults(UrlLogger.getLog());
-		
-		results
-			.assertUrlLoggedBy(FetchUrlsFunction.class, domain1page1, 1)
-			.assertUrlLoggedBy(FetchUrlsFunction.class, domain1page2, 1)
-			// This page never got a high enough estimated score.
-			.assertUrlLoggedBy(FetchUrlsFunction.class, domain1page3, 0)
-			.assertUrlLoggedBy(FetchUrlsFunction.class, domain1page4, 1)
-			.assertUrlLoggedBy(FetchUrlsFunction.class, domain1page5, 1)
-			;
-	}
-	
-	@SuppressWarnings("serial")
-	private static class PageNumberScorer extends BasePageScorer {
-		
-		@Override
-		public float score(ParserResult parse) {
-			String title = parse.getParsedUrl().getTitle();
-			return Float.parseFloat(title.substring("Synthetic page - score = ".length()));
-		}
+        CrawlTopology ct = builder.build();
 
-		@Override
-		public void open(CrawlerAccumulator crawlerAccumulator) throws Exception {
-		}
+        File dotFile = new File(testDir, "topology.dot");
+        ct.printDotFile(dotFile);
 
-		@Override
-		public void close() throws Exception {
-		}
-	}
+        // Execute for a maximum of 20 seconds, but terminate (successfully)
+        // if there's no activity for 5 seconds.
+        ct.execute(20_000, 5_000);
+
+        for (Tuple3<Class<?>, String, Map<String, String>> entry : UrlLogger.getLog()) {
+            LOGGER.debug(String.format("%s: %s", entry.f0, entry.f1));
+        }
+
+        String domain1page1 = normalizer.normalize("domain1.com/page1");
+        String domain1page2 = normalizer.normalize("domain1.com/page2");
+        String domain1page3 = normalizer.normalize("domain1.com/page3");
+        String domain1page4 = normalizer.normalize("domain1.com/page4");
+        String domain1page5 = normalizer.normalize("domain1.com/page5");
+
+        UrlLoggerResults results = new UrlLoggerResults(UrlLogger.getLog());
+
+        results.assertUrlLoggedBy(FetchUrlsFunction.class, domain1page1, 1)
+                .assertUrlLoggedBy(FetchUrlsFunction.class, domain1page2, 1)
+                // This page never got a high enough estimated score.
+                .assertUrlLoggedBy(FetchUrlsFunction.class, domain1page3, 0)
+                .assertUrlLoggedBy(FetchUrlsFunction.class, domain1page4, 1)
+                .assertUrlLoggedBy(FetchUrlsFunction.class, domain1page5, 1);
+    }
+
+    @SuppressWarnings("serial")
+    private static class PageNumberScorer extends BasePageScorer {
+
+        @Override
+        public float score(ParserResult parse) {
+            String title = parse.getParsedUrl().getTitle();
+            return Float.parseFloat(title.substring("Synthetic page - score = ".length()));
+        }
+
+        @Override
+        public void open(CrawlerAccumulator crawlerAccumulator) throws Exception {
+        }
+
+        @Override
+        public void close() throws Exception {
+        }
+    }
 
 }

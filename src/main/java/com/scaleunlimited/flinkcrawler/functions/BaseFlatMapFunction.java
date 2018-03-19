@@ -10,24 +10,24 @@ import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 @SuppressWarnings("serial")
 public abstract class BaseFlatMapFunction<IN, OUT> extends RichFlatMapFunction<IN, OUT> {
 
-	protected transient int _parallelism;
-	protected transient int _partition;
+    protected transient int _parallelism;
+    protected transient int _partition;
 
-	@Override
-	public void open(Configuration parameters) throws Exception {
-		super.open(parameters);
-		
-		RuntimeContext context = getRuntimeContext();
-		_parallelism = context.getNumberOfParallelSubtasks();
-		_partition = context.getIndexOfThisSubtask() + 1;
-	}
-	
-	protected void record(Class<?> clazz, BaseUrl url, String... metaData) {
-		UrlLogger.record(clazz, _partition, _parallelism, url, metaData);
-	}
-	
-	protected void record(Class<?> clazz, BaseUrl url) {
-		UrlLogger.record(clazz, _partition, _parallelism, url);
-	}
-	
+    @Override
+    public void open(Configuration parameters) throws Exception {
+        super.open(parameters);
+
+        RuntimeContext context = getRuntimeContext();
+        _parallelism = context.getNumberOfParallelSubtasks();
+        _partition = context.getIndexOfThisSubtask() + 1;
+    }
+
+    protected void record(Class<?> clazz, BaseUrl url, String... metaData) {
+        UrlLogger.record(clazz, _partition, _parallelism, url, metaData);
+    }
+
+    protected void record(Class<?> clazz, BaseUrl url) {
+        UrlLogger.record(clazz, _partition, _parallelism, url);
+    }
+
 }

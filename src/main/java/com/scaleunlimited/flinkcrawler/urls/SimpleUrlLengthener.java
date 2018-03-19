@@ -31,12 +31,11 @@ public class SimpleUrlLengthener extends BaseUrlLengthener {
     private static final Pattern HOSTNAME_PATTERN = Pattern.compile("^https?://([^/:?]{3,})");
 
     private BaseHttpFetcherBuilder _fetcherBuilder;
-    
+
     private transient BaseHttpFetcher _fetcher;
     private transient Set<String> _urlShorteners;
-    
-    public SimpleUrlLengthener( UserAgent userAgent, 
-                                int maxConnectionsPerHost) {
+
+    public SimpleUrlLengthener(UserAgent userAgent, int maxConnectionsPerHost) {
         this(FetchUtils.makeRedirectFetcherBuilder(maxConnectionsPerHost, userAgent)
                 .setMaxConnectionsPerHost(maxConnectionsPerHost));
     }
@@ -45,7 +44,7 @@ public class SimpleUrlLengthener extends BaseUrlLengthener {
         super();
         _fetcherBuilder = fetcherBuilder;
     }
-    
+
     @Override
     public void open() throws Exception {
         _fetcher = _fetcherBuilder.build();
@@ -53,11 +52,11 @@ public class SimpleUrlLengthener extends BaseUrlLengthener {
     }
 
     @Override
-	public RawUrl lengthen(RawUrl url) {
-		// If the domain is a link shortener, lengthen it.
-		
+    public RawUrl lengthen(RawUrl url) {
+        // If the domain is a link shortener, lengthen it.
+
         String urlString = url.getUrl();
-        
+
         Matcher m = HOSTNAME_PATTERN.matcher(urlString);
         if (!m.find()) {
             return url;
@@ -68,7 +67,7 @@ public class SimpleUrlLengthener extends BaseUrlLengthener {
             // FUTURE - see if this looks like a shortened URL
             return url;
         }
-        
+
         String redirectedUrl = urlString;
         LOGGER.debug(String.format("Checking redirection of '%s'", urlString));
 
@@ -78,33 +77,36 @@ public class SimpleUrlLengthener extends BaseUrlLengthener {
             if (statusCode == HttpStatus.SC_OK) {
                 // This will happen if we're using a fetcher configured to
                 // follow redirects (rather than one configured to immediately
-                // return a 301).  This isn't very nice, since we're fetching
-                // content from the target site without checking its robot rules, 
+                // return a 301). This isn't very nice, since we're fetching
+                // content from the target site without checking its robot rules,
                 // but the caller knows best.
                 redirectedUrl = fr.getFetchedUrl();
-                LOGGER.debug(String.format("Normal redirection of %s to %s", urlString, redirectedUrl));
+                LOGGER.debug(
+                        String.format("Normal redirection of %s to %s", urlString, redirectedUrl));
             } else if (statusCode == HttpStatus.SC_MOVED_PERMANENTLY) {
                 redirectedUrl = extractRedirectUrl(fr, urlString);
                 LOGGER.debug(String.format("Redirecting %s to %s", urlString, redirectedUrl));
             } else {
-                LOGGER.debug(String.format("Status code %d processing redirect for '%s'", statusCode, urlString));
+                LOGGER.debug(String.format("Status code %d processing redirect for '%s'",
+                        statusCode, urlString));
             }
         } catch (BaseFetchException e) {
             // The site doesn't seem to like the way we're forcing it to redirect,
             // so just emit the same URL for downstream fetching.
-            LOGGER.debug("Exception processing redirect for " + urlString + ": " + e.getMessage(), e);
+            LOGGER.debug("Exception processing redirect for " + urlString + ": " + e.getMessage(),
+                    e);
         }
-        
-        return new RawUrl(redirectedUrl, url.getScore());
-	}
 
-	private String extractRedirectUrl(FetchedResult fr, String originalUrlAsString) {
+        return new RawUrl(redirectedUrl, url.getScore());
+    }
+
+    private String extractRedirectUrl(FetchedResult fr, String originalUrlAsString) {
         String redirectUrlAsString = fr.getHeaders().get(Headers.LOCATION);
         if (redirectUrlAsString == null) {
             LOGGER.warn("No redirect location available for: " + originalUrlAsString);
             return originalUrlAsString;
         }
-        
+
         try {
             new URL(redirectUrlAsString);
             return redirectUrlAsString;
@@ -115,30 +117,31 @@ public class SimpleUrlLengthener extends BaseUrlLengthener {
     }
 
     @Override
-	public int getTimeoutInSeconds() {
-	    if (_fetcher == null) {
-	        return _fetcherBuilder.getFetchDurationTimeoutInSeconds();
-	    }
-		return _fetcher.getFetchDurationTimeoutInSeconds();
-	}
-    
+    public int getTimeoutInSeconds() {
+        if (_fetcher == null) {
+            return _fetcherBuilder.getFetchDurationTimeoutInSeconds();
+        }
+        return _fetcher.getFetchDurationTimeoutInSeconds();
+    }
+
     public static Set<String> loadUrlShorteners() throws IOException {
         Set<String> result = new HashSet<String>();
-        List<String> lines = IOUtils.readLines(SimpleUrlLengthener.class.getResourceAsStream("/url-shorteners.txt"), "UTF-8");
+        List<String> lines = IOUtils.readLines(
+                SimpleUrlLengthener.class.getResourceAsStream("/url-shorteners.txt"), "UTF-8");
         for (String line : lines) {
             line = line.trim();
             if ((line.length() == 0) || (line.startsWith("#"))) {
                 continue;
             }
-            
+
             int commentIndex = line.indexOf('#');
             if (commentIndex != -1) {
                 line = line.substring(0, commentIndex).trim();
             }
-            
+
             result.add(line);
         }
-        
+
         return result;
     }
 }

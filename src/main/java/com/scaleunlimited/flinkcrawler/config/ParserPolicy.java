@@ -6,46 +6,45 @@ import java.util.Set;
 
 import com.scaleunlimited.flinkcrawler.parser.BaseLinkExtractor;
 
-
 /**
  * Definition of policy for parsing.
  * 
  */
 @SuppressWarnings("serial")
 public class ParserPolicy implements Serializable {
-    
+
     public static final int NO_MAX_PARSE_DURATION = Integer.MAX_VALUE;
-    
+
     public static final int DEFAULT_MAX_PARSE_DURATION = 30 * 1000;
-    
-    private int _maxParseDuration;        // Max # of milliseconds to wait for parse to complete a document.
-    
+
+    private int _maxParseDuration; // Max # of milliseconds to wait for parse to complete a document.
+
     private Set<String> _linkTags;
-    
+
     private Set<String> _linkAttributeTypes;
-    
+
     public ParserPolicy() {
         this(DEFAULT_MAX_PARSE_DURATION);
     }
 
     public ParserPolicy(int maxParseDuration) {
-        this(   maxParseDuration,
-                BaseLinkExtractor.DEFAULT_LINK_TAGS,
+        this(maxParseDuration, BaseLinkExtractor.DEFAULT_LINK_TAGS,
                 BaseLinkExtractor.DEFAULT_LINK_ATTRIBUTE_TYPES);
     }
 
-    public ParserPolicy(int maxParseDuration,
-                        Set<String> linkTags,
-                        Set<String> linkAttributeTypes) {
+    public ParserPolicy(int maxParseDuration, Set<String> linkTags,
+            Set<String> linkAttributeTypes) {
         if ((maxParseDuration <= 0) && (maxParseDuration != NO_MAX_PARSE_DURATION)) {
-            throw new InvalidParameterException("maxParseDuration must be > 0: " + maxParseDuration);
+            throw new InvalidParameterException(
+                    "maxParseDuration must be > 0: " + maxParseDuration);
         }
-        
+
         // Catch common error of specifying maxParseDuration in seconds versus milliseconds
-        if (maxParseDuration < 100)  {
-            throw new InvalidParameterException("maxParseDuration must be milliseconds, not seconds: " + maxParseDuration);
+        if (maxParseDuration < 100) {
+            throw new InvalidParameterException(
+                    "maxParseDuration must be milliseconds, not seconds: " + maxParseDuration);
         }
-        
+
         _maxParseDuration = maxParseDuration;
         _linkAttributeTypes = linkAttributeTypes;
         _linkTags = linkTags;
@@ -54,7 +53,7 @@ public class ParserPolicy implements Serializable {
     public int getMaxParseDuration() {
         return _maxParseDuration;
     }
-       
+
     public void setMaxParseDuration(int maxParseDuration) {
         _maxParseDuration = maxParseDuration;
     }
@@ -79,7 +78,8 @@ public class ParserPolicy implements Serializable {
     public int hashCode() {
         final int prime = 31;
         int result = 1;
-        result = prime * result + ((_linkAttributeTypes == null) ? 0 : _linkAttributeTypes.hashCode());
+        result = prime * result
+                + ((_linkAttributeTypes == null) ? 0 : _linkAttributeTypes.hashCode());
         result = prime * result + ((_linkTags == null) ? 0 : _linkTags.hashCode());
         result = prime * result + _maxParseDuration;
         return result;
@@ -110,14 +110,14 @@ public class ParserPolicy implements Serializable {
     }
 
     @Override
-	public String toString() {
+    public String toString() {
         StringBuilder result = new StringBuilder();
         result.append("Max parse duration: " + getMaxParseDuration());
         result.append('\r');
         result.append("Link tags: " + getLinkTags());
         result.append('\r');
         result.append("Link attribute types: " + getLinkAttributeTypes());
-        
+
         return result.toString();
     }
 }

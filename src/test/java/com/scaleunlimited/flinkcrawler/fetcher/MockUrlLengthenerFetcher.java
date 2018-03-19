@@ -28,13 +28,13 @@ public class MockUrlLengthenerFetcher extends BaseHttpFetcher {
             return _fetcher;
         }
     }
-    
+
     private Map<String, String> _redirections;
 
     public MockUrlLengthenerFetcher() {
         this(new HashMap<String, String>());
     }
-    
+
     public MockUrlLengthenerFetcher(Map<String, String> redirections) {
         super(1, makeUserAgent());
         _redirections = redirections;
@@ -43,13 +43,13 @@ public class MockUrlLengthenerFetcher extends BaseHttpFetcher {
     public static UserAgent makeUserAgent() {
         return new UserAgent("mock-url-lengthener-fetcher", "user@domain.com", "http://domain.com");
     }
-    
+
     @Override
     public FetchedResult get(String originalUrl, Payload payload) throws BaseFetchException {
-        
+
         final int responseRate = 1000;
         final String mimeType = "text/plain";
-        
+
         Headers headers = new Headers();
         int statusCode = HttpStatus.SC_MOVED_PERMANENTLY;
         String redirectedUrl = _redirections.get(originalUrl);
@@ -59,26 +59,16 @@ public class MockUrlLengthenerFetcher extends BaseHttpFetcher {
         } else {
             headers.add(Headers.LOCATION, redirectedUrl);
         }
-        
+
         // With max redirects set to 0, we don't get the redirected URL in the "actually fetched"
         // field of the FetchedResult (it's in the headers Location:xxx entry).
-        FetchedResult result = new FetchedResult(   originalUrl, 
-                                                    originalUrl, 
-                                                    0, 
-                                                    headers, 
-                                                    new byte[0], 
-                                                    mimeType, 
-                                                    responseRate, 
-                                                    payload, 
-                                                    originalUrl, 
-                                                    0, 
-                                                    "192.168.1.1", 
-                                                    statusCode, 
-                                                    null);
+        FetchedResult result = new FetchedResult(originalUrl, originalUrl, 0, headers, new byte[0],
+                mimeType, responseRate, payload, originalUrl, 0, "192.168.1.1", statusCode, null);
         return result;
     }
 
     @Override
-    public void abort() { }
+    public void abort() {
+    }
 
 }

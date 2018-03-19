@@ -19,20 +19,19 @@ import org.xml.sax.SAXException;
  */
 @SuppressWarnings("serial")
 public class HtmlContentExtractor extends BaseContentExtractor {
-    
-    private  ContentHandler _contentHandler = null;
+
+    private ContentHandler _contentHandler = null;
     private transient StringWriter _stringWriter = null;
     private String _method;
-    
+
     public HtmlContentExtractor() {
         this("html");
     }
-    
+
     public HtmlContentExtractor(String method) {
         _method = method;
     }
-    
-    
+
     @Override
     public void ignorableWhitespace(char[] ch, int start, int length) throws SAXException {
         _contentHandler.ignorableWhitespace(ch, start, length);
@@ -72,7 +71,7 @@ public class HtmlContentExtractor extends BaseContentExtractor {
         }
         _contentHandler.startDocument();
     }
-    
+
     @Override
     public void endDocument() throws SAXException {
         _contentHandler.endDocument();
@@ -80,20 +79,21 @@ public class HtmlContentExtractor extends BaseContentExtractor {
     }
 
     @Override
-    public void startElement(String uri, String localName, String qName, Attributes atts) throws SAXException {
+    public void startElement(String uri, String localName, String qName, Attributes atts)
+            throws SAXException {
         _contentHandler.startElement(uri, localName, qName, atts);
-    }    
-    
+    }
+
     @Override
     public void characters(char[] ch, int start, int length) throws SAXException {
         _contentHandler.characters(ch, start, length);
     }
-    
+
     @Override
     public void endElement(String uri, String localName, String qName) throws SAXException {
         _contentHandler.endElement(uri, localName, qName);
     }
-    
+
     @Override
     public String getContent() {
         return _stringWriter.toString();
@@ -106,29 +106,27 @@ public class HtmlContentExtractor extends BaseContentExtractor {
             _stringWriter.getBuffer().setLength(0);
         }
     }
+
     /**
-     * Returns a transformer handler that serializes incoming SAX events
-     * to XHTML or HTML (depending the given method) using the given output
-     * encoding.
+     * Returns a transformer handler that serializes incoming SAX events to XHTML or HTML (depending the given method)
+     * using the given output encoding.
      *
-     * @param method "xml" or "html"
-     * @param encoding output encoding,
-     *                 or <code>null</code> for the platform default
+     * @param method
+     *            "xml" or "html"
+     * @param encoding
+     *            output encoding, or <code>null</code> for the platform default
      * @return {@link System#out} transformer handler
      * @throws TransformerConfigurationException
-     *         if the transformer can not be created
+     *             if the transformer can not be created
      */
-    private static TransformerHandler getTransformerHandler(
-            String method, String encoding)
+    private static TransformerHandler getTransformerHandler(String method, String encoding)
             throws TransformerConfigurationException {
-        SAXTransformerFactory factory = (SAXTransformerFactory)
-                SAXTransformerFactory.newInstance();
+        SAXTransformerFactory factory = (SAXTransformerFactory) SAXTransformerFactory.newInstance();
         TransformerHandler handler = factory.newTransformerHandler();
         handler.getTransformer().setOutputProperty(OutputKeys.METHOD, method);
         handler.getTransformer().setOutputProperty(OutputKeys.INDENT, "yes");
         if (encoding != null) {
-            handler.getTransformer().setOutputProperty(
-                    OutputKeys.ENCODING, encoding);
+            handler.getTransformer().setOutputProperty(OutputKeys.ENCODING, encoding);
         }
         return handler;
     }

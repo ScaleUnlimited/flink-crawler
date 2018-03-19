@@ -10,9 +10,8 @@ import crawlercommons.fetcher.http.UserAgent;
 public class CrawlToolTest {
 
     private static final UserAgent INVALID_USER_AGENT = new UserAgent(
-        "DO NOT USE THIS USER AGENT (i.e., MAKE YOUR OWN)!",
-        "flink-crawler@scaleunlimited.com",
-        "https://github.com/ScaleUnlimited/flink-crawler/wiki/Crawler-Policy");
+            "DO NOT USE THIS USER AGENT (i.e., MAKE YOUR OWN)!", "flink-crawler@scaleunlimited.com",
+            "https://github.com/ScaleUnlimited/flink-crawler/wiki/Crawler-Policy");
 
     @Before
     public void setUp() throws Exception {
@@ -27,10 +26,10 @@ public class CrawlToolTest {
             // expected
             assertTrue(e.getMessage().toLowerCase().contains("agent"));
         }
-        
+
         options.setCommonCrawlId("42");
         options.validate();
-        
+
         options.setUserAgent(INVALID_USER_AGENT);
         try {
             options.validate();
@@ -38,7 +37,7 @@ public class CrawlToolTest {
             // expected
             assertTrue(e.getMessage().toLowerCase().contains("common"));
         }
-        
+
         options.setCommonCrawlId(null);
         options.validate();
     }

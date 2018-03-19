@@ -29,22 +29,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * A wrapper for ThreadPoolExecutor that implements a specific behavior we need.
- * When execute() is called, it succeeds unless all of the threads are busy and the
- * specified timeout is exceeded (no threads finish up in that amount of time).
+ * A wrapper for ThreadPoolExecutor that implements a specific behavior we need. When execute() is called, it succeeds
+ * unless all of the threads are busy and the specified timeout is exceeded (no threads finish up in that amount of
+ * time).
  *
  */
 public class ThreadedExecutor {
-	private static final Logger LOGGER = LoggerFactory.getLogger(ThreadedExecutor.class);
-	
-	private static final String DEFAULT_NAME = "Flink-crawler";
+    private static final Logger LOGGER = LoggerFactory.getLogger(ThreadedExecutor.class);
+
+    private static final String DEFAULT_NAME = "Flink-crawler";
 
     /**
-     * Always wait for some time when offer() is called. This gives any
-     * active threads that much time to complete, before a RejectedExectionException
-     * is thrown.
+     * Always wait for some time when offer() is called. This gives any active threads that much time to complete,
+     * before a RejectedExectionException is thrown.
      *
-     * @param <E> element stored in queue
+     * @param <E>
+     *            element stored in queue
      */
     @SuppressWarnings("serial")
     private class MyBlockingQueue<E> extends SynchronousQueue<E> {
@@ -66,42 +66,43 @@ public class ThreadedExecutor {
 
     private long _requestTimeout;
     private ThreadPoolExecutor _pool;
-    
+
     public ThreadedExecutor(int numThreads) {
-    	this(numThreads, Long.MAX_VALUE);
+        this(numThreads, Long.MAX_VALUE);
     }
-    
+
     public ThreadedExecutor(String name, int numThreads) {
-    	this(name, numThreads, Long.MAX_VALUE);
+        this(name, numThreads, Long.MAX_VALUE);
     }
-    
+
     public ThreadedExecutor(int numThreads, long requestTimeout) {
-    	this(DEFAULT_NAME, numThreads, requestTimeout);
+        this(DEFAULT_NAME, numThreads, requestTimeout);
     }
-    
+
     public ThreadedExecutor(String name, int numThreads, long requestTimeout) {
         _requestTimeout = requestTimeout;
-        
+
         // With the "always offer with a timeout" queue, the maximumPoolSize should always
         // be set to the same as the corePoolSize, as otherwise things get very inefficient
         // since each execute() call will will delay by <requestTimeout> even if we could add more
         // threads. And since these two values are the same, the keepAliveTime value has
         // no meaning.
-        
+
         BlockingQueue<Runnable> queue = new MyBlockingQueue<Runnable>();
-        _pool = new ThreadPoolExecutor(numThreads, numThreads, Long.MAX_VALUE, TimeUnit.MILLISECONDS, queue);
-        
+        _pool = new ThreadPoolExecutor(numThreads, numThreads, Long.MAX_VALUE,
+                TimeUnit.MILLISECONDS, queue);
+
         // Give the threads used by this executor a consistent name.
         final ThreadGroup group = new ThreadGroup(name);
         _pool.setThreadFactory(new ThreadFactory() {
-			
-			@Override
-			public Thread newThread(Runnable r) {
-				return new Thread(group, r);
-			}
-		});
+
+            @Override
+            public Thread newThread(Runnable r) {
+                return new Thread(group, r);
+            }
+        });
     }
-    
+
     /**
      * Execute <command> using the thread pool.
      * 
@@ -111,8 +112,7 @@ public class ThreadedExecutor {
     public void execute(Runnable command) throws RejectedExecutionException {
         _pool.execute(command);
     }
-    
-    
+
     /**
      * Return number of active threads
      * 
@@ -121,22 +121,22 @@ public class ThreadedExecutor {
     public int getActiveCount() {
         return _pool.getActiveCount();
     }
-    
+
     /**
      * Terminate the thread pool.
      * 
      * @return true if we did a normal termination, false if we had to do a hard shutdown
-     * @throws InterruptedException 
+     * @throws InterruptedException
      */
     public boolean terminate(int duration, TimeUnit timeUnit) throws InterruptedException {
-        
+
         // First just wait for threads to terminate naturally.
         _pool.shutdown();
         LOGGER.info("Waiting for pool termination ({} {})", duration, timeUnit);
         if (_pool.awaitTermination(duration, timeUnit)) {
             return true;
         }
-        
+
         // We need to do a hard shutdown
         List<Runnable> remainingTasks = _pool.shutdownNow();
         if (remainingTasks.size() != 0) {
@@ -145,7 +145,7 @@ public class ThreadedExecutor {
             // for a thread to terminate, and then this terminate was called).
             throw new RuntimeException("There should never be any tasks in the queue");
         }
-        
+
         return false;
     }
 

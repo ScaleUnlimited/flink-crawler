@@ -19,31 +19,20 @@ public class NoopHttpFetcherBuilder extends BaseHttpFetcherBuilder {
     public NoopHttpFetcherBuilder(UserAgent userAgent) {
         super(1, userAgent);
     }
-    
+
     @Override
     public BaseHttpFetcher build() throws Exception {
 
         return new BaseHttpFetcher(0, getUserAgent()) {
-            
+
             @Override
-            public FetchedResult get(String robotsUrl, Payload payload)
-                    throws BaseFetchException {
+            public FetchedResult get(String robotsUrl, Payload payload) throws BaseFetchException {
                 final int responseRate = 1000;
-                return new FetchedResult(   robotsUrl, 
-                                            robotsUrl, 
-                                            0, 
-                                            new Headers(), 
-                                            new byte[0], 
-                                            "text/plain", 
-                                            responseRate, 
-                                            payload, 
-                                            robotsUrl, 
-                                            0, 
-                                            "192.168.1.1", 
-                                            HttpStatus.SC_NOT_FOUND, 
-                                            null);
+                return new FetchedResult(robotsUrl, robotsUrl, 0, new Headers(), new byte[0],
+                        "text/plain", responseRate, payload, robotsUrl, 0, "192.168.1.1",
+                        HttpStatus.SC_NOT_FOUND, null);
             }
-            
+
             @Override
             public void abort() {
             }

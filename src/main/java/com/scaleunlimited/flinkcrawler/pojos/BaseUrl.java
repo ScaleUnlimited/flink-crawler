@@ -7,59 +7,59 @@ import com.scaleunlimited.flinkcrawler.utils.FlinkUtils;
 
 @SuppressWarnings("serial")
 public abstract class BaseUrl implements Serializable {
-	
+
     private static String TICKLER_URL_FORMAT = "http://flickcrawler-tickler-url-%d.com";
     private static String TERMINATE_URL_FORMAT = "http://flickcrawler-terminate-url-%d.com";
-    
-	private String _url;
-	private UrlType _urlType;
-	
-	public BaseUrl() {
-	    _urlType = UrlType.REGULAR;
-	}
-	
-	public BaseUrl(BaseUrl base) {
-		this(base.getUrl(), base.getUrlType());
-	}
-	
+
+    private String _url;
+    private UrlType _urlType;
+
+    public BaseUrl() {
+        _urlType = UrlType.REGULAR;
+    }
+
+    public BaseUrl(BaseUrl base) {
+        this(base.getUrl(), base.getUrlType());
+    }
+
     public BaseUrl(String urlAsString) {
         this(urlAsString, UrlType.REGULAR);
     }
-    
+
     protected BaseUrl(String urlAsString, UrlType urlType) {
         _url = urlAsString;
         _urlType = urlType;
     }
-    
-	public void setUrl(String url) throws MalformedURLException {
-        _url = url;
-	}
-	
-	public String getUrl() {
-		return _url;
-	}
 
-	public void setUrlType(UrlType type) {
-	    _urlType = type;
-	}
-	
-	public UrlType getUrlType() {
-	    return _urlType;
-	}
-	
-	public boolean isRegular() {
-	    return _urlType == UrlType.REGULAR;
-	}
-	
-	public void clear() {
-		_url = null;
-		_urlType = UrlType.REGULAR;
-	}
-	
-	@Override
-	public String toString() {
-		return String.format("%s (%s)", _url, _urlType);
-	}
+    public void setUrl(String url) throws MalformedURLException {
+        _url = url;
+    }
+
+    public String getUrl() {
+        return _url;
+    }
+
+    public void setUrlType(UrlType type) {
+        _urlType = type;
+    }
+
+    public UrlType getUrlType() {
+        return _urlType;
+    }
+
+    public boolean isRegular() {
+        return _urlType == UrlType.REGULAR;
+    }
+
+    public void clear() {
+        _url = null;
+        _urlType = UrlType.REGULAR;
+    }
+
+    @Override
+    public String toString() {
+        return String.format("%s (%s)", _url, _urlType);
+    }
 
     @Override
     public int hashCode() {
@@ -95,13 +95,15 @@ public abstract class BaseUrl implements Serializable {
     }
 
     public static BaseUrl makeTicklerUrl(int maxParallelism, int parallelism, int operatorIndex) {
-        return new BaseUrl(FlinkUtils.makeKeyForOperatorIndex(TICKLER_URL_FORMAT, maxParallelism, parallelism, operatorIndex),
-                UrlType.TICKLER) {};
+        return new BaseUrl(FlinkUtils.makeKeyForOperatorIndex(TICKLER_URL_FORMAT, maxParallelism,
+                parallelism, operatorIndex), UrlType.TICKLER) {
+        };
     }
-    
+
     public static BaseUrl makeTerminateUrl(int maxParallelism, int parallelism, int operatorIndex) {
-        return new BaseUrl(FlinkUtils.makeKeyForOperatorIndex(TERMINATE_URL_FORMAT, maxParallelism, parallelism, operatorIndex),
-                UrlType.TERMINATION) {};
+        return new BaseUrl(FlinkUtils.makeKeyForOperatorIndex(TERMINATE_URL_FORMAT, maxParallelism,
+                parallelism, operatorIndex), UrlType.TERMINATION) {
+        };
     }
-    
+
 }

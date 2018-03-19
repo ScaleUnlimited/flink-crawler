@@ -6,11 +6,11 @@ import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 
 @SuppressWarnings("serial")
 public abstract class BaseUrlLengthener implements Serializable {
-    
+
     public abstract void open() throws Exception;
 
-	public abstract RawUrl lengthen(RawUrl url);
+    public abstract RawUrl lengthen(RawUrl url);
 
-	public abstract int getTimeoutInSeconds();
-	
+    public abstract int getTimeoutInSeconds();
+
 }

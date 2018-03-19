@@ -18,15 +18,19 @@ public abstract class BaseContentExtractor extends DefaultHandler implements Ser
         _inBody = false;
         _inTitle = false;
     }
-    
+
     public abstract String getContent();
-    
+
     // Routines to simplify using base functionality.
-    public void addContent(char[] ch, int start, int length) {};
-    public void addContent(char ch) {};
-    
+    public void addContent(char[] ch, int start, int length) {
+    };
+
+    public void addContent(char ch) {
+    };
+
     @Override
-    public void startElement(String uri, String localName, String name, Attributes atts) throws SAXException {
+    public void startElement(String uri, String localName, String name, Attributes atts)
+            throws SAXException {
         super.startElement(uri, localName, name, atts);
 
         if (_inHead) {
@@ -39,11 +43,11 @@ public abstract class BaseContentExtractor extends DefaultHandler implements Ser
             _inBody = true;
         }
     }
-    
+
     @Override
     public void characters(char[] ch, int start, int length) throws SAXException {
         super.characters(ch, start, length);
-        
+
         if (_inTitle) {
             addContent(ch, start, length);
             addContent(' ');
@@ -51,18 +55,20 @@ public abstract class BaseContentExtractor extends DefaultHandler implements Ser
             addContent(ch, start, length);
         }
     }
-    
-    /* (non-Javadoc)
+
+    /*
+     * (non-Javadoc)
+     * 
      * @see org.xml.sax.helpers.DefaultHandler#ignorableWhitespace(char[], int, int)
      * 
-     * We want to capture whitespace, as otherwise HTML elements get jammed together (e.g.
-     * <li>xxx</li><li>yyy</li> will show up as xxxyyy).
+     * We want to capture whitespace, as otherwise HTML elements get jammed together (e.g. <li>xxx</li><li>yyy</li> will
+     * show up as xxxyyy).
      */
     @Override
     public void ignorableWhitespace(char[] ch, int start, int length) throws SAXException {
         characters(ch, start, length);
     }
-    
+
     @Override
     public void endElement(String uri, String localName, String name) throws SAXException {
         super.endElement(uri, localName, name);

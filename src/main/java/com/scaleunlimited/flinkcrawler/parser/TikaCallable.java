@@ -24,15 +24,14 @@ import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ValidUrl;
 
-
 class TikaCallable implements Callable<ParserResult> {
     private static final Logger LOGGER = LoggerFactory.getLogger(TikaCallable.class);
-    
+
     private static class CustomHtmlMapper extends DefaultHtmlMapper {
-        
+
         private Set<String> _validTags;
         private Set<String> _validAttributes;
-        
+
         public CustomHtmlMapper(Set<String> validTags, Set<String> validAttributes) {
             _validTags = validTags;
             _validAttributes = validAttributes;
@@ -46,13 +45,13 @@ class TikaCallable implements Callable<ParserResult> {
                 return super.mapSafeElement(name);
             }
         }
-        
+
         @Override
         public String mapSafeAttribute(String elementName, String attributeName) {
             // TODO KKr - really the _validAttributes should be a map from element name
             // to a list of valid attributes, but that's not how it's implemented currently.
             // So we blindly assume that if the attribute exists, it's valid.
-            
+
             if (_validAttributes.contains(attributeName)) {
                 return attributeName;
             } else {
@@ -72,17 +71,22 @@ class TikaCallable implements Callable<ParserResult> {
     private Metadata _metadata;
     private boolean _extractLanguage;
     private ParseContext _parseContext;
-    
-    public TikaCallable(Parser parser, BaseContentExtractor contentExtractor, BaseLinkExtractor linkExtractor, InputStream input, Metadata metadata) {
+
+    public TikaCallable(Parser parser, BaseContentExtractor contentExtractor,
+            BaseLinkExtractor linkExtractor, InputStream input, Metadata metadata) {
         this(parser, contentExtractor, linkExtractor, input, metadata, true);
     }
 
-    public TikaCallable(Parser parser, BaseContentExtractor contentExtractor, BaseLinkExtractor linkExtractor, InputStream input, Metadata metadata, boolean extractLanguage) {
+    public TikaCallable(Parser parser, BaseContentExtractor contentExtractor,
+            BaseLinkExtractor linkExtractor, InputStream input, Metadata metadata,
+            boolean extractLanguage) {
         this(parser, contentExtractor, linkExtractor, input, metadata, true, null);
- 
+
     }
-    
-    public TikaCallable(Parser parser, BaseContentExtractor contentExtractor, BaseLinkExtractor linkExtractor, InputStream input, Metadata metadata, boolean extractLanguage, ParseContext parseContext) {
+
+    public TikaCallable(Parser parser, BaseContentExtractor contentExtractor,
+            BaseLinkExtractor linkExtractor, InputStream input, Metadata metadata,
+            boolean extractLanguage, ParseContext parseContext) {
         _parser = parser;
         _contentExtractor = contentExtractor;
         _linkExtractor = linkExtractor;
@@ -91,16 +95,17 @@ class TikaCallable implements Callable<ParserResult> {
         _extractLanguage = extractLanguage;
         _parseContext = parseContext;
     }
-    
+
     @Override
     public ParserResult call() throws Exception {
         try {
             TeeContentHandler teeContentHandler;
             ProfilingHandler profilingHandler = null;
-            
+
             if (_extractLanguage) {
                 profilingHandler = new ProfilingHandler();
-                teeContentHandler = new TeeContentHandler(_contentExtractor, _linkExtractor, profilingHandler);
+                teeContentHandler = new TeeContentHandler(_contentExtractor, _linkExtractor,
+                        profilingHandler);
             } else {
                 teeContentHandler = new TeeContentHandler(_contentExtractor, _linkExtractor);
             }
@@ -109,15 +114,15 @@ class TikaCallable implements Callable<ParserResult> {
                 _parseContext = makeParseContext();
             }
             _parser.parse(_input, teeContentHandler, _metadata, _parseContext);
-            
+
             String lang = _extractLanguage ? detectLanguage(_metadata, profilingHandler) : "";
-            
+
             // We have to construct a ValidUrl from a string. We know the URL should be valid, so it should never throw
             // an exception.
             ValidUrl parsedUrl = new ValidUrl(_metadata.get(Metadata.RESOURCE_NAME_KEY));
             return new ParserResult(new ParsedUrl(parsedUrl, _contentExtractor.getContent(), lang,
-                    _metadata.get(TikaCoreProperties.TITLE), makeMap(_metadata), RawUrl.DEFAULT_SCORE),
-                    _linkExtractor.getLinks());
+                    _metadata.get(TikaCoreProperties.TITLE), makeMap(_metadata),
+                    RawUrl.DEFAULT_SCORE), _linkExtractor.getLinks());
         } catch (Exception e) {
             // Generic exception that's OK to re-throw
             throw e;
@@ -128,10 +133,10 @@ class TikaCallable implements Callable<ParserResult> {
             throw new RuntimeException("Serious shut-down error thrown from Tika", t);
         }
     }
-    
+
     /**
-     * Decide if we need to set up our own HtmlMapper, because the link extractor has tags that
-     * aren't part of the default set.
+     * Decide if we need to set up our own HtmlMapper, because the link extractor has tags that aren't part of the
+     * default set.
      * 
      * @return
      */
@@ -142,36 +147,37 @@ class TikaCallable implements Callable<ParserResult> {
         HtmlMapper defaultMapper = DefaultHtmlMapper.INSTANCE;
         for (String tag : validTags) {
             if (defaultMapper.mapSafeElement(tag) == null) {
-                result.set(HtmlMapper.class, new CustomHtmlMapper(validTags, _linkExtractor.getLinkAttributeTypes()));
+                result.set(HtmlMapper.class,
+                        new CustomHtmlMapper(validTags, _linkExtractor.getLinkAttributeTypes()));
                 break;
             }
         }
-        
+
         return result;
     }
 
     /**
-     * See if a language was set by the parser, from meta tags.
-     * As a last resort falls back to the result from the ProfilingHandler.
-     *  
+     * See if a language was set by the parser, from meta tags. As a last resort falls back to the result from the
+     * ProfilingHandler.
+     * 
      * @param metadata
      * @param profilingHandler
      * @return The first language found (two char lang code) or empty string if no language was detected.
      */
     private static String detectLanguage(Metadata metadata, ProfilingHandler profilingHandler) {
         String result = null;
-        
+
         String dubCoreLang = metadata.get(TikaCoreProperties.LANGUAGE);
         String httpEquivLang = metadata.get(Metadata.CONTENT_LANGUAGE);
-        
+
         if (dubCoreLang != null) {
             result = dubCoreLang;
         } else if (httpEquivLang != null) {
             result = httpEquivLang;
         }
-        
+
         result = getFirstLanguage(result);
-        
+
         if (result == null) {
             // Language is still unspecified, so use ProfileHandler's result
             LanguageIdentifier langIdentifier = profilingHandler.getLanguage();
@@ -184,40 +190,39 @@ class TikaCallable implements Callable<ParserResult> {
             }
 
         }
-        
+
         return result;
     }
 
     private static Map<String, String> makeMap(Metadata metadata) {
         Map<String, String> result = new HashMap<String, String>();
-        
+
         for (String key : metadata.names()) {
             result.put(key, metadata.get(key));
         }
-        
+
         return result;
     }
-
 
     private static String getFirstLanguage(String lang) {
         if (lang != null && lang.length() > 0) {
             // TODO VMa -- DublinCore languages could be specified in a multiple of ways
             // see : http://dublincore.org/documents/2000/07/16/usageguide/qualified-html.shtml#language
             // This means that it is possible to get back 3 character language strings as per ISO639-2
-            // For now, we handle just two character language strings and if we do get a 3 character string we 
+            // For now, we handle just two character language strings and if we do get a 3 character string we
             // treat it as a "null" language.
-            
+
             // TODO VMa - what if the length is just one char ?
             if (lang.length() > 2) {
                 Matcher m = LANGUAGE_CODE_PATTERN.matcher(lang);
-                
+
                 if (m.matches()) {
                     lang = m.group(1);
                 } else {
                     lang = null;
                 }
             }
-        } 
+        }
         return lang;
     }
 

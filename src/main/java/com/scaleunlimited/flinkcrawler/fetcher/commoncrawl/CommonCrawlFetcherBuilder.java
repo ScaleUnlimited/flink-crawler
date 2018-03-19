@@ -30,110 +30,112 @@ import crawlercommons.fetcher.http.UserAgent;
 public class CommonCrawlFetcherBuilder extends BaseHttpFetcherBuilder {
     private static Logger LOGGER = LoggerFactory.getLogger(CommonCrawlFetcherBuilder.class);
 
-	private static final String SERIALIZED_SECONDARY_INDEX_FILENAME = "secondary_index.bin.gz";
+    private static final String SERIALIZED_SECONDARY_INDEX_FILENAME = "secondary_index.bin.gz";
     private static final String SECONDARY_INDEX_FILENAME = "cluster.idx";
 
-	private String _crawlId;
-	private File _cachedFile;
-    
-    public CommonCrawlFetcherBuilder(   int maxSimultaneousRequests, 
-	                                    UserAgent userAgent,
-	                                    String crawlId,
-	                                    String cacheDir) {
-		super(maxSimultaneousRequests, userAgent);
-		_crawlId = crawlId;
-		if (cacheDir != null) {
-	        _cachedFile = makeCacheFile(new File(cacheDir));
+    private String _crawlId;
+    private File _cachedFile;
+
+    public CommonCrawlFetcherBuilder(int maxSimultaneousRequests, UserAgent userAgent,
+            String crawlId, String cacheDir) {
+        super(maxSimultaneousRequests, userAgent);
+        _crawlId = crawlId;
+        if (cacheDir != null) {
+            _cachedFile = makeCacheFile(new File(cacheDir));
             try {
                 prepCache(_cachedFile);
             } catch (IOException e) {
                 throw new RuntimeException("Unable to prepare secondary index file cache", e);
             }
-		}
-	}
+        }
+    }
 
-	private void prepCache(File cachedFile) throws IOException {
-		// Load the cache with the serialized secondary index file.
+    private void prepCache(File cachedFile) throws IOException {
+        // Load the cache with the serialized secondary index file.
 
-		AmazonS3 client = makeClient();
-		if (!cachedFile.exists()) {
-			// Fetch the secondary index file, which we need in memory.
-			String s3Path = S3Utils.makeS3FilePath(_crawlId, SECONDARY_INDEX_FILENAME);
+        AmazonS3 client = makeClient();
+        if (!cachedFile.exists()) {
+            // Fetch the secondary index file, which we need in memory.
+            String s3Path = S3Utils.makeS3FilePath(_crawlId, SECONDARY_INDEX_FILENAME);
 
-			LOGGER.info("Downloading and parsing secondary index file for " + _crawlId + " from " + s3Path);
-			
-			try (S3Object object = client.getObject(new GetObjectRequest(S3Utils.getBucket(), s3Path))) {
-				BufferedReader br = new BufferedReader(new InputStreamReader(object.getObjectContent(), StandardCharsets.UTF_8));
-				SecondaryIndexMap.Builder builder = new SecondaryIndexMap.Builder(1_100_000);
-				String line;
-				while ((line = br.readLine()) != null) {
-					builder.add(line);
-				}
-				
-				SecondaryIndexMap secondaryIndexMap = builder.build();
-				
-				// Serialize the map for next time.
-				cachedFile.getParentFile().mkdirs();
-				cachedFile.createNewFile();
-				LOGGER.info("Saving serialized secondary index file for " + _crawlId + " to " + cachedFile);
-				try (DataOutputStream out = new DataOutputStream(new GZIPOutputStream(new FileOutputStream(cachedFile)))) {
-					secondaryIndexMap.write(out);
-				}
-			}
-		}
-	}
-	
-	private AmazonS3 makeClient() {
-		return AmazonS3ClientBuilder
-                .standard()
-                .withCredentials(new MyS3CredentialsProviderChain())
+            LOGGER.info("Downloading and parsing secondary index file for " + _crawlId + " from "
+                    + s3Path);
+
+            try (S3Object object = client
+                    .getObject(new GetObjectRequest(S3Utils.getBucket(), s3Path))) {
+                BufferedReader br = new BufferedReader(
+                        new InputStreamReader(object.getObjectContent(), StandardCharsets.UTF_8));
+                SecondaryIndexMap.Builder builder = new SecondaryIndexMap.Builder(1_100_000);
+                String line;
+                while ((line = br.readLine()) != null) {
+                    builder.add(line);
+                }
+
+                SecondaryIndexMap secondaryIndexMap = builder.build();
+
+                // Serialize the map for next time.
+                cachedFile.getParentFile().mkdirs();
+                cachedFile.createNewFile();
+                LOGGER.info("Saving serialized secondary index file for " + _crawlId + " to "
+                        + cachedFile);
+                try (DataOutputStream out = new DataOutputStream(
+                        new GZIPOutputStream(new FileOutputStream(cachedFile)))) {
+                    secondaryIndexMap.write(out);
+                }
+            }
+        }
+    }
+
+    private AmazonS3 makeClient() {
+        return AmazonS3ClientBuilder.standard().withCredentials(new MyS3CredentialsProviderChain())
                 // TODO control the region???
-                .withRegion("us-east-1")
-                .build();
-	}
-	
-	private File makeCacheFile(File cacheDir) {
-		if (_crawlId == null) {
-			throw new IllegalStateException("Can't set up cache file if crawl id hasn't been set");
-		}
-		return new File(cacheDir, String.format("%s-%s", _crawlId, SERIALIZED_SECONDARY_INDEX_FILENAME));
-	}
-	
-	@Override
-	public BaseHttpFetcher build() throws Exception {
-		AmazonS3 client = makeClient();
-		
-		// If the caller hasn't set up a cachedFile then we create one in a temp location
-		if (_cachedFile == null) {
+                .withRegion("us-east-1").build();
+    }
+
+    private File makeCacheFile(File cacheDir) {
+        if (_crawlId == null) {
+            throw new IllegalStateException("Can't set up cache file if crawl id hasn't been set");
+        }
+        return new File(cacheDir,
+                String.format("%s-%s", _crawlId, SERIALIZED_SECONDARY_INDEX_FILENAME));
+    }
+
+    @Override
+    public BaseHttpFetcher build() throws Exception {
+        AmazonS3 client = makeClient();
+
+        // If the caller hasn't set up a cachedFile then we create one in a temp location
+        if (_cachedFile == null) {
             File tempDir = File.createTempFile("cache-dir", "");
             tempDir.delete();
             tempDir.mkdir();
             _cachedFile = makeCacheFile(tempDir);
             prepCache(_cachedFile);
-		}
+        }
 
-		LOGGER.info("Loading serialized secondary index for cache from " + _cachedFile);
-		try (DataInputStream in = new DataInputStream(new GZIPInputStream(new FileInputStream(_cachedFile)))) {
-			SecondaryIndexMap secondaryIndexMap = new SecondaryIndexMap();
-			secondaryIndexMap.read(in);
-			CommonCrawlFetcher result = new CommonCrawlFetcher(client, _crawlId, _maxSimultaneousRequests, CommonCrawlFetcher.DEFAULT_CACHE_SIZE, secondaryIndexMap);
-			return configure(result);
-		}
-	}
-	
+        LOGGER.info("Loading serialized secondary index for cache from " + _cachedFile);
+        try (DataInputStream in = new DataInputStream(
+                new GZIPInputStream(new FileInputStream(_cachedFile)))) {
+            SecondaryIndexMap secondaryIndexMap = new SecondaryIndexMap();
+            secondaryIndexMap.read(in);
+            CommonCrawlFetcher result = new CommonCrawlFetcher(client, _crawlId,
+                    _maxSimultaneousRequests, CommonCrawlFetcher.DEFAULT_CACHE_SIZE,
+                    secondaryIndexMap);
+            return configure(result);
+        }
+    }
+
     /**
-     * We want to use the S3CredentialsProviderChain, which supports the --no-sign-request (CLI) option,
-     * but that's not visible. So always pretend like we have no credentials.
+     * We want to use the S3CredentialsProviderChain, which supports the --no-sign-request (CLI) option, but that's not
+     * visible. So always pretend like we have no credentials.
      *
      */
     private static class MyS3CredentialsProviderChain extends DefaultAWSCredentialsProviderChain {
-    	
-    	@Override
-    	public AWSCredentials getCredentials() {
-    		return null;
-    	}
-    }
-    
 
+        @Override
+        public AWSCredentials getCredentials() {
+            return null;
+        }
+    }
 
 }

@@ -26,41 +26,42 @@ import crawlercommons.fetcher.BaseFetchException;
 import crawlercommons.fetcher.FetchedResult;
 import crawlercommons.fetcher.http.BaseHttpFetcher;
 
-
 @SuppressWarnings("serial")
-public class FetchUrlsFunction extends BaseAsyncFunction<FetchUrl, Tuple2<CrawlStateUrl, FetchedUrl>> {
+public class FetchUrlsFunction
+        extends BaseAsyncFunction<FetchUrl, Tuple2<CrawlStateUrl, FetchedUrl>> {
     static final Logger LOGGER = LoggerFactory.getLogger(FetchUrlsFunction.class);
-    
-	public static final int DEFAULT_THREAD_COUNT = 100;
-	
-	private static final int FETCH_RATE_WINDOW_SIZE = 30;
-	
-	private BaseHttpFetcherBuilder _fetcherBuilder;
-	private BaseHttpFetcher _fetcher;
-	
-	// TODO use native String->long map
-	private transient Map<String, Long> _nextFetch;
 
-	private transient TimedCounter _fetchCounts;
-	
-	/**
-	 * Returns a Tuple2 of the CrawlStateUrl and FetchedUrl. In the case of an error while fetching
-	 * the FetchedUrl is set to null.
-	 * @param fetcherBuider
-	 */
-	public FetchUrlsFunction(BaseHttpFetcherBuilder fetcherBuilder) {
-		super(fetcherBuilder.getMaxSimultaneousRequests(), fetcherBuilder.getFetchDurationTimeoutInSeconds());
-		
-		_fetcherBuilder = fetcherBuilder;
-	}
+    public static final int DEFAULT_THREAD_COUNT = 100;
 
-	@Override
-	public void open(Configuration parameters) throws Exception {
-		super.open(parameters);
-		
+    private static final int FETCH_RATE_WINDOW_SIZE = 30;
+
+    private BaseHttpFetcherBuilder _fetcherBuilder;
+    private BaseHttpFetcher _fetcher;
+
+    // TODO use native String->long map
+    private transient Map<String, Long> _nextFetch;
+
+    private transient TimedCounter _fetchCounts;
+
+    /**
+     * Returns a Tuple2 of the CrawlStateUrl and FetchedUrl. In the case of an error while fetching the FetchedUrl is
+     * set to null.
+     * 
+     * @param fetcherBuider
+     */
+    public FetchUrlsFunction(BaseHttpFetcherBuilder fetcherBuilder) {
+        super(fetcherBuilder.getMaxSimultaneousRequests(),
+                fetcherBuilder.getFetchDurationTimeoutInSeconds());
+
+        _fetcherBuilder = fetcherBuilder;
+    }
+
+    @Override
+    public void open(Configuration parameters) throws Exception {
+        super.open(parameters);
+
         getRuntimeContext().getMetricGroup().gauge(
-                CrawlerMetrics.GAUGE_URLS_CURRENTLY_BEING_FETCHED.toString(),
-                new Gauge<Integer>() {
+                CrawlerMetrics.GAUGE_URLS_CURRENTLY_BEING_FETCHED.toString(), new Gauge<Integer>() {
                     @Override
                     public Integer getValue() {
                         if (_executor != null) {
@@ -69,23 +70,23 @@ public class FetchUrlsFunction extends BaseAsyncFunction<FetchUrl, Tuple2<CrawlS
                         return 0;
                     }
                 });
-         
+
         _fetchCounts = new TimedCounter(FETCH_RATE_WINDOW_SIZE);
         getRuntimeContext().getMetricGroup().gauge(
-                CrawlerMetrics.GAUGE_URLS_FETCHED_PER_SECOND.toString(),
-                new Gauge<Integer>() {
+                CrawlerMetrics.GAUGE_URLS_FETCHED_PER_SECOND.toString(), new Gauge<Integer>() {
                     @Override
                     public Integer getValue() {
                         return _fetchCounts.getTotalCounts() / FETCH_RATE_WINDOW_SIZE;
                     }
                 });
-         
-		_fetcher = _fetcherBuilder.build();
-		_nextFetch = new HashMap<>();
-	}
-	
-	@Override
-    public void asyncInvoke(FetchUrl url, ResultFuture<Tuple2<CrawlStateUrl, FetchedUrl>> future) throws Exception {
+
+        _fetcher = _fetcherBuilder.build();
+        _nextFetch = new HashMap<>();
+    }
+
+    @Override
+    public void asyncInvoke(FetchUrl url, ResultFuture<Tuple2<CrawlStateUrl, FetchedUrl>> future)
+            throws Exception {
         record(this.getClass(), url);
 
         final String domainKey = url.getUrlWithoutPath();
@@ -127,23 +128,26 @@ public class FetchUrlsFunction extends BaseAsyncFunction<FetchUrl, Tuple2<CrawlS
                         FetchStatus fetchStatus = ExceptionUtils
                                 .mapHttpStatusToFetchStatus(result.getStatusCode());
                         // TODO set next fetch time to something valid, based on the error
-                        future.complete(Collections.singleton(
-                                new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url,
-                                        fetchStatus, System.currentTimeMillis(), 0.0f, 0L), null)));
+                        future.complete(
+                                Collections
+                                        .singleton(new Tuple2<CrawlStateUrl, FetchedUrl>(
+                                                new CrawlStateUrl(url, fetchStatus,
+                                                        System.currentTimeMillis(), 0.0f, 0L),
+                                                null)));
                         LOGGER.trace(String.format("Forwarded failed URL to update status: '%s'",
                                 result.getFetchedUrl()));
                     } else {
                         LOGGER.debug(String.format("Fetched %d bytes from '%s'",
                                 result.getContentLength(), result.getFetchedUrl()));
-                        
+
                         // TODO set next fetch time to something valid.
                         future.complete(
                                 Collections
                                         .singleton(new Tuple2<CrawlStateUrl, FetchedUrl>(
-                                                new CrawlStateUrl(url, FetchStatus.FETCHED, fetchedUrl.getFetchTime(), 0.0f,
-                                                        0L),
+                                                new CrawlStateUrl(url, FetchStatus.FETCHED,
+                                                        fetchedUrl.getFetchTime(), 0.0f, 0L),
                                                 fetchedUrl)));
-                        
+
                         if (LOGGER.isTraceEnabled()) {
                             LOGGER.trace(String.format("Forwarded fetched URL to be parsed: '%s'",
                                     result.getFetchedUrl()));
@@ -172,64 +176,67 @@ public class FetchUrlsFunction extends BaseAsyncFunction<FetchUrl, Tuple2<CrawlS
         });
     }
 
-	private Collection<Tuple2<CrawlStateUrl, FetchedUrl>> skipUrl(FetchUrl url, Long nextFetchTime) {
-		return Collections.singleton(new Tuple2<CrawlStateUrl, FetchedUrl>(new CrawlStateUrl(url, FetchStatus.SKIPPED_CRAWLDELAY, nextFetchTime), null));
-	}
-	
-	protected static class TimedCounter {
-	    
-	    private int[] _countsPerSecond;
-	    private long _lastTimeInSeconds;
-	    private int _numSeconds;
-	    
-	    public TimedCounter(int numSeconds) {
-	        _numSeconds = numSeconds;
-	        _countsPerSecond = new int[_numSeconds];
-	        _lastTimeInSeconds = System.currentTimeMillis() / 1000L;
-	    }
-	    
-	    public void increment() {
-	        increment(System.currentTimeMillis());
-	    }
-	    
-	    public void increment(long timeInMS) {
-	        synchronized(_countsPerSecond) {
-	            long timeInSeconds = timeInMS / 1000L;
-	            int deltaSeconds = (int)(timeInSeconds - _lastTimeInSeconds);
-	            if (deltaSeconds < 0) {
-	                throw new RuntimeException("Time can't go backwards");
-	            }
+    private Collection<Tuple2<CrawlStateUrl, FetchedUrl>> skipUrl(FetchUrl url,
+            Long nextFetchTime) {
+        return Collections.singleton(new Tuple2<CrawlStateUrl, FetchedUrl>(
+                new CrawlStateUrl(url, FetchStatus.SKIPPED_CRAWLDELAY, nextFetchTime), null));
+    }
 
-	            if (deltaSeconds == 0) {
-	                // No shift or fill
-	            } else if (deltaSeconds >= _numSeconds) {
-	                // No need to shift, just clear everything and then increment.
-	                Arrays.fill(_countsPerSecond, 0);
-	            } else {
-	                // Shift values, clear new counts.
-	                System.arraycopy(_countsPerSecond, deltaSeconds, _countsPerSecond, 0, _numSeconds - deltaSeconds);
-	                Arrays.fill(_countsPerSecond, _numSeconds - deltaSeconds, _numSeconds, 0);
-	            }
+    protected static class TimedCounter {
 
-	            _lastTimeInSeconds = timeInSeconds;
-	            _countsPerSecond[_numSeconds - 1]++;
-	        }
-	    }
-	    
-	    public int getTotalCounts() {
-	        synchronized(_countsPerSecond) {
-	            int result = 0;
-	            for (int i = 0; i < _numSeconds; i++) {
-	                result += _countsPerSecond[i];
-	            }
+        private int[] _countsPerSecond;
+        private long _lastTimeInSeconds;
+        private int _numSeconds;
 
-	            return result;
-	        }
-	    }
-	    
-	    protected int[] getCountsPerSecond() {
-	        return _countsPerSecond;
-	    }
-	}
-	
+        public TimedCounter(int numSeconds) {
+            _numSeconds = numSeconds;
+            _countsPerSecond = new int[_numSeconds];
+            _lastTimeInSeconds = System.currentTimeMillis() / 1000L;
+        }
+
+        public void increment() {
+            increment(System.currentTimeMillis());
+        }
+
+        public void increment(long timeInMS) {
+            synchronized (_countsPerSecond) {
+                long timeInSeconds = timeInMS / 1000L;
+                int deltaSeconds = (int) (timeInSeconds - _lastTimeInSeconds);
+                if (deltaSeconds < 0) {
+                    throw new RuntimeException("Time can't go backwards");
+                }
+
+                if (deltaSeconds == 0) {
+                    // No shift or fill
+                } else if (deltaSeconds >= _numSeconds) {
+                    // No need to shift, just clear everything and then increment.
+                    Arrays.fill(_countsPerSecond, 0);
+                } else {
+                    // Shift values, clear new counts.
+                    System.arraycopy(_countsPerSecond, deltaSeconds, _countsPerSecond, 0,
+                            _numSeconds - deltaSeconds);
+                    Arrays.fill(_countsPerSecond, _numSeconds - deltaSeconds, _numSeconds, 0);
+                }
+
+                _lastTimeInSeconds = timeInSeconds;
+                _countsPerSecond[_numSeconds - 1]++;
+            }
+        }
+
+        public int getTotalCounts() {
+            synchronized (_countsPerSecond) {
+                int result = 0;
+                for (int i = 0; i < _numSeconds; i++) {
+                    result += _countsPerSecond[i];
+                }
+
+                return result;
+            }
+        }
+
+        protected int[] getCountsPerSecond() {
+            return _countsPerSecond;
+        }
+    }
+
 }

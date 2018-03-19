@@ -32,21 +32,21 @@ import crawlercommons.sitemaps.SiteMapParser;
 
 public class CrawlTool {
 
-	public static final long DO_NOT_FORCE_CRAWL_DELAY = -1L;
-	
-	// As per https://developers.google.com/search/reference/robots_txt
+    public static final long DO_NOT_FORCE_CRAWL_DELAY = -1L;
+
+    // As per https://developers.google.com/search/reference/robots_txt
     private static final int MAX_ROBOTS_TXT_SIZE = 500 * 1024;
 
-	private static void printUsageAndExit(CmdLineParser parser) {
+    private static void printUsageAndExit(CmdLineParser parser) {
         parser.printUsage(System.err);
         System.exit(-1);
     }
-	
-	public static void main(String[] args) {
-		
+
+    public static void main(String[] args) {
+
         // Dump the classpath to stdout to debug artifact version conflicts
-//		System.out.println(    "Java classpath: "
-//                    		+   System.getProperty("java.class.path", "."));
+        // System.out.println( "Java classpath: "
+        // + System.getProperty("java.class.path", "."));
 
         CrawlToolOptions options = new CrawlToolOptions();
         CmdLineParser parser = new CmdLineParser(options);
@@ -58,130 +58,125 @@ public class CrawlTool {
             printUsageAndExit(parser);
         }
 
-		// Generate topology, run it
-        
-		try {
-			StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-			// TODO decide if this is a default option, or a configuration setting from the cmd line
-			env.getConfig().enableObjectReuse();
-			
-			if (options.getCheckpointDir() != null) {
-	            // Enable checkpointing every 100 seconds.
-			    env.enableCheckpointing(100_000L, CheckpointingMode.AT_LEAST_ONCE, true);
-			    env.setStateBackend(new FsStateBackend(options.getCheckpointDir()));
-			}
-			
-			env.setStreamTimeCharacteristic(TimeCharacteristic.ProcessingTime);
-			
-			run(env, options);
-		} catch (Throwable t) {
-			System.err.println("Error running CrawlTool: " + t.getMessage());
-			t.printStackTrace(System.err);
-			System.exit(-1);
-		}
-	}
+        // Generate topology, run it
 
-	public static void run(StreamExecutionEnvironment env, CrawlToolOptions options) throws Exception {
-		
-	    // TODO Complain if -cachedir is specified when not running locally?
-	    
-	    SimpleUrlValidator urlValidator =
-			(	options.isSingleDomain() ?
-				new SingleDomainUrlValidator(options.getSingleDomain())
-			:	new SimpleUrlValidator());
-		
-		UserAgent userAgent =
-	        (   options.isCommonCrawl() ?
-                new UserAgent("unused-common-crawl-user-agent", "", "")
-            :   options.getUserAgent());
+        try {
+            StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+            // TODO decide if this is a default option, or a configuration setting from the cmd line
+            env.getConfig().enableObjectReuse();
 
-		BaseUrlLengthener urlLengthener = getUrlLengthener(options, userAgent);
-		BaseHttpFetcherBuilder siteMapFetcherBuilder = getSitemapFetcherBuilder(options, userAgent);
-		BaseHttpFetcherBuilder robotsFetcherBuilder = getRobotsFetcherBuilder(options, userAgent);
-		BaseHttpFetcherBuilder pageFetcherBuilder = getPageFetcherBuilder(options, userAgent);
-		
-		// See if we need to restrict what mime types we download.
-		if (options.isHtmlOnly()) {
-			Set<String> validMimeTypes = new HashSet<>();
-			for (MediaType mediaType : new HtmlParser().getSupportedTypes(new ParseContext())) {
-				validMimeTypes.add(mediaType.toString());
-			}
-			
-			pageFetcherBuilder.setValidMimeTypes(validMimeTypes);
-		}
+            if (options.getCheckpointDir() != null) {
+                // Enable checkpointing every 100 seconds.
+                env.enableCheckpointing(100_000L, CheckpointingMode.AT_LEAST_ONCE, true);
+                env.setStateBackend(new FsStateBackend(options.getCheckpointDir()));
+            }
 
-        CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
-		    .setUserAgent(userAgent)
-		    .setUrlLengthener(urlLengthener)
-            .setUrlSource(new SeedUrlSource(options.getCrawlDbParallelism(),
-                                            options.getSeedUrlsFilename(), 
-                                            RawUrl.DEFAULT_SCORE))
-            .setRobotsFetcherBuilder(robotsFetcherBuilder)
-            .setUrlFilter(urlValidator)
-            .setSiteMapFetcherBuilder(siteMapFetcherBuilder)
-            .setPageFetcherBuilder(pageFetcherBuilder)
-            .setForceCrawlDelay(options.getForceCrawlDelay())
-            .setDefaultCrawlDelay(options.getDefaultCrawlDelay())
-            .setParallelism(options.getParallelism())
-            .setMaxOutlinksPerPage(options.getMaxOutlinksPerPage());
-		
-		if (options.getOutputFile() != null) {
-			builder.setContentTextFile(options.getOutputFile());
-		}
-		
-		builder.build().execute();
-	}
+            env.setStreamTimeCharacteristic(TimeCharacteristic.ProcessingTime);
 
-    private static BaseUrlLengthener getUrlLengthener(CrawlToolOptions options, UserAgent userAgent) {
+            run(env, options);
+        } catch (Throwable t) {
+            System.err.println("Error running CrawlTool: " + t.getMessage());
+            t.printStackTrace(System.err);
+            System.exit(-1);
+        }
+    }
+
+    public static void run(StreamExecutionEnvironment env, CrawlToolOptions options)
+            throws Exception {
+
+        // TODO Complain if -cachedir is specified when not running locally?
+
+        SimpleUrlValidator urlValidator = (options.isSingleDomain()
+                ? new SingleDomainUrlValidator(options.getSingleDomain())
+                : new SimpleUrlValidator());
+
+        UserAgent userAgent = (options.isCommonCrawl()
+                ? new UserAgent("unused-common-crawl-user-agent", "", "") : options.getUserAgent());
+
+        BaseUrlLengthener urlLengthener = getUrlLengthener(options, userAgent);
+        BaseHttpFetcherBuilder siteMapFetcherBuilder = getSitemapFetcherBuilder(options, userAgent);
+        BaseHttpFetcherBuilder robotsFetcherBuilder = getRobotsFetcherBuilder(options, userAgent);
+        BaseHttpFetcherBuilder pageFetcherBuilder = getPageFetcherBuilder(options, userAgent);
+
+        // See if we need to restrict what mime types we download.
+        if (options.isHtmlOnly()) {
+            Set<String> validMimeTypes = new HashSet<>();
+            for (MediaType mediaType : new HtmlParser().getSupportedTypes(new ParseContext())) {
+                validMimeTypes.add(mediaType.toString());
+            }
+
+            pageFetcherBuilder.setValidMimeTypes(validMimeTypes);
+        }
+
+        CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env).setUserAgent(userAgent)
+                .setUrlLengthener(urlLengthener)
+                .setUrlSource(new SeedUrlSource(options.getCrawlDbParallelism(),
+                        options.getSeedUrlsFilename(), RawUrl.DEFAULT_SCORE))
+                .setRobotsFetcherBuilder(robotsFetcherBuilder).setUrlFilter(urlValidator)
+                .setSiteMapFetcherBuilder(siteMapFetcherBuilder)
+                .setPageFetcherBuilder(pageFetcherBuilder)
+                .setForceCrawlDelay(options.getForceCrawlDelay())
+                .setDefaultCrawlDelay(options.getDefaultCrawlDelay())
+                .setParallelism(options.getParallelism())
+                .setMaxOutlinksPerPage(options.getMaxOutlinksPerPage());
+
+        if (options.getOutputFile() != null) {
+            builder.setContentTextFile(options.getOutputFile());
+        }
+
+        builder.build().execute();
+    }
+
+    private static BaseUrlLengthener getUrlLengthener(CrawlToolOptions options,
+            UserAgent userAgent) {
         if (options.isNoLengthen()) {
             return new NoopUrlLengthener();
         }
-        
+
         int maxConnectionsPerHost = options.getFetchersPerTask();
         return new SimpleUrlLengthener(userAgent, maxConnectionsPerHost);
     }
-    
-    private static BaseHttpFetcherBuilder getPageFetcherBuilder(CrawlToolOptions options, UserAgent userAgent) throws IOException {
+
+    private static BaseHttpFetcherBuilder getPageFetcherBuilder(CrawlToolOptions options,
+            UserAgent userAgent) throws IOException {
         if (options.isCommonCrawl()) {
-            return new CommonCrawlFetcherBuilder(   options.getFetchersPerTask(), 
-                                                    userAgent, 
-                                                    options.getCommonCrawlId(),
-                                                    options.getCommonCrawlCacheDir());
+            return new CommonCrawlFetcherBuilder(options.getFetchersPerTask(), userAgent,
+                    options.getCommonCrawlId(), options.getCommonCrawlCacheDir());
         }
-        
+
         return new SimpleHttpFetcherBuilder(options.getFetchersPerTask(), userAgent)
                 .setDefaultMaxContentSize(options.getMaxContentSize());
     }
 
-    private static BaseHttpFetcherBuilder getSitemapFetcherBuilder(CrawlToolOptions options, UserAgent userAgent) throws IOException {
+    private static BaseHttpFetcherBuilder getSitemapFetcherBuilder(CrawlToolOptions options,
+            UserAgent userAgent) throws IOException {
         if (options.isCommonCrawl()) {
             // Common crawl index doesn't have sitemap files.
             return new NoopHttpFetcherBuilder(userAgent);
         }
-        
+
         // By default, give site map fetcher 20% of #threads page fetcher has
-        int maxSimultaneousRequests = 
-            Math.max(1, options.getFetchersPerTask() / 5);
+        int maxSimultaneousRequests = Math.max(1, options.getFetchersPerTask() / 5);
         return new SimpleHttpFetcherBuilder(maxSimultaneousRequests, userAgent)
-                    .setDefaultMaxContentSize(SiteMapParser.MAX_BYTES_ALLOWED);
+                .setDefaultMaxContentSize(SiteMapParser.MAX_BYTES_ALLOWED);
     }
 
-	private static BaseHttpFetcherBuilder getRobotsFetcherBuilder(CrawlToolOptions options, UserAgent userAgent) throws IOException {
-		
-		// Although the static Common Crawl data does have robots.txt files
-		// (in a separate location), there's no index, so it would be ugly to
-		// have to download the whole thing.  For now, let's just pretend that
-		// nobody has a robots.txt file by using a fetcher that always returns
-		// a 404.
-		if (options.isCommonCrawl()) {
+    private static BaseHttpFetcherBuilder getRobotsFetcherBuilder(CrawlToolOptions options,
+            UserAgent userAgent) throws IOException {
+
+        // Although the static Common Crawl data does have robots.txt files
+        // (in a separate location), there's no index, so it would be ugly to
+        // have to download the whole thing. For now, let's just pretend that
+        // nobody has a robots.txt file by using a fetcher that always returns
+        // a 404.
+        if (options.isCommonCrawl()) {
             return new NoopHttpFetcherBuilder(userAgent);
-		}
-		
-		// By default, give robots fetcher 20% of #threads page fetcher has
-		int maxSimultaneousRequests = 
-	        Math.max(1, options.getFetchersPerTask() / 5);
+        }
+
+        // By default, give robots fetcher 20% of #threads page fetcher has
+        int maxSimultaneousRequests = Math.max(1, options.getFetchersPerTask() / 5);
         return new SimpleHttpFetcherBuilder(maxSimultaneousRequests, userAgent)
-                    .setDefaultMaxContentSize(MAX_ROBOTS_TXT_SIZE);
-	}
+                .setDefaultMaxContentSize(MAX_ROBOTS_TXT_SIZE);
+    }
 
 }
