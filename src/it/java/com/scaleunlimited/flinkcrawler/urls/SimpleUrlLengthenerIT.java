@@ -31,10 +31,6 @@ public class SimpleUrlLengthenerIT {
         RawUrl sourceUrl = new RawUrl(_normalizer.normalize(TEST_SOURCE_URL));
         RawUrl targetUrl = _lengthener.lengthen(sourceUrl);
         Assert.assertEquals(_normalizer.normalize(TEST_DESTINATION_URL), targetUrl.getUrl());
-
-        // Try again to test LRU cache (via stepping into lengthen method in debugger)
-        targetUrl = _lengthener.lengthen(sourceUrl);
-        Assert.assertEquals(_normalizer.normalize(TEST_DESTINATION_URL), targetUrl.getUrl());
     }
 
 }

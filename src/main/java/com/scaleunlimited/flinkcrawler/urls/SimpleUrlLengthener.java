@@ -31,10 +31,8 @@ public class SimpleUrlLengthener extends BaseUrlLengthener {
     private static final Logger LOGGER = LoggerFactory.getLogger(SimpleUrlLengthener.class);
 
     private static final Pattern HOSTNAME_PATTERN = Pattern.compile("^https?://([^/:?]{3,})");
-
     private static final int LRU_CACHE_CAPACITY = 10_000;
-
-    private static final float LRU_CACHE_LOAD_FACTOR = 0.75f;
+    private static final float DEFAULT_LOAD_FACTOR = 0.75f;
 
     private BaseHttpFetcherBuilder _fetcherBuilder;
 
@@ -51,14 +49,24 @@ public class SimpleUrlLengthener extends BaseUrlLengthener {
         super();
         _fetcherBuilder = fetcherBuilder;
     }
+    
+    // Default visibility to support testing
+    static <K, V> Map<K, V> makeLruCache(int maxSize) {
+        return new LinkedHashMap<K, V>( Math.round(maxSize/DEFAULT_LOAD_FACTOR), 
+                                        DEFAULT_LOAD_FACTOR, 
+                                        true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
+                return size() > maxSize;
+            }
+        };
+    }
 
     @Override
     public void open() throws Exception {
         _fetcher = _fetcherBuilder.build();
         _urlShorteners = loadUrlShorteners();
-        _lengthenedUrlMap = new LinkedHashMap<RawUrl, RawUrl>(  (LRU_CACHE_CAPACITY * 4/3),
-                                                                LRU_CACHE_LOAD_FACTOR, 
-                                                                true); // LRU
+        _lengthenedUrlMap = makeLruCache(LRU_CACHE_CAPACITY);
     }
 
     @Override
