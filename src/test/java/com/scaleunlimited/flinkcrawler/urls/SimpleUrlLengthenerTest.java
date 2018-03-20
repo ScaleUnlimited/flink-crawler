@@ -48,4 +48,27 @@ public class SimpleUrlLengthenerTest {
             }
         }
     }
+    
+    @Test
+    public void testLruCache() throws Throwable {
+        Map<Integer, Integer> testCache = SimpleUrlLengthener.makeLruCache(10);
+        for (int i = 0; i < 10; i++) {
+            testCache.put(i, i * 5);
+        }
+        for (int i = 0; i < 5; i++) {
+            testCache.put(i * 2, i * 10);
+        }
+        for (int i = 0; i < 5; i++) {
+            testCache.put((i+1) * 10, (i+1) * 10);
+        }
+        testCache.put(1000, 1000);
+        for (int i = 0; i < 5; i++) {
+            Assert.assertNull(testCache.get(0));
+            if (i != 0) {
+                Assert.assertEquals(i * 10, (int)(testCache.get(i * 2)));
+            }
+            Assert.assertEquals((i+1) * 10, (int)(testCache.get((i+1) * 10)));
+            Assert.assertEquals(1000, (int)(testCache.get(1000)));
+        }
+    }
 }
