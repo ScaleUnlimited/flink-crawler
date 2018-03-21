@@ -35,7 +35,10 @@ public abstract class BaseAsyncFunction<IN, OUT> extends RichAsyncFunction<IN, O
         _parallelism = context.getNumberOfParallelSubtasks();
         _partition = context.getIndexOfThisSubtask() + 1;
 
-        _executor = new ThreadedExecutor("Flink-crawler-" + context.getTaskName(), _threadCount);
+        // Get a shorter name. So FetchUrlsFunction -> (Select fetch status, ...
+        // becomes FetchUrlsFunction.
+        String taskName = context.getTaskName().replaceFirst(" -> .+", "");
+        _executor = new ThreadedExecutor("Flink-crawler-" + taskName, _threadCount);
     }
 
     @Override
