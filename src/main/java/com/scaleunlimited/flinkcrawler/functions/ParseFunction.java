@@ -23,10 +23,7 @@ public class ParseFunction extends BaseProcessFunction<FetchedUrl, ParsedUrl> {
 
     public static final OutputTag<ExtractedUrl> OUTLINK_OUTPUT_TAG 
         = new OutputTag<ExtractedUrl>("outlink"){};
-    public static final OutputTag<String> CONTENT_OUTPUT_TAG 
-        = new OutputTag<String>("content"){};
     
-    private static final String TABS_AND_RETURNS_PATTERN = "[\t\r\n]";
     private BasePageParser _parser;
     private int _maxOutlinksPerPage;
 
@@ -92,16 +89,5 @@ public class ParseFunction extends BaseProcessFunction<FetchedUrl, ParsedUrl> {
                 break;
             }
         }
-
-        // Output the text version of the content
-        String contentText = makeContentText(result);
-        context.output(CONTENT_OUTPUT_TAG, contentText);
     }
-
-    private String makeContentText(ParserResult result) {
-        String parsedText = result.getParsedUrl().getParsedText();
-        String contentField = parsedText.replaceAll(TABS_AND_RETURNS_PATTERN, " ");
-        return result.getParsedUrl().getUrl() + "\t" + contentField;
-    }
-
 }

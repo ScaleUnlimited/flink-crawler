@@ -7,7 +7,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
@@ -95,6 +94,7 @@ public class CrawlTopologyBuilder {
     private BasePageParser _pageParser = new SimplePageParser();
     private BasePageParser _siteMapParser = new SimpleSiteMapParser();
     private int _maxOutlinksPerPage = DEFAULT_MAX_OUTLINKS_PER_PAGE;
+    private static final String TABS_AND_RETURNS_PATTERN = "[\t\r\n]";
 
     public CrawlTopologyBuilder(StreamExecutionEnvironment env) {
         _env = env;
@@ -393,12 +393,14 @@ public class CrawlTopologyBuilder {
 
         // Save off parsed page content text. So just extract the parsed content text piece of the Tuple3, and
         // then pass it on to the provided content sink function (or just send it to the console).
-        DataStream<String> contentText = parsedUrls.getSideOutput(ParseFunction.CONTENT_OUTPUT_TAG)
-                .filter(new FilterFunction<String>() {
-
+        DataStream<String> contentText = parsedUrls
+                .map(new MapFunction<ParsedUrl, String>() {
+        
                     @Override
-                    public boolean filter(String content) throws Exception {
-                        return true; // (pass all Strings through)
+                    public String map(ParsedUrl parsedUrl) throws Exception {
+                        String contentField = 
+                            parsedUrl.getParsedText().replaceAll(TABS_AND_RETURNS_PATTERN, " ");
+                        return parsedUrl.getUrl() + "\t" + contentField;
                     }
                     
                 })
