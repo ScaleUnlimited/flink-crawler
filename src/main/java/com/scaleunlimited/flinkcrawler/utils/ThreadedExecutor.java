@@ -1,7 +1,7 @@
 package com.scaleunlimited.flinkcrawler.utils;
 
 /*
- * Copyright 2009-2017 Scale Unlimited
+ * Copyright 2009-2018 Scale Unlimited
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,7 +66,8 @@ public class ThreadedExecutor {
 
     private long _requestTimeout;
     private ThreadPoolExecutor _pool;
-
+    private String _name;
+    
     public ThreadedExecutor(int numThreads) {
         this(numThreads, Long.MAX_VALUE);
     }
@@ -80,6 +81,7 @@ public class ThreadedExecutor {
     }
 
     public ThreadedExecutor(String name, int numThreads, long requestTimeout) {
+        _name = name;
         _requestTimeout = requestTimeout;
 
         // With the "always offer with a timeout" queue, the maximumPoolSize should always
@@ -93,12 +95,12 @@ public class ThreadedExecutor {
                 TimeUnit.MILLISECONDS, queue);
 
         // Give the threads used by this executor a consistent name.
-        final ThreadGroup group = new ThreadGroup(name);
+        final ThreadGroup group = new ThreadGroup(_name);
         _pool.setThreadFactory(new ThreadFactory() {
 
             @Override
             public Thread newThread(Runnable r) {
-                return new Thread(group, r);
+                return new Thread(group, r, _name);
             }
         });
     }
@@ -131,13 +133,16 @@ public class ThreadedExecutor {
     public boolean terminate(int duration, TimeUnit timeUnit) throws InterruptedException {
 
         // First just wait for threads to terminate naturally.
+        LOGGER.debug("Shutting down the '{}' pool", _name);
         _pool.shutdown();
-        LOGGER.info("Waiting for pool termination ({} {})", duration, timeUnit);
+        
+        LOGGER.debug("Waiting for '{}' pool termination ({} {})", _name, duration, timeUnit);
         if (_pool.awaitTermination(duration, timeUnit)) {
             return true;
         }
 
         // We need to do a hard shutdown
+        LOGGER.debug("Hard shutdown of the '{}' pool", _name);
         List<Runnable> remainingTasks = _pool.shutdownNow();
         if (remainingTasks.size() != 0) {
             // Houston, we have a problem. Since ThreadedExecutor isn't multi-threaded, we should

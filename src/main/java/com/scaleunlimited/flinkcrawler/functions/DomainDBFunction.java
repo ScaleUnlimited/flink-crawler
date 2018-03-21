@@ -35,20 +35,25 @@ public class DomainDBFunction extends BaseFlatMapFunction<CrawlStateUrl, CrawlSt
     private static int DOMAINS_PER_TICKLE = 100;
 
     // Sorted list of PLDs, for state.
-    private transient List<String> _domains;
+    private List<String> _domains;
 
     // Unsorted list of domain tickler URLs that we
     // iterate over.
-    private transient List<CrawlStateUrl> _urls;
-    private transient int _domainIndex;
+    private List<CrawlStateUrl> _urls;
+    private int _domainIndex;
 
-    @Override
-    public void open(Configuration parameters) throws Exception {
-        super.open(parameters);
-
+    public DomainDBFunction() {
+        
+        // Note we have to set up our state-related variables here,
+        // as open() isn't called before restoreState().
         _domains = new ArrayList<>();
         _urls = new ArrayList<>();
         _domainIndex = 0;
+    }
+    
+    @Override
+    public void open(Configuration parameters) throws Exception {
+        super.open(parameters);
 
         RuntimeContext context = getRuntimeContext();
 
@@ -59,7 +64,6 @@ public class DomainDBFunction extends BaseFlatMapFunction<CrawlStateUrl, CrawlSt
                         return _domains.size();
                     }
                 });
-
     }
 
     @Override
@@ -135,13 +139,8 @@ public class DomainDBFunction extends BaseFlatMapFunction<CrawlStateUrl, CrawlSt
         LOGGER.debug(
                 String.format("Restoring DomainDBFunction state with %d entries", state.size()));
 
-        if (_domains == null) {
-            LOGGER.warn("Restoring DomainDBFunction state but _domains is null!");
-            _domains = new ArrayList<>(state);
-        } else {
-            _domains.clear();
-            _domains.addAll(state);
-        }
+        _domains.clear();
+        _domains.addAll(state);
 
         Collections.sort(_domains);
         _domainIndex = 0;

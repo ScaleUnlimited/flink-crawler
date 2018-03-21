@@ -14,6 +14,9 @@ import org.apache.flink.api.common.typeinfo.TypeHint;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.metrics.Gauge;
+import org.apache.flink.runtime.state.FunctionInitializationContext;
+import org.apache.flink.runtime.state.FunctionSnapshotContext;
+import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
 import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,7 +41,7 @@ import com.scaleunlimited.flinkcrawler.utils.FetchQueue.FetchQueueResult;
  * to scan every URL.
  */
 @SuppressWarnings("serial")
-public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> {
+public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> implements CheckpointedFunction {
     static final Logger LOGGER = LoggerFactory.getLogger(UrlDBFunction.class);
 
     private static final int URLS_PER_TICKLE = 10;
@@ -66,6 +69,36 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
     public UrlDBFunction(BaseUrlStateMerger merger, FetchQueue fetchQueue) {
         _merger = merger;
         _fetchQueue = fetchQueue;
+    }
+
+    @Override
+    public void initializeState(FunctionInitializationContext context) throws Exception {
+        // Create three keyed/managed states
+
+        // 1. Active URLs: MapState (key = url hash, value = CrawlStateUrl)
+        MapStateDescriptor<Long, CrawlStateUrl> urlStateDescriptor = new MapStateDescriptor<>(
+                "active-urls", Long.class, CrawlStateUrl.class);
+        _activeUrls = getRuntimeContext().getMapState(urlStateDescriptor);
+
+        // 2. Active URL count: ValueState (value = number of entries in MapState)
+        ValueStateDescriptor<Integer> urlCountDescriptor = new ValueStateDescriptor<>(
+                "num-active-urls", TypeInformation.of(new TypeHint<Integer>() {
+                }));
+        _numActiveUrls = getRuntimeContext().getState(urlCountDescriptor);
+
+        // 3. Archived URLs: MapState (key = url hash, value = CrawlStateUrl)
+        MapStateDescriptor<Long, CrawlStateUrl> archivedUrlsStateDescriptor = new MapStateDescriptor<>(
+                "archived-urls", Long.class, CrawlStateUrl.class);
+        _archivedUrls = getRuntimeContext().getMapState(archivedUrlsStateDescriptor);
+
+        // 4. Index to hash mapping for active URLs (key = index, value = url hash)
+        //
+        // So if we have an index from 0...<active url count>-1, we can look up the
+        // hash, and then use that to find the actual CrawlStateUrl in the active
+        // URLs MapState.
+        MapStateDescriptor<Integer, Long> activeUrlsIndexStateDescriptor = new MapStateDescriptor<>(
+                "active-urls-index", Integer.class, Long.class);
+        _activeUrlsIndex = getRuntimeContext().getMapState(activeUrlsIndexStateDescriptor);
     }
 
     @Override
@@ -99,45 +132,7 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
 
         _rand = new Random(0L);
 
-        // Create three keyed/managed states
-
-        // 1. Active URLs: MapState (key = url hash, value = CrawlStateUrl)
-        MapStateDescriptor<Long, CrawlStateUrl> urlStateDescriptor = new MapStateDescriptor<>(
-                "active-urls", Long.class, CrawlStateUrl.class);
-        _activeUrls = getRuntimeContext().getMapState(urlStateDescriptor);
-
-        // 2. Active URL count: ValueState (value = number of entries in MapState)
-        ValueStateDescriptor<Integer> urlCountDescriptor = new ValueStateDescriptor<>(
-                "num-active-urls", TypeInformation.of(new TypeHint<Integer>() {
-                }));
-        _numActiveUrls = getRuntimeContext().getState(urlCountDescriptor);
-
-        // 3. Archived URLs: MapState (key = url hash, value = CrawlStateUrl)
-        MapStateDescriptor<Long, CrawlStateUrl> archivedUrlsStateDescriptor = new MapStateDescriptor<>(
-                "archived-urls", Long.class, CrawlStateUrl.class);
-        _archivedUrls = getRuntimeContext().getMapState(archivedUrlsStateDescriptor);
-
-        // 4. Index to hash mapping for active URLs (key = index, value = url hash)
-        //
-        // So if we have an index from 0...<active url count>-1, we can look up the
-        // hash, and then use that to find the actual CrawlStateUrl in the active
-        // URLs MapState.
-        MapStateDescriptor<Integer, Long> activeUrlsIndexStateDescriptor = new MapStateDescriptor<>(
-                "active-urls-index", Integer.class, Long.class);
-        _activeUrlsIndex = getRuntimeContext().getMapState(activeUrlsIndexStateDescriptor);
-
         _inFlightUrls = new HashMap<>();
-    }
-
-    @Override
-    public void close() throws Exception {
-
-        long curTime = System.currentTimeMillis();
-        for (String url : _inFlightUrls.keySet()) {
-            LOGGER.debug(String.format("%d\t%s", curTime - _inFlightUrls.get(url), url));
-        }
-
-        super.close();
     }
 
     @Override
@@ -154,6 +149,23 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
             throw new RuntimeException(String.format("Unknown URL type '%s' for '%s'",
                     url.getUrlType(), url.getUrl()));
         }
+    }
+
+    @Override
+    public void snapshotState(FunctionSnapshotContext context) throws Exception {
+        // Nothing special we need to do here, since we have keyed state that gets
+        // handled automatically.
+    }
+
+    @Override
+    public void close() throws Exception {
+
+        long curTime = System.currentTimeMillis();
+        for (String url : _inFlightUrls.keySet()) {
+            LOGGER.debug(String.format("%d\t%s", curTime - _inFlightUrls.get(url), url));
+        }
+
+        super.close();
     }
 
     /**
@@ -393,5 +405,6 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
                 throw new RuntimeException("Unknown merge result: " + result);
         }
     }
+
 
 }

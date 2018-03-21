@@ -47,15 +47,18 @@ public class ParseFunction
         try {
             long start = System.currentTimeMillis();
             result = _parser.parse(fetchedUrl);
-            LOGGER.debug(String.format("Parsed '%s' in %dms", fetchedUrl,
-                    System.currentTimeMillis() - start));
+            LOGGER.debug("Thread {}: Parsed '{}' in {}ms", Thread.currentThread().getName(), fetchedUrl, System.currentTimeMillis() - start);
+        } catch (InterruptedException e) {
+            // Ignore, as these happen when we're parsing a file and the workflow
+            // is shutting down.
+            LOGGER.debug("Interrupted while parsing '{}'", fetchedUrl);
+            return;
         } catch (Exception e) {
             if (LOGGER.isDebugEnabled()) {
                 LOGGER.warn("Parsing exception " + fetchedUrl, e);
             } else {
                 // If we're not doing debug level logging, don't spit out stack trace.
-                LOGGER.warn(String.format("Parsing exception '%s': %s", fetchedUrl,
-                        e.getCause().getMessage()));
+                LOGGER.warn("Parsing exception '{}': {}", fetchedUrl, e.getCause().getMessage());
             }
 
             return;
@@ -65,6 +68,8 @@ public class ParseFunction
         if (result.getParsedUrl().getScore() > 0) {
             collector.collect(
                     new Tuple3<ExtractedUrl, ParsedUrl, String>(null, result.getParsedUrl(), null));
+        } else {
+            LOGGER.debug("Skipping content output of zero-score '{}'", fetchedUrl);
         }
 
         // Since we are limiting the number of outlinks, first sort by score and then limit.
@@ -76,6 +81,7 @@ public class ParseFunction
                 return (int) (o1.getScore() - o2.getScore());
             }
         });
+        
         int count = 0;
         for (ExtractedUrl outlink : extractedUrls) {
             String message = String.format("Extracted '%s' from '%s'", outlink.getUrl(),
