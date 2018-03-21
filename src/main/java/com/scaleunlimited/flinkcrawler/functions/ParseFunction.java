@@ -73,7 +73,7 @@ public class ParseFunction
 
             @Override
             public int compare(ExtractedUrl o1, ExtractedUrl o2) {
-                return (int) (o1.getScore() - o2.getScore());
+                return (int) (o2.getScore() - o1.getScore());
             }
         });
         int count = 0;

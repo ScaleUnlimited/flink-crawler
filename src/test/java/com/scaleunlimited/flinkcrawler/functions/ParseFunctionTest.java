@@ -1,12 +1,17 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import java.net.MalformedURLException;
 
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.util.Collector;
 import org.junit.Test;
 import org.mockito.ArgumentMatcher;
-import static org.mockito.Mockito.*;
 
 import com.scaleunlimited.flinkcrawler.parser.BasePageParser;
 import com.scaleunlimited.flinkcrawler.parser.ParserResult;
@@ -44,30 +49,29 @@ public class ParseFunctionTest {
         when(parsedUrl.getParsedText()).thenReturn("");
         func.flatMap(fetchedUrl, collector);
 
-        // Verify that we only get the top 2 links
-        verify(collector).collect(argThat(new MatchExtractedUrls(2, 2)));
+        // Verify that we only get the top 2 links (plus the text version of the content)
+        verify(collector, times(3)).collect(argThat(new MatchExtractedUrls(2)));
     }
 
     private static class MatchExtractedUrls
             implements ArgumentMatcher<Tuple3<ExtractedUrl, ParsedUrl, String>> {
 
-        private int _numUrls;
         private float _minScore;
-        private int _count = 0;
 
-        public MatchExtractedUrls(int numUrls, float minScore) {
-            _numUrls = numUrls;
+        public MatchExtractedUrls(float minScore) {
             _minScore = minScore;
+        }
+
+        @Override
+        protected void finalize() throws Throwable {
+            // TODO Auto-generated method stub
+            super.finalize();
         }
 
         @Override
         public boolean matches(Tuple3<ExtractedUrl, ParsedUrl, String> tuple3) {
             if ((tuple3.f0 == null) && (tuple3.f1 == null) && (tuple3.f2 != null)) {
                 return true; // the content tuple doesn't need to be counted.
-            }
-            _count++;
-            if (_count > _numUrls) {
-                return false;
             }
             if (tuple3.f0.getScore() < _minScore) {
                 return false;
