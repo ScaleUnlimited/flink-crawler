@@ -347,11 +347,12 @@ public class CrawlTopologyBuilder {
                 .name("HandleFailedSiteMapFunction")
                 .addSink(new DiscardingSink<CrawlStateUrl>());
 
-        DataStream<Tuple3<ExtractedUrl, ParsedUrl, String>> parsedSiteMapUrls = selectFetchedUrls(siteMapFetchAttemptedUrls)
+        DataStream<RawUrl> newSiteMapExtractedUrls = 
+                selectFetchedUrls(siteMapFetchAttemptedUrls)
                 .flatMap(new ParseSiteMapFunction(_siteMapParser))
-                .name("ParseSiteMapFunction");
-        SplitStream<Tuple3<ExtractedUrl, ParsedUrl, String>> sitemapOutlinksContent = splitOutlinkContent(parsedSiteMapUrls);
-        DataStream<RawUrl> newSiteMapExtractedUrls = sitemapOutlinksContent.select("outlink")
+                .name("ParseSiteMapFunction")
+                .split(getOutlinkSelector())
+                .select("outlink")
                 .map(new OutlinkToStateUrlFunction())
                 .name("OutlinkToStateUrlFunction");
 
@@ -557,34 +558,6 @@ public class CrawlTopologyBuilder {
         };
     }
     
-    @SuppressWarnings("serial")
-    private SplitStream<Tuple3<ExtractedUrl, ParsedUrl, String>> splitOutlinkContent(
-            DataStream<Tuple3<ExtractedUrl, ParsedUrl, String>> parsedUrls) {
-        SplitStream<Tuple3<ExtractedUrl, ParsedUrl, String>> outlinksOrContent = parsedUrls
-                .split(new OutputSelector<Tuple3<ExtractedUrl, ParsedUrl, String>>() {
-
-                    private final List<String> OUTLINK_STREAM = Arrays.asList("outlink");
-                    private final List<String> CONTENT_STREAM = Arrays.asList("content");
-                    private final List<String> CONTENT_TEXT_STREAM = Arrays.asList("content_text");
-
-                    @Override
-                    public Iterable<String> select(
-                            Tuple3<ExtractedUrl, ParsedUrl, String> outlinksOrContent) {
-                        if (outlinksOrContent.f0 != null) {
-                            return OUTLINK_STREAM;
-                        } else if (outlinksOrContent.f1 != null) {
-                            return CONTENT_STREAM;
-                        } else if (outlinksOrContent.f2 != null) {
-                            return CONTENT_TEXT_STREAM;
-                        } else {
-                            throw new RuntimeException(
-                                    "Invalid case of neither outlink, content, nor content_text");
-                        }
-                    }
-                });
-        return outlinksOrContent;
-    }
-
     private static RawUrl makeDefaultSeedUrl() {
         try {
             return new RawUrl("http://www.scaleunlimited.com/");
