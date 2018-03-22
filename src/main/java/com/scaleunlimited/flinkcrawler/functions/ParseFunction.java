@@ -13,14 +13,18 @@ import org.slf4j.LoggerFactory;
 import com.scaleunlimited.flinkcrawler.metrics.CrawlerAccumulator;
 import com.scaleunlimited.flinkcrawler.parser.BasePageParser;
 import com.scaleunlimited.flinkcrawler.parser.ParserResult;
+import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
-import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
+import com.scaleunlimited.flinkcrawler.pojos.FetchResultUrl;
+import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 
 @SuppressWarnings("serial")
-public class ParseFunction extends BaseProcessFunction<FetchedUrl, ParsedUrl> {
+public class ParseFunction extends BaseProcessFunction<FetchResultUrl, ParsedUrl> {
     private static final Logger LOGGER = LoggerFactory.getLogger(ParseFunction.class);
 
+    public static final OutputTag<CrawlStateUrl> STATUS_OUTPUT_TAG 
+        = new OutputTag<CrawlStateUrl>("status"){};
     public static final OutputTag<ExtractedUrl> OUTLINK_OUTPUT_TAG 
         = new OutputTag<ExtractedUrl>("outlink"){};
     
@@ -40,24 +44,34 @@ public class ParseFunction extends BaseProcessFunction<FetchedUrl, ParsedUrl> {
     }
 
     @Override
-    public void processElement( FetchedUrl fetchedUrl,
+    public void processElement( FetchResultUrl fetchResultUrl,
                                 Context context,
                                 Collector<ParsedUrl> collector) 
         throws Exception {
-        record(this.getClass(), fetchedUrl);
+
+        // We need to update the URL's status, but if it wasn't a successful fetch then we have nothing to parse
+        context.output(STATUS_OUTPUT_TAG, new CrawlStateUrl(fetchResultUrl));
+        if (fetchResultUrl.getStatus() != FetchStatus.FETCHED) {
+            LOGGER.trace(String.format("Forwarded failed URL to update status: '%s'",
+                    fetchResultUrl.getFetchedUrl()));
+            return;
+        }
+        
+        // TODO I moved this down here, but would it be better to expect that ParseFunction logs unsuccessful fetches?
+        record(this.getClass(), fetchResultUrl);
 
         ParserResult result;
         try {
             long start = System.currentTimeMillis();
-            result = _parser.parse(fetchedUrl);
-            LOGGER.debug(String.format("Parsed '%s' in %dms", fetchedUrl,
+            result = _parser.parse(fetchResultUrl);
+            LOGGER.debug(String.format("Parsed '%s' in %dms", fetchResultUrl,
                     System.currentTimeMillis() - start));
         } catch (Exception e) {
             if (LOGGER.isDebugEnabled()) {
-                LOGGER.warn("Parsing exception " + fetchedUrl, e);
+                LOGGER.warn("Parsing exception " + fetchResultUrl, e);
             } else {
                 // If we're not doing debug level logging, don't spit out stack trace.
-                LOGGER.warn(String.format("Parsing exception '%s': %s", fetchedUrl,
+                LOGGER.warn(String.format("Parsing exception '%s': %s", fetchResultUrl,
                         e.getCause().getMessage()));
             }
 
@@ -81,7 +95,7 @@ public class ParseFunction extends BaseProcessFunction<FetchedUrl, ParsedUrl> {
         int count = 0;
         for (ExtractedUrl outlink : extractedUrls) {
             String message = String.format("Extracted '%s' from '%s'", outlink.getUrl(),
-                    fetchedUrl.getUrl());
+                    fetchResultUrl.getUrl());
             LOGGER.trace(message);
             context.output(OUTLINK_OUTPUT_TAG, outlink);
             count++;

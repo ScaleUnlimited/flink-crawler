@@ -7,11 +7,12 @@ import org.slf4j.LoggerFactory;
 import com.scaleunlimited.flinkcrawler.parser.BasePageParser;
 import com.scaleunlimited.flinkcrawler.parser.ParserResult;
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
-import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
+import com.scaleunlimited.flinkcrawler.pojos.FetchResultUrl;
+import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 
 @SuppressWarnings("serial")
 public class ParseSiteMapFunction
-        extends BaseFlatMapFunction<FetchedUrl, ExtractedUrl> {
+        extends BaseFlatMapFunction<FetchResultUrl, ExtractedUrl> {
 
     static final Logger LOGGER = LoggerFactory.getLogger(ParseSiteMapFunction.class);
 
@@ -22,10 +23,16 @@ public class ParseSiteMapFunction
     }
 
     @Override
-    public void flatMap(FetchedUrl fetchedUrl,
+    public void flatMap(FetchResultUrl fetchedUrl,
             Collector<ExtractedUrl> collector) throws Exception {
         record(this.getClass(), fetchedUrl);
 
+        if (fetchedUrl.getStatus() != FetchStatus.FETCHED) {
+            LOGGER.trace(String.format("Skipping failed site map URL: '%s'",
+                    fetchedUrl.getFetchedUrl()));
+            return;
+        }
+        
         try {
             ParserResult parserResult = _siteMapParser.parse(fetchedUrl);
 

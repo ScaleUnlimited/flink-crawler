@@ -6,7 +6,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.streaming.api.functions.async.ResultFuture;
@@ -16,10 +15,9 @@ import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.fetcher.BaseHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.metrics.CrawlerMetrics;
-import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
+import com.scaleunlimited.flinkcrawler.pojos.FetchResultUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
-import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.utils.ExceptionUtils;
 
 import crawlercommons.fetcher.BaseFetchException;
@@ -28,7 +26,7 @@ import crawlercommons.fetcher.http.BaseHttpFetcher;
 
 @SuppressWarnings("serial")
 public class FetchUrlsFunction
-        extends BaseAsyncFunction<FetchUrl, Tuple2<CrawlStateUrl, FetchedUrl>> {
+        extends BaseAsyncFunction<FetchUrl, FetchResultUrl> {
     static final Logger LOGGER = LoggerFactory.getLogger(FetchUrlsFunction.class);
 
     public static final int DEFAULT_THREAD_COUNT = 100;
@@ -85,7 +83,7 @@ public class FetchUrlsFunction
     }
 
     @Override
-    public void asyncInvoke(FetchUrl url, ResultFuture<Tuple2<CrawlStateUrl, FetchedUrl>> future)
+    public void asyncInvoke(FetchUrl url, ResultFuture<FetchResultUrl> future)
             throws Exception {
         record(this.getClass(), url);
 
@@ -109,8 +107,12 @@ public class FetchUrlsFunction
 
                 try {
                     FetchedResult result = _fetcher.get(url.getUrl(), null);
-                    FetchedUrl fetchedUrl = new FetchedUrl(url, result.getFetchedUrl(),
-                            result.getFetchTime(), result.getHeaders(), result.getContent(),
+                    FetchStatus fetchStatus = (result.getStatusCode() == HttpStatus.SC_OK) ?
+                                FetchStatus.FETCHED
+                            :   ExceptionUtils
+                                    .mapHttpStatusToFetchStatus(result.getStatusCode());
+                    FetchResultUrl fetchedUrl = new FetchResultUrl(url, fetchStatus, result.getFetchTime(),
+                            result.getFetchedUrl(), result.getHeaders(), result.getContent(),
                             result.getContentType(), result.getResponseRate());
 
                     _fetchCounts.increment();
@@ -125,15 +127,7 @@ public class FetchUrlsFunction
                             LOGGER.debug(msg);
                         }
 
-                        FetchStatus fetchStatus = ExceptionUtils
-                                .mapHttpStatusToFetchStatus(result.getStatusCode());
                         // TODO set next fetch time to something valid, based on the error
-                        future.complete(
-                                Collections
-                                        .singleton(new Tuple2<CrawlStateUrl, FetchedUrl>(
-                                                new CrawlStateUrl(url, fetchStatus,
-                                                        System.currentTimeMillis(), 0.0f, 0L),
-                                                null)));
                         LOGGER.trace(String.format("Forwarded failed URL to update status: '%s'",
                                 result.getFetchedUrl()));
                     } else {
@@ -141,27 +135,19 @@ public class FetchUrlsFunction
                                 result.getContentLength(), result.getFetchedUrl()));
 
                         // TODO set next fetch time to something valid.
-                        future.complete(
-                                Collections
-                                        .singleton(new Tuple2<CrawlStateUrl, FetchedUrl>(
-                                                new CrawlStateUrl(url, FetchStatus.FETCHED,
-                                                        fetchedUrl.getFetchTime(), 0.0f, 0L),
-                                                fetchedUrl)));
-
                         if (LOGGER.isTraceEnabled()) {
                             LOGGER.trace(String.format("Forwarded fetched URL to be parsed: '%s'",
                                     result.getFetchedUrl()));
                         }
                     }
+                    future.complete(Collections.singleton(fetchedUrl));
                 } catch (Exception e) {
                     LOGGER.debug(
                             String.format("Failed to fetch '%s' due to %s", url, e.getMessage()));
 
                     if (e instanceof BaseFetchException) {
-                        future.complete(Collections.singleton(new Tuple2<CrawlStateUrl, FetchedUrl>(
-                                new CrawlStateUrl(url, ExceptionUtils.mapExceptionToFetchStatus(e),
-                                        System.currentTimeMillis(), 0, 0L),
-                                null)));
+                        future.complete(Collections.singleton(new FetchResultUrl(url, ExceptionUtils.mapExceptionToFetchStatus(e),
+                                System.currentTimeMillis())));
                         LOGGER.trace(String.format("Forwarded exception URL to update status: '%s'",
                                 url));
                     } else {
@@ -176,10 +162,11 @@ public class FetchUrlsFunction
         });
     }
 
-    private Collection<Tuple2<CrawlStateUrl, FetchedUrl>> skipUrl(FetchUrl url,
-            Long nextFetchTime) {
-        return Collections.singleton(new Tuple2<CrawlStateUrl, FetchedUrl>(
-                new CrawlStateUrl(url, FetchStatus.SKIPPED_CRAWLDELAY, nextFetchTime), null));
+    private Collection<FetchResultUrl> skipUrl(FetchUrl url, Long nextFetchTime) {
+        FetchResultUrl fetchResultUrl = new FetchResultUrl(url, FetchStatus.SKIPPED_CRAWLDELAY,
+                System.currentTimeMillis());
+        fetchResultUrl.setNextFetchTime(nextFetchTime);
+        return Collections.singleton(fetchResultUrl);
     }
 
     protected static class TimedCounter {

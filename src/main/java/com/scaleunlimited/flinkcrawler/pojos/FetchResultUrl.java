@@ -3,25 +3,32 @@ package com.scaleunlimited.flinkcrawler.pojos;
 import crawlercommons.util.Headers;
 
 @SuppressWarnings("serial")
-public class FetchedUrl extends ValidUrl {
+public class FetchResultUrl extends ValidUrl {
 
+    private FetchStatus _status;
+    private long _statusTime;
     private String _fetchedUrl;
-    private long _fetchTime;
     private Headers _headers;
     private byte[] _content;
     private String _contentType;
     private int _responseRate;
+    private long _nextFetchTime = 0L;
 
-    public FetchedUrl() {
+    public FetchResultUrl() {
         super();
     }
 
-    public FetchedUrl(ValidUrl url, String fetchedUrl, long fetchTime, Headers headers,
-            byte[] content, String contentType, int responseRate) {
+    public FetchResultUrl(ValidUrl url, FetchStatus status, long statusTime) {
+        this(url, status, statusTime, url.getUrl(), null, null, null, 0);
+    }
+
+    public FetchResultUrl(ValidUrl url, FetchStatus status, long statusTime, String fetchedUrl,
+            Headers headers, byte[] content, String contentType, int responseRate) {
         super(url);
 
+        _status = status;
+        _statusTime = statusTime;
         _fetchedUrl = fetchedUrl;
-        _fetchTime = fetchTime;
         _headers = headers;
         _content = content;
         _contentType = contentType;
@@ -30,20 +37,28 @@ public class FetchedUrl extends ValidUrl {
         // TODO do we need redirects or new baseUrl ?
     }
 
+    public FetchStatus getStatus() {
+        return _status;
+    }
+
+    public void setStatus(FetchStatus status) {
+        _status = status;
+    }
+
+    public long getStatusTime() {
+        return _statusTime;
+    }
+
+    public void setStatusTime(long statusTime) {
+        _statusTime = statusTime;
+    }
+
     public String getFetchedUrl() {
         return _fetchedUrl;
     }
 
     public void setFetchedUrl(String fetchedUrl) {
         _fetchedUrl = fetchedUrl;
-    }
-
-    public long getFetchTime() {
-        return _fetchTime;
-    }
-
-    public void setFetchTime(long fetchTime) {
-        _fetchTime = fetchTime;
     }
 
     public Headers getHeaders() {
@@ -76,6 +91,14 @@ public class FetchedUrl extends ValidUrl {
 
     public void setResponseRate(int responseRate) {
         _responseRate = responseRate;
+    }
+
+    public long getNextFetchTime() {
+        return _nextFetchTime;
+    }
+
+    public void setNextFetchTime(long nextFetchTime) {
+        _nextFetchTime = nextFetchTime;
     }
 
     @Override

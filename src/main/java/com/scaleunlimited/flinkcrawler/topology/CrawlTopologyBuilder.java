@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.flink.api.common.functions.MapFunction;
-import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.core.fs.FileSystem.WriteMode;
 import org.apache.flink.streaming.api.collector.selector.OutputSelector;
@@ -39,8 +38,8 @@ import com.scaleunlimited.flinkcrawler.parser.BasePageParser;
 import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
 import com.scaleunlimited.flinkcrawler.parser.SimpleSiteMapParser;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
+import com.scaleunlimited.flinkcrawler.pojos.FetchResultUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
-import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.sources.BaseUrlSource;
@@ -317,7 +316,7 @@ public class CrawlTopologyBuilder {
                     }
                 }).name("Select sitemap URLs").keyBy(new PldKeySelector<FetchUrl>());
 
-        DataStream<Tuple2<CrawlStateUrl, FetchedUrl>> sitemapUrls =
+        DataStream<FetchResultUrl> sitemapUrls =
                 // TODO get capacity from fetcher builder.
                 AsyncDataStream.unorderedWait(sitemapUrlsToFetch,
                         new FetchUrlsFunction(_siteMapFetcherBuilder),
@@ -330,7 +329,7 @@ public class CrawlTopologyBuilder {
         // FUTURE - flag as sitemap and emit as any other url from the robots code; but this would require us to payload
         // the flag through
         DataStream<RawUrl> newSiteMapExtractedUrls =
-                selectFetchedUrls(splitFetchedUrlsStream(sitemapUrls))
+                sitemapUrls
                     .flatMap(new ParseSiteMapFunction(_siteMapParser))
                     .name("ParseSiteMapFunction")
                     .map(new OutlinkToStateUrlFunction())
@@ -359,7 +358,7 @@ public class CrawlTopologyBuilder {
                     }
                 }).name("Select passed URLs").keyBy(new PldKeySelector<FetchUrl>());
 
-        DataStream<Tuple2<CrawlStateUrl, FetchedUrl>> fetchedUrls =
+        DataStream<FetchResultUrl> fetchResultUrls =
                 // TODO get capacity from fetcher builder.
                 AsyncDataStream
                         .unorderedWait(urlsToFetch, new FetchUrlsFunction(_pageFetcherBuilder),
@@ -367,15 +366,9 @@ public class CrawlTopologyBuilder {
                                 TimeUnit.SECONDS, 10000)
                         .name("FetchUrlsFunction");
 
-        SplitStream<Tuple2<CrawlStateUrl, FetchedUrl>> fetchAttemptedUrls = splitFetchedUrlsStream(
-                fetchedUrls);
-        // Get the status of all URLs we've attempted to fetch, so that we can union them with URLs blocked by robots,
-        // and iterate those back into the crawl DB.
-        DataStream<CrawlStateUrl> fetchStatusUrls = selectFetchStatus(fetchAttemptedUrls);
-
-        SingleOutputStreamOperator<ParsedUrl> parsedUrls = selectFetchedUrls(
-                fetchAttemptedUrls).process(new ParseFunction(_pageParser, _maxOutlinksPerPage))
-                        .name("ParseFunction");
+        SingleOutputStreamOperator<ParsedUrl> parsedUrls = fetchResultUrls
+                .process(new ParseFunction(_pageParser, _maxOutlinksPerPage))
+                .name("ParseFunction");
 
         DataStream<RawUrl> newRawUrls = parsedUrls.getSideOutput(ParseFunction.OUTLINK_OUTPUT_TAG)
                 .map(new OutlinkToStateUrlFunction()).name("OutlinkToStateUrlFunction")
@@ -385,6 +378,7 @@ public class CrawlTopologyBuilder {
 
         // We need to merge robotBlockedUrls with the "status" stream from fetchAttemptedUrls and status
         // stream of the siteMapFetchAttemptedUrls and all of the new URLs from outlinks and sitemaps.
+        DataStream<CrawlStateUrl> fetchStatusUrls = parsedUrls.getSideOutput(ParseFunction.STATUS_OUTPUT_TAG);
         crawlDbIteration.closeWith(robotBlockedUrls.union(fetchStatusUrls, newUrls));
 
         // Save off parsed page content. So just extract the parsed content piece of the Tuple3, and
@@ -432,59 +426,6 @@ public class CrawlTopologyBuilder {
                 .name("LengthenUrlsFunction").flatMap(new NormalizeUrlsFunction(_urlNormalizer))
                 .name("NormalizeUrlsFunction").flatMap(new ValidUrlsFilter(_urlFilter))
                 .name("ValidUrlsFilter");
-    }
-
-    @SuppressWarnings("serial")
-    private SplitStream<Tuple2<CrawlStateUrl, FetchedUrl>> splitFetchedUrlsStream(
-            DataStream<Tuple2<CrawlStateUrl, FetchedUrl>> fetchedUrls) {
-        // Split the fetchedUrls so that we can parse the ones we have actually fetched versus
-        // the ones that have failed.
-        SplitStream<Tuple2<CrawlStateUrl, FetchedUrl>> fetchAttemptedUrls = fetchedUrls
-                .split(new OutputSelector<Tuple2<CrawlStateUrl, FetchedUrl>>() {
-                    private final List<String> FETCH_STATUS_STREAM = Arrays.asList("fetch_status");
-                    private final List<String> FETCHED_URL_STREAMS = Arrays.asList("fetch_status",
-                            "fetched_url");
-
-                    @Override
-                    public Iterable<String> select(Tuple2<CrawlStateUrl, FetchedUrl> url) {
-                        if (url.f1 != null) {
-                            return FETCHED_URL_STREAMS;
-                        } else {
-                            return FETCH_STATUS_STREAM;
-                        }
-                    }
-                });
-        return fetchAttemptedUrls;
-    }
-
-    @SuppressWarnings("serial")
-    private DataStream<CrawlStateUrl> selectFetchStatus(
-            SplitStream<Tuple2<CrawlStateUrl, FetchedUrl>> fetchAttemptedUrls) {
-        DataStream<CrawlStateUrl> fetchStatusUrls = fetchAttemptedUrls.select("fetch_status")
-                .map(new MapFunction<Tuple2<CrawlStateUrl, FetchedUrl>, CrawlStateUrl>() {
-
-                    @Override
-                    public CrawlStateUrl map(Tuple2<CrawlStateUrl, FetchedUrl> url)
-                            throws Exception {
-                        return url.f0;
-                    }
-                }).name("Select fetch status");
-        return fetchStatusUrls;
-    }
-
-    @SuppressWarnings("serial")
-    private DataStream<FetchedUrl> selectFetchedUrls(
-            SplitStream<Tuple2<CrawlStateUrl, FetchedUrl>> fetchAttemptedUrls) {
-        DataStream<FetchedUrl> fetchedUrls = fetchAttemptedUrls.select("fetched_url")
-                .map(new MapFunction<Tuple2<CrawlStateUrl, FetchedUrl>, FetchedUrl>() {
-
-                    @Override
-                    public FetchedUrl map(Tuple2<CrawlStateUrl, FetchedUrl> hasFetchedUrl)
-                            throws Exception {
-                        return hasFetchedUrl.f1;
-                    }
-                }).name("Select fetched URLs");
-        return fetchedUrls;
     }
 
     private static RawUrl makeDefaultSeedUrl() {

@@ -30,8 +30,10 @@ public class ValidUrlsFilter extends BaseFlatMapFunction<RawUrl, CrawlStateUrl> 
         if (_urlValidator.isValid(urlAsString)) {
             try {
                 ValidUrl validatedUrl = new ValidUrl(urlAsString);
-                collector.collect(new CrawlStateUrl(validatedUrl, FetchStatus.UNFETCHED,
-                        System.currentTimeMillis(), url.getScore(), 0));
+                CrawlStateUrl crawlStateUrl = new CrawlStateUrl(validatedUrl, FetchStatus.UNFETCHED,
+                        System.currentTimeMillis());
+                crawlStateUrl.setScore(url.getScore());
+                collector.collect(crawlStateUrl);
             } catch (MalformedURLException e) {
                 LOGGER.warn("Filtering malformed URL (not caught by validator!!!) " + urlAsString);
             } catch (Throwable t) {

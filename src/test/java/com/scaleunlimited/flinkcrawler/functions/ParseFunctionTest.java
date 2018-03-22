@@ -16,8 +16,10 @@ import org.mockito.ArgumentMatcher;
 
 import com.scaleunlimited.flinkcrawler.parser.BasePageParser;
 import com.scaleunlimited.flinkcrawler.parser.ParserResult;
+import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
-import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
+import com.scaleunlimited.flinkcrawler.pojos.FetchResultUrl;
+import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 
 public class ParseFunctionTest {
@@ -32,11 +34,13 @@ public class ParseFunctionTest {
         ParseFunction func = new ParseFunction(basePageParser, 2); // Limit to 2 outlinks per page
         Collector<ParsedUrl> parsedUrlCollector = mock(Collector.class);
         ParseFunction.Context parserContext = mock(Context.class);
-        FetchedUrl fetchedUrl = new FetchedUrl();
-        fetchedUrl.setFetchedUrl("http://foo.com");
+        FetchResultUrl fetchResultUrl = new FetchResultUrl();
+        fetchResultUrl.setFetchedUrl("http://foo.com");
+        fetchResultUrl.setStatus(FetchStatus.FETCHED);
+        fetchResultUrl.setNextFetchTime(System.currentTimeMillis() + 1000L);
 
         ParserResult parserResult = mock(ParserResult.class);
-        when(basePageParser.parse(fetchedUrl)).thenReturn(parserResult);
+        when(basePageParser.parse(fetchResultUrl)).thenReturn(parserResult);
         ParsedUrl parsedUrl = mock(ParsedUrl.class);
         when(parserResult.getParsedUrl()).thenReturn(parsedUrl);
         when(parsedUrl.getScore()).thenReturn(0f); // we don't care about returning the ParsedUrl
@@ -49,11 +53,32 @@ public class ParseFunctionTest {
         when(parserResult.getExtractedUrls()).thenReturn(extractedUrls);
 
         when(parsedUrl.getParsedText()).thenReturn("");
-        func.processElement(fetchedUrl, parserContext, parsedUrlCollector);
+        func.processElement(fetchResultUrl, parserContext, parsedUrlCollector);
 
+        verify(parserContext, times(1)).output( eq(ParseFunction.STATUS_OUTPUT_TAG), 
+                                                argThat(new MatchCrawlStateUrl(fetchResultUrl)));
+        
         // Verify that we only get the top 2 links
         verify(parserContext, times(2)).output( eq(ParseFunction.OUTLINK_OUTPUT_TAG), 
                                                 argThat(new MatchExtractedUrls(2)));
+    }
+    
+    private static class MatchCrawlStateUrl
+            implements ArgumentMatcher<CrawlStateUrl> {
+
+        FetchResultUrl _fetchResultUrl;
+        
+        public MatchCrawlStateUrl(FetchResultUrl fetchResultUrl) {
+            super();
+            _fetchResultUrl = fetchResultUrl;
+        }
+
+        @Override
+        public boolean matches(CrawlStateUrl crawlStateUrl) {
+            return (    crawlStateUrl.getStatus().equals(_fetchResultUrl.getStatus())
+                    &&  crawlStateUrl.getNextFetchTime() == _fetchResultUrl.getNextFetchTime());
+        }
+        
     }
 
     private static class MatchExtractedUrls

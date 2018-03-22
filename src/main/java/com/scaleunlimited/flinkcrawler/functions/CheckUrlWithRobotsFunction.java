@@ -205,7 +205,9 @@ public class CheckUrlWithRobotsFunction
             CrawlStateUrl crawlStateUrl = new CrawlStateUrl(url,
                     rules.isDeferVisits() ? FetchStatus.SKIPPED_DEFERRED
                             : FetchStatus.SKIPPED_BLOCKED,
-                    now, url.getScore(), now + DEFAULT_RETRY_INTERVAL_MS);
+                    now);
+            crawlStateUrl.setScore(url.getScore());
+            crawlStateUrl.setNextFetchTime(now + DEFAULT_RETRY_INTERVAL_MS);
             return Collections.singleton(
                     new Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>(crawlStateUrl, null, null));
         }

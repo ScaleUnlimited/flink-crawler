@@ -9,7 +9,9 @@ public class CrawlStateUrlTest {
     @Test
     public void testSettingFromAnotherUrl() throws Exception {
         ValidUrl url = new ValidUrl("http://domain.com?q=s");
-        CrawlStateUrl csu = new CrawlStateUrl(url, FetchStatus.FETCHED, 100, 1.0f, 1000);
+        CrawlStateUrl csu = new CrawlStateUrl(url, FetchStatus.FETCHED, 100);
+        csu.setScore(1.0f);
+        csu.setNextFetchTime(1000L);
 
         CrawlStateUrl newUrl = new CrawlStateUrl();
         newUrl.setFrom(csu);

@@ -1,6 +1,6 @@
 package com.scaleunlimited.flinkcrawler.urldb;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import org.assertj.core.data.Percentage;
 import org.junit.Test;
@@ -8,8 +8,6 @@ import org.junit.Test;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.ValidUrl;
-import com.scaleunlimited.flinkcrawler.urldb.BaseUrlStateMerger;
-import com.scaleunlimited.flinkcrawler.urldb.DefaultUrlStateMerger;
 import com.scaleunlimited.flinkcrawler.urldb.BaseUrlStateMerger.MergeResult;
 
 public class DefaultUrlStateMergerTest {
@@ -19,8 +17,10 @@ public class DefaultUrlStateMergerTest {
         BaseUrlStateMerger merger = new DefaultUrlStateMerger();
 
         ValidUrl url = new ValidUrl("http://domain.com?q=s");
-        CrawlStateUrl csu1 = new CrawlStateUrl(url, FetchStatus.UNFETCHED, 100, 1.0f, 1000);
-        CrawlStateUrl csu2 = new CrawlStateUrl(url, FetchStatus.UNFETCHED, 100, 1.0f, 1000);
+        CrawlStateUrl csu1 = new CrawlStateUrl(url, FetchStatus.UNFETCHED, 100);
+        csu1.setScore(1.0f);
+        CrawlStateUrl csu2 = new CrawlStateUrl(url, FetchStatus.UNFETCHED, 100);
+        csu2.setScore(1.0f);
         CrawlStateUrl mergedValue = new CrawlStateUrl();
 
         MergeResult result = merger.doMerge(csu1, csu2, mergedValue);
@@ -34,8 +34,8 @@ public class DefaultUrlStateMergerTest {
         BaseUrlStateMerger merger = new DefaultUrlStateMerger();
 
         ValidUrl url = new ValidUrl("http://domain1.com/");
-        CrawlStateUrl stateUrl = new CrawlStateUrl(url, FetchStatus.FETCHING, 100, 1.0f, 1000);
-        CrawlStateUrl newUrl = new CrawlStateUrl(url, FetchStatus.FETCHED, 200, 1.0f, 1000);
+        CrawlStateUrl stateUrl = new CrawlStateUrl(url, FetchStatus.FETCHING, 100);
+        CrawlStateUrl newUrl = new CrawlStateUrl(url, FetchStatus.FETCHED, 200);
         CrawlStateUrl mergedValue = new CrawlStateUrl();
 
         MergeResult result = merger.doMerge(stateUrl, newUrl, mergedValue);

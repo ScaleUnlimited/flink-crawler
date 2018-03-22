@@ -13,7 +13,8 @@ import org.mockito.Mockito;
 
 import com.scaleunlimited.flinkcrawler.metrics.CrawlerAccumulator;
 import com.scaleunlimited.flinkcrawler.parser.ParserResult;
-import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
+import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
+import com.scaleunlimited.flinkcrawler.pojos.FetchResultUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ValidUrl;
 
 import crawlercommons.util.Headers;
@@ -35,7 +36,7 @@ public class FocusedPageParserTest {
         Headers headers = new Headers();
         byte[] content = "<html><head><title></title></head><body><p>0.75</p></body></html>"
                 .getBytes(StandardCharsets.UTF_8);
-        FetchedUrl fetchedUrl = new FetchedUrl(url, url.getUrl(), 0, headers, content, "text/html",
+        FetchResultUrl fetchedUrl = new FetchResultUrl(url, FetchStatus.FETCHED, 0, url.getUrl(), headers, content, "text/html",
                 0);
         ParserResult result = parser.parse(fetchedUrl);
         assertEquals(0.75f, result.getParsedUrl().getScore(), 0.0001f);

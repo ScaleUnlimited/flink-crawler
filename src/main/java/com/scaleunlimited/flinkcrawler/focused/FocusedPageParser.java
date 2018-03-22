@@ -4,7 +4,7 @@ import com.scaleunlimited.flinkcrawler.metrics.CrawlerAccumulator;
 import com.scaleunlimited.flinkcrawler.parser.ParserResult;
 import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
-import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
+import com.scaleunlimited.flinkcrawler.pojos.FetchResultUrl;
 
 @SuppressWarnings("serial")
 public class FocusedPageParser extends SimplePageParser {
@@ -30,7 +30,7 @@ public class FocusedPageParser extends SimplePageParser {
     }
 
     @Override
-    public ParserResult parse(FetchedUrl fetchedUrl) throws Exception {
+    public ParserResult parse(FetchResultUrl fetchedUrl) throws Exception {
         ParserResult result = super.parse(fetchedUrl);
         float score = _pageScorer.score(result);
         result.getParsedUrl().setScore(score);
