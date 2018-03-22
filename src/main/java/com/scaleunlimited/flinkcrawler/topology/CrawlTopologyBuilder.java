@@ -13,6 +13,7 @@ import org.apache.flink.core.fs.FileSystem.WriteMode;
 import org.apache.flink.streaming.api.collector.selector.OutputSelector;
 import org.apache.flink.streaming.api.datastream.AsyncDataStream;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.datastream.DataStreamSink;
 import org.apache.flink.streaming.api.datastream.IterativeStream;
 import org.apache.flink.streaming.api.datastream.KeyedStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
@@ -208,6 +209,14 @@ public class CrawlTopologyBuilder {
         _parallelism = parallelism;
         return this;
     }
+    
+    public int getRealParallelism() {
+        if (_parallelism == DEFAULT_PARALLELISM) {
+            return _env.getParallelism();
+        } else {
+            return _parallelism;
+        }
+    }
 
     /**
      * This is where we do all of the heavy lifting to actually use all of our configuration settings to build a
@@ -305,7 +314,7 @@ public class CrawlTopologyBuilder {
 
         // Split off the sitemap urls and fetch and later parse them using the sitemap fetcher
         // and parser to generate outlinks
-        KeyedStream<FetchUrl, String> sitemapUrlsToFetch = blockedOrPassedOrSitemapUrls
+        DataStream<FetchUrl> sitemapUrlsToFetch = blockedOrPassedOrSitemapUrls
                 .select("sitemap")
                 .map(new MapFunction<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>, FetchUrl>() {
 
@@ -314,26 +323,28 @@ public class CrawlTopologyBuilder {
                             throws Exception {
                         return sitemapUrl.f2;
                     }
-                }).name("Select sitemap URLs").keyBy(new PldKeySelector<FetchUrl>());
+                })
+                .name("Select sitemap URLs")
+                // So we don't wind up running the async sitemap fetch as part of the async
+                // robots fetch/check task.
+                .rebalance();
 
         DataStream<FetchResultUrl> sitemapUrls =
                 // TODO get capacity from fetcher builder.
                 AsyncDataStream.unorderedWait(sitemapUrlsToFetch,
                         new FetchUrlsFunction(_siteMapFetcherBuilder),
                         _siteMapFetcherBuilder.getFetchDurationTimeoutInSeconds() * 2,
-                        TimeUnit.SECONDS, 10000).name("FetchUrlsFunction for sitemap"); // FUTURE Have a separate
-                                                                                        // FetchSiteMapUrlFunction that
-                                                                                        // extends FetchUrlsFunction
+                        TimeUnit.SECONDS, 10000)
+                .name("FetchUrlsFunction for sitemap");
 
         // Run the failed urls into a custom function to log it and then to a DiscardingSink.
         // FUTURE - flag as sitemap and emit as any other url from the robots code; but this would require us to payload
         // the flag through
-        DataStream<RawUrl> newSiteMapExtractedUrls =
-                sitemapUrls
-                    .flatMap(new ParseSiteMapFunction(_siteMapParser))
-                    .name("ParseSiteMapFunction")
-                    .map(new OutlinkToStateUrlFunction())
-                    .name("OutlinkToStateUrlFunction");
+        DataStream<RawUrl> newSiteMapExtractedUrls = sitemapUrls
+                .flatMap(new ParseSiteMapFunction(_siteMapParser))
+                .name("ParseSiteMapFunction")
+                .map(new OutlinkToStateUrlFunction())
+                .name("OutlinkToStateUrlFunction");
 
         // Split off rejected URLs. These will get unioned (merged) with the status of URLs that we
         // attempt to fetch, and then fed back into the crawl DB via the inner iteration.
@@ -356,7 +367,11 @@ public class CrawlTopologyBuilder {
                             throws Exception {
                         return justHasFetchUrl.f1;
                     }
-                }).name("Select passed URLs").keyBy(new PldKeySelector<FetchUrl>());
+                })
+                .name("Select passed URLs")
+                // We need to key by PLD since the FetchUrlsFunction has to enforce politeness
+                // on a per-domain basis.
+                .keyBy(new PldKeySelector<FetchUrl>());
 
         DataStream<FetchResultUrl> fetchResultUrls =
                 // TODO get capacity from fetcher builder.
@@ -366,12 +381,17 @@ public class CrawlTopologyBuilder {
                                 TimeUnit.SECONDS, 10000)
                         .name("FetchUrlsFunction");
 
+        final int parseParallelism = getRealParallelism() * 4;
         SingleOutputStreamOperator<ParsedUrl> parsedUrls = fetchResultUrls
                 .process(new ParseFunction(_pageParser, _maxOutlinksPerPage))
-                .name("ParseFunction");
+                .name("ParseFunction")
+                // Parsing is CPU intensive, so we want to use more slots for it.
+                .setParallelism(parseParallelism);
 
         DataStream<RawUrl> newRawUrls = parsedUrls.getSideOutput(ParseFunction.OUTLINK_OUTPUT_TAG)
-                .map(new OutlinkToStateUrlFunction()).name("OutlinkToStateUrlFunction")
+                .map(new OutlinkToStateUrlFunction())
+                .name("OutlinkToStateUrlFunction")
+                .setParallelism(parseParallelism)
                 .union(newSiteMapExtractedUrls);
 
         DataStream<CrawlStateUrl> newUrls = cleanUrls(newRawUrls);
@@ -381,9 +401,12 @@ public class CrawlTopologyBuilder {
         DataStream<CrawlStateUrl> fetchStatusUrls = parsedUrls.getSideOutput(ParseFunction.STATUS_OUTPUT_TAG);
         crawlDbIteration.closeWith(robotBlockedUrls.union(fetchStatusUrls, newUrls));
 
-        // Save off parsed page content. So just extract the parsed content piece of the Tuple3, and
-        // then pass it on to the provided content sink function.
-        parsedUrls.name("Select fetched content").addSink(_contentSink).name("ContentSink");
+        // Save off parsed page content by passing it on to the provided content sink function.
+        parsedUrls
+            .name("Select fetched content")
+            .addSink(_contentSink)
+            .name("ContentSink")
+            .setParallelism(parseParallelism);
 
         // Save off parsed page content text. So just extract the parsed content text piece of the Tuple3, and
         // then pass it on to the provided content sink function (or just send it to the console).
@@ -398,14 +421,21 @@ public class CrawlTopologyBuilder {
                     }
                     
                 })
-                .name("Select fetched content text").name("ContentTextSink");
+                .name("Select fetched content text")
+                .name("ContentTextSink")
+                .setParallelism(parseParallelism);
+
+        DataStreamSink<String> contentTextSink;
         if (_contentTextSink != null) {
-            contentText.addSink(_contentTextSink);
+            contentTextSink = contentText.addSink(_contentTextSink);
         } else if (_contentTextFilePathString != null) {
-            contentText.writeAsText(_contentTextFilePathString, WriteMode.OVERWRITE);
+            contentTextSink = contentText.writeAsText(_contentTextFilePathString, WriteMode.OVERWRITE);
         } else {
-            contentText.print();
+            contentTextSink = contentText.print();
         }
+        
+        contentTextSink.name("ContentTextSink")
+        .setParallelism(parseParallelism);
 
         return new CrawlTopology(_env, _jobName);
     }
@@ -418,13 +448,13 @@ public class CrawlTopologyBuilder {
      * @return
      */
     private DataStream<CrawlStateUrl> cleanUrls(DataStream<RawUrl> rawUrls) {
-        // TODO LengthenUrlsFunction needs to just pass along invalid URLs
-        rawUrls = rawUrls.rebalance();
         return AsyncDataStream
                 .unorderedWait(rawUrls, new LengthenUrlsFunction(_urlLengthener),
                         _urlLengthener.getTimeoutInSeconds(), TimeUnit.SECONDS)
-                .name("LengthenUrlsFunction").flatMap(new NormalizeUrlsFunction(_urlNormalizer))
-                .name("NormalizeUrlsFunction").flatMap(new ValidUrlsFilter(_urlFilter))
+                .name("LengthenUrlsFunction")
+                .flatMap(new NormalizeUrlsFunction(_urlNormalizer))
+                .name("NormalizeUrlsFunction")
+                .flatMap(new ValidUrlsFilter(_urlFilter))
                 .name("ValidUrlsFilter");
     }
 

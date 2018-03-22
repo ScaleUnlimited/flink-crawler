@@ -64,15 +64,18 @@ public class ParseFunction extends BaseProcessFunction<FetchResultUrl, ParsedUrl
         try {
             long start = System.currentTimeMillis();
             result = _parser.parse(fetchResultUrl);
-            LOGGER.debug(String.format("Parsed '%s' in %dms", fetchResultUrl,
-                    System.currentTimeMillis() - start));
+            LOGGER.debug("Parsed '{}' in {}ms", fetchResultUrl, System.currentTimeMillis() - start);
+        } catch (InterruptedException e) {
+            // Ignore, as these happen when we're parsing a file and the workflow
+            // is shutting down.
+            LOGGER.debug("Interrupted while parsing '{}'", fetchResultUrl);
+            return;
         } catch (Exception e) {
             if (LOGGER.isDebugEnabled()) {
                 LOGGER.warn("Parsing exception " + fetchResultUrl, e);
             } else {
                 // If we're not doing debug level logging, don't spit out stack trace.
-                LOGGER.warn(String.format("Parsing exception '%s': %s", fetchResultUrl,
-                        e.getCause().getMessage()));
+                LOGGER.warn("Parsing exception '{}': {}", fetchResultUrl, e.getCause().getMessage());
             }
 
             return;
@@ -81,6 +84,8 @@ public class ParseFunction extends BaseProcessFunction<FetchResultUrl, ParsedUrl
         // Output the content only if we have a score that is greater than 0
         if (result.getParsedUrl().getScore() > 0) {
             collector.collect(result.getParsedUrl());
+        } else {
+            LOGGER.debug("Skipping content output of zero-score '{}'", fetchResultUrl);
         }
 
         // Since we are limiting the number of outlinks, first sort by score and then limit.
@@ -92,6 +97,7 @@ public class ParseFunction extends BaseProcessFunction<FetchResultUrl, ParsedUrl
                 return (int) (o2.getScore() - o1.getScore());
             }
         });
+        
         int count = 0;
         for (ExtractedUrl outlink : extractedUrls) {
             String message = String.format("Extracted '%s' from '%s'", outlink.getUrl(),

@@ -45,8 +45,9 @@ public class SeedUrlSource extends BaseUrlSource {
     // For when we've read from a local file
     private RawUrl[] _urls;
 
-    private transient InputStream _s3FileStream;
     private volatile boolean _keepRunning = false;
+
+    private transient InputStream _s3FileStream;
     private transient int _seedUrlIndex;
     private transient RawUrl[] _ticklers;
 
@@ -153,25 +154,15 @@ public class SeedUrlSource extends BaseUrlSource {
 
         long nextTickleTime = 0;
         while (_keepRunning) {
-
-            // TODO Handle skipping empty lines/comments after we've decided if
-            // the line is for the appropriate partition, so that we could use
-            // _seedUrlIndex to re-sync if we get terminated/checkpointed/the
-            // stream is closed & we have to reopen it, etc.
-            //
-            // Hmmm. That would make _seedUrlIndex an input line index rather
-            // than a URL index, no? Assuming the file contents don't change,
-            // it seems like we could either save a separate input line index
-            // (i.e., to save re-parsing each input line for the re-sync),
-            // or we just let it spin through the file re-parsing each line
-            // until we've seen _seedUrlIndex real URLs.
-            //
+            
             if (useS3File()) {
                 String sourceLine = s3FileReader.readLine();
                 if (sourceLine == null) {
                     break;
                 }
+                
                 RawUrl url = parseSourceLine(sourceLine);
+                
                 if (url != null) {
                     collectUrl(url, context);
                 }
@@ -228,6 +219,7 @@ public class SeedUrlSource extends BaseUrlSource {
         if (seedUrl.isEmpty() || seedUrl.startsWith("#")) {
             return null;
         }
+        
         return new RawUrl(seedUrl, _estimatedScore);
     }
 
