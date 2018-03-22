@@ -185,7 +185,8 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
      * @throws Exception
      */
     private void processDomainUrl(String pld, Collector<FetchUrl> collector) throws Exception {
-        if (LOGGER.isTraceEnabled()) {
+        final boolean doTracing = LOGGER.isTraceEnabled();
+        if (doTracing) {
             LOGGER.trace("Got domain URL for " + pld);
         }
 
@@ -204,7 +205,7 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
                 Long urlHash = _activeUrlsIndex.get(index);
                 CrawlStateUrl stateUrl = _activeUrls.get(urlHash);
                 FetchQueueResult queueResult = _fetchQueue.add(stateUrl);
-                if (LOGGER.isTraceEnabled()) {
+                if (doTracing) {
                     LOGGER.trace(String.format(
                             "UrlDBFunction (%d/%d) got result %s adding '%s' to fetch queue",
                             _partition, _parallelism, queueResult, stateUrl));
@@ -241,7 +242,8 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
      * @param collector
      */
     private void processTicklerUrl(Collector<FetchUrl> collector) {
-        if (LOGGER.isTraceEnabled()) {
+        final boolean doTracing = LOGGER.isTraceEnabled();
+        if (doTracing) {
             LOGGER.trace(String.format("UrlDBFunction (%d/%d) checking for URLs to emit",
                     _partition, _parallelism));
         }
@@ -249,7 +251,7 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
         for (int i = 0; i < URLS_PER_TICKLE; i++) {
             int activeUrls = _numInFlightUrls.get();
             if (activeUrls > MAX_IN_FLIGHT_URLS) {
-                if (LOGGER.isTraceEnabled()) {
+                if (doTracing) {
                     LOGGER.trace(String.format(
                             "UrlDBFunction (%d/%d) skipping emit, too many active URLs (%d)",
                             _partition, _parallelism, activeUrls));

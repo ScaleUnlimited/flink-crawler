@@ -47,7 +47,7 @@ public class ParseFunction
         try {
             long start = System.currentTimeMillis();
             result = _parser.parse(fetchedUrl);
-            LOGGER.debug("Thread {}: Parsed '{}' in {}ms", Thread.currentThread().getName(), fetchedUrl, System.currentTimeMillis() - start);
+            LOGGER.debug("Parsed '{}' in {}ms", fetchedUrl, System.currentTimeMillis() - start);
         } catch (InterruptedException e) {
             // Ignore, as these happen when we're parsing a file and the workflow
             // is shutting down.
