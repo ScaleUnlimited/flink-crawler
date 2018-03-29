@@ -54,13 +54,10 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
     private static final Pattern CDX_LINE_PATTERN = Pattern
             .compile("(.+?)[ ]+(\\d+)[ ]+(\\{.+\\})");
 
-    private static final String ENCODED_CHARS = "0123456789abcdefABCDEF";
-
     private static final Headers EMPTY_HEADERS = new Headers();
     private static final byte[] EMPTY_CONTENT = new byte[0];
 
     protected static final String DEFAULT_CRAWL_ID = "2017-22";
-    protected static final int DEFAULT_THREADS = 1;
     protected static final int DEFAULT_CACHE_SIZE = 8 * 1024 * 1024;
 
     private final String _crawlId;
@@ -145,7 +142,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
         }
 
         // Figure out which segment it's in.
-        String targetKey = reverseDomain(redirectUrl);
+        String targetKey = CommonCrawlUrls.convertToIndexFormat(redirectUrl);
         SecondaryIndex indexEntry = _secondaryIndexMap.get(targetKey);
         if (indexEntry == null) {
             return make404FetchResult(redirectUrl, numRedirects, payload);
@@ -324,8 +321,10 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
             throws IOFetchException {
         byte[] segmentData = getSegmentData(url, indexEntry);
         JsonObject result = null;
-        String urlAsStr = url.toString();
-
+        boolean found = false;
+        long resultTimestamp = 0;
+        String protocol = url.getProtocol() + "://";
+        
         try (BufferedReader lineReader = new BufferedReader(
                 new InputStreamReader(new GZIPInputStream(new ByteArrayInputStream(segmentData)),
                         StandardCharsets.UTF_8))) {
@@ -343,19 +342,45 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
                 String entryKey = m.group(1);
                 int sort = targetKey.compareTo(entryKey);
                 if (sort == 0) {
-                    // We found a match, now get info from the JSON field.
+                    long timestamp = Long.parseLong(m.group(2));
                     String json = m.group(3);
                     JsonObject newResult = _jsonParser.parse(json).getAsJsonObject();
+                    String fetchedUrl = newResult.get("url").getAsString();
+                    
+                    // Avoid case of http request redirecting to https, which we don't
+                    // have (or vice versa). We only want to check protocol, as doing
+                    // the full URL comparison means having exact normalization (which
+                    // we don't do yet) to match what CC uses. If we had that, then we
+                    // would be passing in the URL normalized the same way, and then we
+                    // could do the URL comparison.
+                    if (!fetchedUrl.startsWith(protocol)) {
+                        continue;
+                    }
+                    
+                    boolean newWasFound = newResult.get("status").getAsInt() == HttpStatus.SC_OK;
 
-                    // See if the URL in the JsonObject matches what we're looking for.
-                    String newUrl = newResult.get("url").getAsString();
-
-                    // TODO hack to match encoded characters, where hex digits can be upper
-                    // case in the URL, even though the key used for ordering is lower-case.
-                    if (newUrl.equalsIgnoreCase(urlAsStr)) {
-                        // FUTURE should we check the timestamp to pick the last one?
+                    // Use the new result if we don't yet have a result, or the previous
+                    // result wasn't found, and this timestamp is newer or this one was found,
+                    // or the previous result was found and this timestamp is newer. We do
+                    // this to try to optimize our chance of getting an actual result, versus
+                    // endless redirects.
+                    boolean useNewResult = false;
+                    if (result == null) {
+                        useNewResult = true;
+                    } else if (!found) {
+                        if (timestamp > resultTimestamp) {
+                            useNewResult = true;
+                        } else if (newWasFound) {
+                            useNewResult = true;
+                        }
+                    } else if (newWasFound && (timestamp > resultTimestamp)) {
+                        useNewResult = true;
+                    }
+                    
+                    if (useNewResult) {
                         result = newResult;
-                        result.addProperty("timestamp", new Long(Long.parseLong(m.group(2))));
+                        result.addProperty("timestamp", new Long(timestamp));
+                        found = newWasFound;
                     }
                 } else if (sort < 0) {
                     return result;
@@ -463,99 +488,6 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
         }
 
         return false;
-    }
-
-    // TODO Find domain normalization code used in other projects
-    protected static String reverseDomain(URL url) {
-        StringBuilder reversedUrl = new StringBuilder();
-
-        String domain = url.getHost();
-        String[] domainParts = domain.split("\\.");
-        for (int i = domainParts.length - 1; i >= 0; i--) {
-            // Skip leading www
-            if ((i > 0) || !domainParts[i].equals("www")) {
-                if (reversedUrl.length() > 0) {
-                    reversedUrl.append(',');
-                }
-
-                reversedUrl.append(domainParts[i]);
-            }
-        }
-
-        if (url.getPort() != -1) {
-            reversedUrl.append(':');
-            reversedUrl.append(url.getPort());
-        }
-
-        reversedUrl.append(")");
-
-        if (!url.getPath().isEmpty()) {
-            reversedUrl.append(lowerCaseEncodedChars(url.getPath()));
-        } else {
-            reversedUrl.append('/');
-        }
-
-        if (url.getQuery() != null) {
-            reversedUrl.append('?');
-            reversedUrl.append(url.getQuery());
-        }
-
-        return reversedUrl.toString();
-    }
-
-    /**
-     * If the path contains URL-encoded characters, we need to make sure A-F are lowercased.
-     * 
-     * @param path
-     * @return
-     */
-    private static String lowerCaseEncodedChars(final String path) {
-        int offset = path.indexOf('%');
-        if (offset == -1) {
-            return path;
-        }
-
-        boolean inPercent = true;
-        boolean inFirstDigit = false;
-        char savedFirstDigit = ' ';
-
-        offset += 1;
-        StringBuilder result = new StringBuilder(path.substring(0, offset));
-
-        for (; offset < path.length(); offset++) {
-            char c = path.charAt(offset);
-            if (!inPercent) {
-                result.append(c);
-                if (c == '%') {
-                    inPercent = true;
-                }
-            } else if (!inFirstDigit) {
-                if (ENCODED_CHARS.indexOf(c) != -1) {
-                    inFirstDigit = true;
-                    savedFirstDigit = c;
-                } else {
-                    inPercent = false;
-                    result.append(c);
-                }
-            } else {
-                if (ENCODED_CHARS.indexOf(c) != -1) {
-                    result.append(Character.toLowerCase(savedFirstDigit));
-                    result.append(Character.toLowerCase(c));
-                } else {
-                    result.append(savedFirstDigit);
-                    result.append(c);
-                }
-
-                inPercent = false;
-                inFirstDigit = false;
-            }
-        }
-
-        if (inFirstDigit) {
-            result.append(savedFirstDigit);
-        }
-
-        return result.toString();
     }
 
 }
