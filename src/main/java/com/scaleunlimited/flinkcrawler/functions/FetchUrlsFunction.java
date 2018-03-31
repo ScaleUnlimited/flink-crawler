@@ -29,8 +29,6 @@ public class FetchUrlsFunction
         extends BaseAsyncFunction<FetchUrl, FetchResultUrl> {
     static final Logger LOGGER = LoggerFactory.getLogger(FetchUrlsFunction.class);
 
-    public static final int DEFAULT_THREAD_COUNT = 100;
-
     private static final int FETCH_RATE_WINDOW_SIZE = 30;
 
     private BaseHttpFetcherBuilder _fetcherBuilder;

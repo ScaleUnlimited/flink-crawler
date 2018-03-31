@@ -2,14 +2,13 @@ package com.scaleunlimited.flinkcrawler.tools;
 
 import org.kohsuke.args4j.Option;
 
+import com.scaleunlimited.flinkcrawler.parser.SimpleLinkExtractor;
 import com.scaleunlimited.flinkcrawler.topology.CrawlTopologyBuilder;
 
 import crawlercommons.fetcher.http.SimpleHttpFetcher;
 import crawlercommons.fetcher.http.UserAgent;
 
 public class CrawlToolOptions {
-
-    public static final int DEFAULT_MAX_OUTLINKS_PER_PAGE = 50;
 
     private UserAgent _userAgent = null;
     private String _urlsFilename;
@@ -24,7 +23,7 @@ public class CrawlToolOptions {
     private boolean _noLengthen = false;
     private int _crawlDbParallelism = 1;
     private String _checkpointDir = null;
-    private int _maxOutlinksPerPage = DEFAULT_MAX_OUTLINKS_PER_PAGE;
+    private int _maxOutlinksPerPage = SimpleLinkExtractor.DEFAULT_MAX_EXTRACTED_LINKS_SIZE;
 
     private String _cacheDir;
     private String _commonCrawlId = null;
@@ -126,7 +125,7 @@ public class CrawlToolOptions {
         _noLengthen = noLengthen;
     }
 
-    @Option(name = "-maxoutlinks", usage = "maximum coutlinks per page that are extracted (default:50)", required = false)
+    @Option(name = "-maxoutlinks", usage = "maximum outlinks per page that are extracted", required = false)
     public void setMaxOutlinksPerPage(int maxOutlinksPerPage) {
         _maxOutlinksPerPage = maxOutlinksPerPage;
     }
