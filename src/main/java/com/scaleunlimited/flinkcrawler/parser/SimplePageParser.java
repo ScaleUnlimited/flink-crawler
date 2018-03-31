@@ -19,7 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.config.ParserPolicy;
 import com.scaleunlimited.flinkcrawler.metrics.CrawlerAccumulator;
-import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
+import com.scaleunlimited.flinkcrawler.pojos.FetchResultUrl;
 import com.scaleunlimited.flinkcrawler.utils.IoUtils;
 
 @SuppressWarnings("serial")
@@ -152,7 +152,7 @@ public class SimplePageParser extends BasePageParser {
     }
 
     @Override
-    public ParserResult parse(FetchedUrl fetchedUrl) throws Exception {
+    public ParserResult parse(FetchResultUrl fetchedUrl) throws Exception {
         init();
 
         if (LOGGER.isTraceEnabled()) {

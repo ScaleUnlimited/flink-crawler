@@ -14,29 +14,27 @@ public class CrawlStateUrl extends ValidUrl {
 
     private FetchStatus _status;
     private long _statusTime;
-    private float _score;
-    private long _nextFetchTime;
+    private float _score = 0.0f;
+    private long _nextFetchTime = 0L;
 
     public CrawlStateUrl() {
         // So it's a valid POJO for Flink.
     }
 
     public CrawlStateUrl(RawUrl url) {
-        this(new ValidUrl(url), FetchStatus.UNFETCHED, System.currentTimeMillis(), 0.0f, 0);
+        this(new ValidUrl(url), FetchStatus.UNFETCHED, System.currentTimeMillis());
+    }
+    
+    public CrawlStateUrl(FetchResultUrl fetchedUrl) {
+        this(fetchedUrl, fetchedUrl.getStatus(), fetchedUrl.getStatusTime());
+        setNextFetchTime(fetchedUrl.getNextFetchTime());
     }
 
-    public CrawlStateUrl(FetchUrl url, FetchStatus status, long nextFetchTime) {
-        this(url, status, System.currentTimeMillis(), url.getScore(), nextFetchTime);
-    }
-
-    public CrawlStateUrl(ValidUrl url, FetchStatus status, long statusTime, float score,
-            long nextFetchTime) {
+    public CrawlStateUrl(ValidUrl url, FetchStatus status, long statusTime) {
         super(url);
 
         _status = status;
-        _score = score;
         _statusTime = statusTime;
-        _nextFetchTime = nextFetchTime;
     }
 
     public long makeKey() {
@@ -133,19 +131,19 @@ public class CrawlStateUrl extends ValidUrl {
     public static CrawlStateUrl makeTicklerUrl(int maxParallelism, int parallelism,
             int operatorIndex) {
         return new CrawlStateUrl(ValidUrl.makeTickerUrl(maxParallelism, parallelism, operatorIndex),
-                FetchStatus.UNFETCHED, System.currentTimeMillis(), 0.0f, 0);
+                FetchStatus.UNFETCHED, System.currentTimeMillis());
     }
 
     public static CrawlStateUrl makeDomainUrl(String domain) throws MalformedURLException {
         return new CrawlStateUrl(ValidUrl.makeDomainUrl(domain), FetchStatus.UNFETCHED,
-                System.currentTimeMillis(), 0.0f, 0);
+                System.currentTimeMillis());
     }
 
     public static CrawlStateUrl makeTerminateUrl(int maxParallelism, int parallelism,
             int operatorIndex) {
         return new CrawlStateUrl(
                 ValidUrl.makeTerminateUrl(maxParallelism, parallelism, operatorIndex),
-                FetchStatus.UNFETCHED, System.currentTimeMillis(), 0.0f, 0);
+                FetchStatus.UNFETCHED, System.currentTimeMillis());
     }
 
 }

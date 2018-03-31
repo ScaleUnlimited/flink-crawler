@@ -10,7 +10,7 @@ import org.slf4j.LoggerFactory;
 import com.scaleunlimited.flinkcrawler.config.ParserPolicy;
 import com.scaleunlimited.flinkcrawler.metrics.CrawlerAccumulator;
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
-import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
+import com.scaleunlimited.flinkcrawler.pojos.FetchResultUrl;
 
 import crawlercommons.sitemaps.AbstractSiteMap;
 import crawlercommons.sitemaps.SiteMap;
@@ -48,7 +48,7 @@ public class SimpleSiteMapParser extends BasePageParser {
     }
 
     @Override
-    public ParserResult parse(FetchedUrl fetchedUrl) throws Exception {
+    public ParserResult parse(FetchResultUrl fetchedUrl) throws Exception {
 
         init();
 

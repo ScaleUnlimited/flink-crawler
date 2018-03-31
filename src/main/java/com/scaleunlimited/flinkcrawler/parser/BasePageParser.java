@@ -9,7 +9,7 @@ import org.apache.tika.utils.CharsetUtils;
 
 import com.scaleunlimited.flinkcrawler.config.ParserPolicy;
 import com.scaleunlimited.flinkcrawler.metrics.CrawlerAccumulator;
-import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
+import com.scaleunlimited.flinkcrawler.pojos.FetchResultUrl;
 import com.scaleunlimited.flinkcrawler.utils.HttpUtils;
 
 import crawlercommons.util.Headers;
@@ -32,7 +32,7 @@ public abstract class BasePageParser implements Serializable {
 
     public abstract void close() throws Exception;
 
-    public abstract ParserResult parse(FetchedUrl fetchedUrl) throws Exception;
+    public abstract ParserResult parse(FetchResultUrl fetchedUrl) throws Exception;
 
     public void setAccumulator(CrawlerAccumulator crawlerAccumulator) {
         _crawlerAccumulator = crawlerAccumulator;
@@ -50,7 +50,7 @@ public abstract class BasePageParser implements Serializable {
      * @param datum
      * @return charset in response headers, or null
      */
-    protected String getCharset(FetchedUrl fetchedUrl) {
+    protected String getCharset(FetchResultUrl fetchedUrl) {
         return CharsetUtils.clean(HttpUtils.getCharsetFromContentType(fetchedUrl.getContentType()));
     }
 
@@ -61,7 +61,7 @@ public abstract class BasePageParser implements Serializable {
      * @param charset
      * @return first language in response headers, or null
      */
-    protected String getLanguage(FetchedUrl fetchedUrl, String charset) {
+    protected String getLanguage(FetchResultUrl fetchedUrl, String charset) {
         return getFirst(fetchedUrl.getHeaders(), HttpUtils.CONTENT_LANGUAGE);
     }
 
@@ -72,7 +72,7 @@ public abstract class BasePageParser implements Serializable {
      * @return the base URL
      * @throws MalformedURLException
      */
-    protected URL getContentLocation(FetchedUrl fetchedUrl) throws MalformedURLException {
+    protected URL getContentLocation(FetchResultUrl fetchedUrl) throws MalformedURLException {
         URL baseUrl = new URL(fetchedUrl.getFetchedUrl());
 
         // See if we have a content location from the HTTP headers that we should use as

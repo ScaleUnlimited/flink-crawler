@@ -11,7 +11,8 @@ import org.junit.Test;
 import com.scaleunlimited.flinkcrawler.parser.ParserResult;
 import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
-import com.scaleunlimited.flinkcrawler.pojos.FetchedUrl;
+import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
+import com.scaleunlimited.flinkcrawler.pojos.FetchResultUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ValidUrl;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlNormalizer;
 
@@ -35,9 +36,10 @@ public class CommonCrawlFetcherIT {
         assertEquals("https://www.cloudera.com/", result.getFetchedUrl());
         
         SimplePageParser parser = new SimplePageParser();
-        ParserResult parseResult = parser.parse(new FetchedUrl(new ValidUrl(result.getBaseUrl()),
-                result.getFetchedUrl(), result.getFetchTime(), result.getHeaders(),
-                result.getContent(), result.getContentType(), result.getResponseRate()));
+        ParserResult parseResult = parser.parse(new FetchResultUrl(new ValidUrl(result.getBaseUrl()),
+                FetchStatus.FETCHED, result.getFetchTime(), result.getFetchedUrl(), result
+                        .getHeaders(), result.getContent(), result.getContentType(), result
+                        .getResponseRate()));
 
         ExtractedUrl[] outlinks = parseResult.getExtractedUrls();
         assertTrue(outlinks.length > 0);
