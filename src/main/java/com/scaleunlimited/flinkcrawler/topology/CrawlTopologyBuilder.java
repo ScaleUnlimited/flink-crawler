@@ -37,6 +37,7 @@ import com.scaleunlimited.flinkcrawler.functions.PldKeySelector;
 import com.scaleunlimited.flinkcrawler.functions.UrlDBFunction;
 import com.scaleunlimited.flinkcrawler.functions.ValidUrlsFilter;
 import com.scaleunlimited.flinkcrawler.parser.BasePageParser;
+import com.scaleunlimited.flinkcrawler.parser.SimpleLinkExtractor;
 import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
 import com.scaleunlimited.flinkcrawler.parser.SimpleSiteMapParser;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
@@ -68,7 +69,6 @@ public class CrawlTopologyBuilder {
             "https://github.com/ScaleUnlimited/flink-crawler/wiki/Crawler-Policy");
 
     public static final int DEFAULT_PARALLELISM = -1;
-    public static final int DEFAULT_MAX_OUTLINKS_PER_PAGE = 50;
 
     private StreamExecutionEnvironment _env;
     private String _jobName = "flink-crawler";
@@ -95,7 +95,7 @@ public class CrawlTopologyBuilder {
             INVALID_USER_AGENT);
     private BasePageParser _pageParser = new SimplePageParser();
     private BasePageParser _siteMapParser = new SimpleSiteMapParser();
-    private int _maxOutlinksPerPage = DEFAULT_MAX_OUTLINKS_PER_PAGE;
+    private int _maxOutlinksPerPage = SimpleLinkExtractor.DEFAULT_MAX_EXTRACTED_LINKS_SIZE;
 
     public CrawlTopologyBuilder(StreamExecutionEnvironment env) {
         _env = env;

@@ -24,16 +24,16 @@ public class CommonCrawlFetcherIT {
     private static final String CACHE_DIR = "./target/commoncrawlcache/";
 
     @Test
-    public void testSingleUrlFetchWithRedirects() throws Exception {
+    public void testFetchGetMostRecentResult() throws Exception {
         BaseHttpFetcher fetcher = makeFetcher(1);
 
+        // This URL has 5 entries in the 2017-17 index. The most recent
+        // one is a 200 status code, with final URL = https://www.cloudera.com/
         FetchedResult result = fetcher.get("http://cloudera.com/");
-
-        // We've got one redirect from http => https, and another from https://cloudera.com
-        // to https://www.cloudera.com
-        assertEquals(2, result.getNumRedirects());
         assertEquals(200, result.getStatusCode());
-
+        assertEquals("http://cloudera.com/", result.getBaseUrl());
+        assertEquals("https://www.cloudera.com/", result.getFetchedUrl());
+        
         SimplePageParser parser = new SimplePageParser();
         ParserResult parseResult = parser.parse(new FetchedUrl(new ValidUrl(result.getBaseUrl()),
                 result.getFetchedUrl(), result.getFetchTime(), result.getHeaders(),
@@ -43,16 +43,29 @@ public class CommonCrawlFetcherIT {
         assertTrue(outlinks.length > 0);
     }
 
+    @Test
+    public void testIgnoringHttpsEntry() throws Exception {
+        BaseHttpFetcher fetcher = makeFetcher(1);
+
+        // We don't pick the entry for https://www.linkedin.com/, because
+        // the protocol is different. So we get the redirect to (what seems
+        // bogus) https://www.linkedin.com/hp/.
+        FetchedResult result = fetcher.get("http://www.linkedin.com/");
+        assertEquals(200, result.getStatusCode());
+        assertEquals("http://www.linkedin.com/", result.getBaseUrl());
+        assertEquals("https://www.linkedin.com/hp/", result.getFetchedUrl());
+    }
+
     @Ignore
     @Test
     // Enable this test to try pulling a particular URL out of the common crawl dataset.
     public void testSpecificUrl() throws Exception {
         BaseHttpFetcher fetcher = makeFetcher(1);
 
-        FetchedResult result = fetcher.get("http://www.ghandalf.org/actividades/");
-
-        System.out.println("Redirects: " + result.getNumRedirects());
-        System.out.println("Status: " + result.getStatusCode());
+        FetchedResult result = fetcher.get("http://www.domain.com/");
+        assertEquals(200, result.getStatusCode());
+        assertEquals("http://www.domain.com//", result.getBaseUrl());
+        assertEquals("http://www.domain.com/", result.getFetchedUrl());
     }
 
     @Test
@@ -70,9 +83,14 @@ public class CommonCrawlFetcherIT {
     public void testMultiThreading() throws Exception {
         BaseHttpFetcher fetcher = makeFetcher(3);
 
-        final String[] urlsToFetch = normalize("http://cloudera.com/", "http://cnn.com/",
-                "http://uspto.gov/", "http://www.google.com/", "http://www.scaleunlimited.com/",
-                "http://www.linkedin.com/", "http://www.pinterest.com/",
+        final String[] urlsToFetch = normalize(
+                "http://cloudera.com/", 
+                "http://cnn.com/",
+                "http://uspto.gov/", 
+                "http://www.google.com/", 
+                "http://www.scaleunlimited.com/",
+                "http://www.linkedin.com/", 
+                "http://www.pinterest.com/",
                 "http://www.instagram.com/");
 
         final Thread[] threads = new Thread[urlsToFetch.length];

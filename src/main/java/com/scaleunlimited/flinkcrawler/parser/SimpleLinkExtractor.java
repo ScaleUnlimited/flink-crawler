@@ -10,7 +10,7 @@ import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
 
 @SuppressWarnings("serial")
 public class SimpleLinkExtractor extends BaseLinkExtractor {
-    private static final int DEFAULT_MAX_EXTRACTED_LINKS_SIZE = 100;
+    public static final int DEFAULT_MAX_EXTRACTED_LINKS_SIZE = 50;
 
     private boolean _inHead;
     private boolean _skipLinks;
