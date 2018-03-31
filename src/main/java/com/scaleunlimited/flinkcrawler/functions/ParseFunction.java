@@ -99,10 +99,12 @@ public class ParseFunction extends BaseProcessFunction<FetchResultUrl, ParsedUrl
         });
         
         int count = 0;
+        boolean tracing = LOGGER.isTraceEnabled();
         for (ExtractedUrl outlink : extractedUrls) {
-            String message = String.format("Extracted '%s' from '%s'", outlink.getUrl(),
-                    fetchResultUrl.getUrl());
-            LOGGER.trace(message);
+            if (tracing) {
+                LOGGER.trace("Extracted '{}' from '{}'", outlink.getUrl(), fetchResultUrl.getUrl());
+            }
+            
             context.output(OUTLINK_OUTPUT_TAG, outlink);
             count++;
             if (count >= _maxOutlinksPerPage) {
