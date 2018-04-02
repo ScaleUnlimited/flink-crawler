@@ -3,11 +3,13 @@ package com.scaleunlimited.flinkcrawler.focused;
 import java.io.File;
 import java.util.Map;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironmentWithAsyncExecution;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.util.FileUtils;
+import org.apache.hadoop.io.NullWritable;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,9 +19,10 @@ import com.scaleunlimited.flinkcrawler.fetcher.MockUrlLengthenerFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.SiteMapGraphFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.WebGraphFetcher;
 import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
+import com.scaleunlimited.flinkcrawler.io.WARCWritable;
+import com.scaleunlimited.flinkcrawler.metrics.CrawlerAccumulator;
 import com.scaleunlimited.flinkcrawler.parser.ParserResult;
 import com.scaleunlimited.flinkcrawler.parser.SimpleSiteMapParser;
-import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
 import com.scaleunlimited.flinkcrawler.topology.CrawlTopology;
 import com.scaleunlimited.flinkcrawler.topology.CrawlTopologyBuilder;
@@ -94,7 +97,7 @@ public class FocusedCrawlTest {
                         new MockRobotsFetcher.MockRobotsFetcherBuilder(new MockRobotsFetcher()))
                 .setRobotsParser(new SimpleRobotRulesParser())
                 .setPageParser(new FocusedPageParser(new PageNumberScorer()))
-                .setContentSink(new DiscardingSink<ParsedUrl>())
+                .setContentSink(new DiscardingSink<Tuple2<NullWritable, WARCWritable>>())
                 .setContentTextFile(contentTextFile.getAbsolutePath()).setUrlNormalizer(normalizer)
                 .setUrlFilter(new SimpleUrlValidator())
                 .setSiteMapFetcherBuilder(new SiteMapGraphFetcher.SiteMapGraphFetcherBuilder(
