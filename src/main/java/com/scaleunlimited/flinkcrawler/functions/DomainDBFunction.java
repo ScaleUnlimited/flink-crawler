@@ -112,7 +112,7 @@ public class DomainDBFunction extends BaseFlatMapFunction<CrawlStateUrl, CrawlSt
         if (position < 0) {
             try {
                 if (LOGGER.isTraceEnabled()) {
-                    LOGGER.trace(String.format("Adding domain '%s' to tickler list", domain));
+                    LOGGER.trace("Adding domain '{}' to tickler list", domain);
                 }
 
                 CrawlStateUrl url = CrawlStateUrl.makeDomainUrl(domain);
@@ -128,16 +128,14 @@ public class DomainDBFunction extends BaseFlatMapFunction<CrawlStateUrl, CrawlSt
 
     @Override
     public List<String> snapshotState(long checkpointId, long timestamp) throws Exception {
-        LOGGER.debug(String.format("Checkpointing DomainDBFunction (id %d at %d)", checkpointId,
-                timestamp));
+        LOGGER.info("Checkpointing DomainDBFunction (id {} at {})", checkpointId, timestamp);
 
         return _domains;
     }
 
     @Override
     public void restoreState(List<String> state) throws Exception {
-        LOGGER.debug(
-                String.format("Restoring DomainDBFunction state with %d entries", state.size()));
+        LOGGER.info("Restoring DomainDBFunction state with {} entries", state.size());
 
         _domains.clear();
         _domains.addAll(state);

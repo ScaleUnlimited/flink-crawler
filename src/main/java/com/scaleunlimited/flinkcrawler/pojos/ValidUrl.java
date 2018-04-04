@@ -162,7 +162,7 @@ public class ValidUrl extends BaseUrl {
         // Use support in EffectiveTldFinder
         String result = EffectiveTldFinder.getAssignedDomain(hostname, true);
         if (result == null) {
-            LOGGER.debug("Hostname {} isn't a valid FQDN", hostname);
+            LOGGER.trace("Hostname {} isn't a valid FQDN", hostname);
             return hostname;
         } else {
             return result;

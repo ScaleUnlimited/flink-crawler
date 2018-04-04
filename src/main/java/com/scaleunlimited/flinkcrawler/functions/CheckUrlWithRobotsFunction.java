@@ -86,7 +86,7 @@ public class CheckUrlWithRobotsFunction
             ResultFuture<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> future) throws Exception {
         record(this.getClass(), url);
 
-        LOGGER.debug(String.format("Queueing for robots check: %s", url));
+        LOGGER.trace("Queueing '{}' for robots check", url);
 
         _executor.execute(new Runnable() {
 
@@ -103,7 +103,7 @@ public class CheckUrlWithRobotsFunction
                         _rules.remove(robotsUrl);
                         _ruleExpirations.remove(robotsUrl);
                     } else {
-                        LOGGER.debug(String.format("Found cached rule for '%s', collecting", url));
+                        LOGGER.trace("Found cached rule for '{}', collecting", url);
                         future.complete(processUrl(rules, url));
                         return;
                     }
@@ -112,9 +112,8 @@ public class CheckUrlWithRobotsFunction
                 long robotsFetchRetryDelay;
                 try {
                     FetchedResult result = _fetcher.get(robotsUrl);
-                    LOGGER.debug(String.format(
-                            "CheckUrlWithRobotsFunction fetched URL %s with status %d", robotsUrl,
-                            result.getStatusCode()));
+                    LOGGER.trace("CheckUrlWithRobotsFunction fetched URL '{}' with status {}", robotsUrl,
+                            result.getStatusCode());
                     robotsFetchRetryDelay = calcRobotsFetchRetryDelay(result.getStatusCode());
                     if (result.getStatusCode() != HttpStatus.SC_OK) {
                         rules = _parser.failedFetch(result.getStatusCode());
@@ -146,13 +145,12 @@ public class CheckUrlWithRobotsFunction
                             result.add(new Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>(null, null,
                                     new FetchUrl(new ValidUrl(sitemap))));
                         } catch (MalformedURLException e) {
-                            LOGGER.info(String.format("Invalid sitemap URL from %s: %s", robotsUrl,
-                                    sitemap));
+                            LOGGER.warn("Invalid sitemap URL '{}' from '{}'", robotsUrl, sitemap);
                         }
                     }
                 }
 
-                LOGGER.debug(String.format("Collecting checked results for '%s'", url));
+                LOGGER.trace("Completing robots results for '{}'", url);
                 future.complete(result);
             }
 

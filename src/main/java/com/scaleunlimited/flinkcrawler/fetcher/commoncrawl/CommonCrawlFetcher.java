@@ -98,9 +98,9 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
 
             FetchedResult result = fetch(realUrl, realUrl, payload, 0);
             if (result.getStatusCode() == HttpStatus.SC_NOT_FOUND) {
-                LOGGER.debug(String.format("Didn't find '%s'", url));
+                LOGGER.debug("Didn't find '{}'", url);
             } else {
-                LOGGER.debug(String.format("Fetched '%s' (%d)", url, result.getStatusCode()));
+                LOGGER.debug("Fetched '{}' ({})", url, result.getStatusCode());
             }
             return result;
         } catch (MalformedURLException e) {
@@ -134,7 +134,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
      */
     private FetchedResult fetch(URL originalUrl, URL redirectUrl, Payload payload, int numRedirects)
             throws BaseFetchException {
-        LOGGER.debug(String.format("Fetching '%s' with %d redirects", redirectUrl, numRedirects));
+        LOGGER.trace("Fetching '{}' with {} redirects", redirectUrl, numRedirects);
 
         if (numRedirects > getMaxRedirects()) {
             throw new RedirectFetchException(originalUrl.toString(), redirectUrl.toString(),
@@ -187,9 +187,13 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
             double responseRateExact = (double) bytesRead / deltaTime;
             // Response rate is bytes/second, not bytes/millisecond
             int responseRate = (int) Math.round(responseRateExact * 1000.0);
-            LOGGER.debug(String.format(
-                    "Read %,d bytes from page at %,d offset from '%s' in %,dms (%,d bytes/sec) for '%s'",
-                    bytesRead, offset, warcFile, deltaTime, responseRate, redirectUrl));
+
+            if (LOGGER.isTraceEnabled()) {
+                LOGGER.trace(String.format(
+                        "Read %,d bytes from page at %,d offset from '%s' in %,dms (%,d bytes/sec) for '%s'",
+                        bytesRead, offset, warcFile, deltaTime, responseRate, redirectUrl));
+            }
+            
             Headers headers = new Headers();
             for (String httpHeader : pageRecord.getHttpHeaders()) {
                 String[] keyValue = httpHeader.split(":", 2);
@@ -406,8 +410,7 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
     private byte[] getSegmentData(URL url, SecondaryIndex indexEntry) throws IOFetchException {
         byte[] result = _cache.get(indexEntry.getSegmentId());
         if (result != null) {
-            LOGGER.trace(String.format("Found data for segment #%d in our cache for '%s'",
-                    indexEntry.getSegmentId(), url));
+            LOGGER.trace("Found segment #{} in our cache for '{}'", indexEntry.getSegmentId(), url);
             return result;
         }
 
@@ -424,15 +427,17 @@ public class CommonCrawlFetcher extends BaseHttpFetcher {
             is = object.getObjectContent();
             long startTime = System.currentTimeMillis();
             IOUtils.read(is, result);
-            long deltaTime = System.currentTimeMillis() - startTime;
-            double responseRateExact = (double) length / deltaTime;
-            // Response rate is bytes/second, not bytes/millisecond
-            int responseRate = (int) Math.round(responseRateExact * 1000.0);
-            LOGGER.debug(String.format(
-                    "Read %,d byte segment #%d at %,d offset within %s in %,dms (%,d bytes/sec) for '%s'",
-                    length, indexEntry.getSegmentId(), offset, indexFilename, deltaTime,
-                    responseRate, url));
-
+            if (LOGGER.isTraceEnabled()) {
+                long deltaTime = System.currentTimeMillis() - startTime;
+                double responseRateExact = (double) length / deltaTime;
+                // Response rate is bytes/second, not bytes/millisecond
+                int responseRate = (int) Math.round(responseRateExact * 1000.0);
+                LOGGER.trace(String.format(
+                        "Read %,d byte segment #%d at %,d offset within %s in %,dms (%,d bytes/sec) for '%s'",
+                        length, indexEntry.getSegmentId(), offset, indexFilename, deltaTime,
+                        responseRate, url));
+            }
+            
             _cache.put(indexEntry.getSegmentId(), result);
             return result;
         } catch (IOException e) {

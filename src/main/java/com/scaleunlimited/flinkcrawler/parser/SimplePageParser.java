@@ -156,7 +156,7 @@ public class SimplePageParser extends BasePageParser {
         init();
 
         if (LOGGER.isTraceEnabled()) {
-            LOGGER.trace(String.format("Parsing %s", fetchedUrl.getFetchedUrl()));
+            LOGGER.trace("Parsing '{}'", fetchedUrl.getFetchedUrl());
         }
 
         // Provide clues to the parser about the format of the content.

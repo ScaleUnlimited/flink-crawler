@@ -125,7 +125,7 @@ public class CrawlTopologyTest {
         // ct.execute(200_000, 200_000);
 
         for (Tuple3<Class<?>, String, Map<String, String>> entry : UrlLogger.getLog()) {
-            LOGGER.debug(String.format("%s: %s", entry.f0, entry.f1));
+            LOGGER.debug("{}: {}", entry.f0, entry.f1);
         }
 
         String domain1page1 = normalizer.normalize("domain1.com/page1");

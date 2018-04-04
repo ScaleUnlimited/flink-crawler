@@ -126,28 +126,27 @@ public class FetchUrlsFunction
                         }
 
                         // TODO set next fetch time to something valid, based on the error
-                        LOGGER.trace(String.format("Forwarded failed URL to update status: '%s'",
-                                result.getFetchedUrl()));
+                        LOGGER.trace("Forwarded failed URL to update status: '{}'",
+                                result.getFetchedUrl());
                     } else {
-                        LOGGER.debug(String.format("Fetched %d bytes from '%s'",
-                                result.getContentLength(), result.getFetchedUrl()));
-
                         // TODO set next fetch time to something valid.
                         if (LOGGER.isTraceEnabled()) {
-                            LOGGER.trace(String.format("Forwarded fetched URL to be parsed: '%s'",
-                                    result.getFetchedUrl()));
+                            LOGGER.trace("Fetched {} bytes from '{}'",
+                                    result.getContentLength(), result.getFetchedUrl());
+                            
+                            LOGGER.trace("Forwarded fetched URL to be parsed: '{}'",
+                                    result.getFetchedUrl());
                         }
                     }
+                    
                     future.complete(Collections.singleton(fetchedUrl));
                 } catch (Exception e) {
-                    LOGGER.debug(
-                            String.format("Failed to fetch '%s' due to %s", url, e.getMessage()));
+                    LOGGER.trace("Failed to fetch '{}' due to {}", url, e.getMessage());
 
                     if (e instanceof BaseFetchException) {
                         future.complete(Collections.singleton(new FetchResultUrl(url, ExceptionUtils.mapExceptionToFetchStatus(e),
                                 System.currentTimeMillis())));
-                        LOGGER.trace(String.format("Forwarded exception URL to update status: '%s'",
-                                url));
+                        LOGGER.trace("Forwarded exception URL to update status: '{}'", url);
                     } else {
                         throw new RuntimeException("Exception fetching " + url, e);
                     }

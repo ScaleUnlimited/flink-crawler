@@ -199,11 +199,11 @@ public class SeedUrlSource extends BaseUrlSource {
     private void collectUrl(RawUrl url, SourceContext<RawUrl> context) {
         if (url.isRegular()) {
             if (LOGGER.isDebugEnabled()) {
-                LOGGER.debug(String.format("Emitting %s", url));
+                LOGGER.debug("Emitting '{}'", url);
             }
         } else {
             if (LOGGER.isTraceEnabled()) {
-                LOGGER.trace(String.format("Emitting %s", url));
+                LOGGER.trace("Emitting '{}'", url);
             }
         }
 

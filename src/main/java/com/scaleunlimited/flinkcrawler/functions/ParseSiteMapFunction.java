@@ -28,8 +28,7 @@ public class ParseSiteMapFunction
         record(this.getClass(), fetchedUrl);
 
         if (fetchedUrl.getStatus() != FetchStatus.FETCHED) {
-            LOGGER.trace(String.format("Skipping failed site map URL: '%s'",
-                    fetchedUrl.getFetchedUrl()));
+            LOGGER.trace("Skipping failed site map URL: '{}'", fetchedUrl.getFetchedUrl());
             return;
         }
         
@@ -38,12 +37,12 @@ public class ParseSiteMapFunction
 
             if (parserResult != null) {
                 for (ExtractedUrl extractedUrl : parserResult.getExtractedUrls()) {
-                    LOGGER.debug("Emitting sitemap URL " + extractedUrl);
+                    LOGGER.trace("Emitting sitemap URL: {}", extractedUrl);
                     collector.collect(extractedUrl);
                 }
             }
         } catch (Throwable t) {
-            LOGGER.info(String.format("Error while parsing sitemap url %s : %s",
+            LOGGER.error(String.format("Error while parsing sitemap url %s: %s",
                     fetchedUrl.getFetchedUrl(), t.getMessage()), t);
         }
     }
