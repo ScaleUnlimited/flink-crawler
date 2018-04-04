@@ -52,8 +52,7 @@ public class ParseFunction extends BaseProcessFunction<FetchResultUrl, ParsedUrl
         // We need to update the URL's status, but if it wasn't a successful fetch then we have nothing to parse
         context.output(STATUS_OUTPUT_TAG, new CrawlStateUrl(fetchResultUrl));
         if (fetchResultUrl.getStatus() != FetchStatus.FETCHED) {
-            LOGGER.trace(String.format("Forwarded failed URL to update status: '%s'",
-                    fetchResultUrl.getFetchedUrl()));
+            LOGGER.trace("Forwarded failed URL to update status: '{}'", fetchResultUrl.getFetchedUrl());
             return;
         }
         

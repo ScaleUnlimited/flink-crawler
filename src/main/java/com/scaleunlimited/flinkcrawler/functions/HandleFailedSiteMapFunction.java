@@ -22,8 +22,8 @@ public class HandleFailedSiteMapFunction extends RichFilterFunction<CrawlStateUr
         // only log if failed
         FetchStatus status = crawlStateUrl.getStatus();
         if (status != FetchStatus.FETCHED) {
-            LOGGER.info(String.format("Failed fetching sitemap url '%s' due to '%s'",
-                    crawlStateUrl.getUrl(), crawlStateUrl.getStatus()));
+            LOGGER.info("Failed fetching sitemap url '{}' due to '{}'",
+                    crawlStateUrl.getUrl(), crawlStateUrl.getStatus());
         }
 
         return true;

@@ -53,7 +53,7 @@ public class SimpleSiteMapParser extends BasePageParser {
         init();
 
         if (LOGGER.isTraceEnabled()) {
-            LOGGER.trace(String.format("Parsing sitemap %s", fetchedUrl.getFetchedUrl()));
+            LOGGER.trace("Parsing sitemap '{}'", fetchedUrl.getFetchedUrl());
         }
 
         AbstractSiteMap parsedSiteMap = _siteMapParser.parseSiteMap(fetchedUrl.getContent(),

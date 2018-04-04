@@ -92,7 +92,7 @@ public class SimpleUrlLengthener extends BaseUrlLengthener {
         }
 
         String redirectedUrl = urlString;
-        LOGGER.debug(String.format("Checking redirection of '%s'", urlString));
+        LOGGER.trace("Checking redirection of '{}'", urlString);
 
         try {
             FetchedResult fr = _fetcher.get(urlString);
@@ -104,19 +104,17 @@ public class SimpleUrlLengthener extends BaseUrlLengthener {
                 // content from the target site without checking its robot rules,
                 // but the caller knows best.
                 redirectedUrl = fr.getFetchedUrl();
-                LOGGER.debug(
-                        String.format("Normal redirection of %s to %s", urlString, redirectedUrl));
+                LOGGER.trace("Normal redirection of '{}' to '{}'", urlString, redirectedUrl);
             } else if (statusCode == HttpStatus.SC_MOVED_PERMANENTLY) {
                 redirectedUrl = extractRedirectUrl(fr, urlString);
-                LOGGER.debug(String.format("Redirecting %s to %s", urlString, redirectedUrl));
+                LOGGER.trace("Redirecting '{}' to '{}'", urlString, redirectedUrl);
             } else {
-                LOGGER.debug(String.format("Status code %d processing redirect for '%s'",
-                        statusCode, urlString));
+                LOGGER.trace("Status code {} processing redirect for '{}'", statusCode, urlString);
             }
         } catch (BaseFetchException e) {
             // The site doesn't seem to like the way we're forcing it to redirect,
             // so just emit the same URL for downstream fetching.
-            LOGGER.debug("Exception processing redirect for " + urlString + ": " + e.getMessage(),
+            LOGGER.error(String.format("Exception processing redirect for '{}': {}", urlString, e.getMessage()),
                     e);
         }
 
