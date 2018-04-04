@@ -173,7 +173,7 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
      * (ignore domain URLs).
      */
     private void processTerminationUrl() {
-        LOGGER.info("UrlDBFunction {}/{}) terminating", _partition, _parallelism);
+        LOGGER.info("UrlDBFunction ({}/{}) terminating", _partition, _parallelism);
         // TODO flush queue, set flag
     }
 
