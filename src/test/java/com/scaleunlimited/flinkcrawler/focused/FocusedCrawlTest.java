@@ -28,6 +28,7 @@ import com.scaleunlimited.flinkcrawler.topology.CrawlTopologyTest;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlLengthener;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlValidator;
+import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
 import com.scaleunlimited.flinkcrawler.utils.TestUrlLogger.UrlLoggerResults;
 import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 import com.scaleunlimited.flinkcrawler.webgraph.BaseWebGraph;
@@ -93,7 +94,7 @@ public class FocusedCrawlTest {
                 .setSiteMapParser(new SimpleSiteMapParser()).setDefaultCrawlDelay(0)
                 .setPageFetcherBuilder(
                         new WebGraphFetcher.WebGraphFetcherBuilder(new WebGraphFetcher(graph)))
-                .setFetchQueue(new FocusedFetchQueue(10_000, minFetchScore));
+                .setFetchQueue(new FetchQueue(10_000, minFetchScore));
 
         CrawlTopology ct = builder.build();
 

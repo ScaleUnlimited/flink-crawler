@@ -1,6 +1,5 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
-import java.net.MalformedURLException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -19,7 +18,6 @@ import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
 import org.apache.flink.util.Collector;
-import org.apache.flink.util.OutputTag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,12 +26,10 @@ import com.scaleunlimited.flinkcrawler.metrics.CrawlerMetrics;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
-import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.pojos.UrlType;
 import com.scaleunlimited.flinkcrawler.urldb.BaseUrlStateMerger;
 import com.scaleunlimited.flinkcrawler.urldb.BaseUrlStateMerger.MergeResult;
 import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
-import com.scaleunlimited.flinkcrawler.utils.FetchQueue.FetchQueueResult;
 
 /**
  * The Flink operator that managed the "crawl DB". Incoming URLs are merged in memory, using MapState with key == URL
@@ -44,14 +40,15 @@ import com.scaleunlimited.flinkcrawler.utils.FetchQueue.FetchQueueResult;
  * to scan every URL.
  */
 @SuppressWarnings("serial")
-public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> implements CheckpointedFunction {
+public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> implements CheckpointedFunction {
     static final Logger LOGGER = LoggerFactory.getLogger(UrlDBFunction.class);
-
-    public static final OutputTag<CrawlStateUrl> STATUS_OUTPUT_TAG 
-        = new OutputTag<CrawlStateUrl>("status"){};
 
     private static final int URLS_PER_TICKLE = 10;
     private static final int MAX_IN_FLIGHT_URLS = URLS_PER_TICKLE * 10;
+
+    // Number of URLs we'll check (for adding to queue) when we receive a domain
+    // tickler
+    private static final int MAX_URLS_PER_DOMAIN_TO_CHECK = 1000;
 
     private BaseUrlStateMerger _merger;
 
@@ -69,7 +66,7 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
 
     private transient CrawlStateUrl _mergedUrlState;
 
-    // TODO remove this debugging code.
+    // TODO(kkrugler) remove this debugging code.
     private transient Map<String, Long> _inFlightUrls;
 
     public UrlDBFunction(BaseUrlStateMerger merger, FetchQueue fetchQueue) {
@@ -142,13 +139,13 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
     }
 
     @Override
-    public void processElement(CrawlStateUrl url, Context context, Collector<FetchUrl> collector) throws Exception {
+    public void flatMap(CrawlStateUrl url, Collector<FetchUrl> collector) throws Exception {
         if (url.getUrlType() == UrlType.REGULAR) {
             processRegularUrl(url, collector);
         } else if (url.getUrlType() == UrlType.TICKLER) {
-            processTicklerUrl(context, collector);
+            processTicklerUrl(collector);
         } else if (url.getUrlType() == UrlType.DOMAIN) {
-            processDomainUrl(url.getPld(), context, collector);
+            processDomainUrl(url.getPld(), collector);
         } else if (url.getUrlType() == UrlType.TERMINATION) {
             processTerminationUrl();
         } else {
@@ -184,13 +181,13 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
     }
 
     /**
-     * We got a "domain" URL, which triggers adding URLs for that domain to the fetch queue.
+     * We got a "domain" URL, which triggers adding a URL for that domain to the fetch queue.
      * 
      * @param pld
      * @param collector
      * @throws Exception
      */
-    private void processDomainUrl(String pld, Context context, Collector<FetchUrl> collector) throws Exception {
+    private void processDomainUrl(String pld, Collector<FetchUrl> collector) throws Exception {
         final boolean doTracing = LOGGER.isTraceEnabled();
         if (doTracing) {
             LOGGER.trace("Got domain URL for " + pld);
@@ -200,45 +197,36 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
         if (numUrls == null) {
             LOGGER.warn("Houston, we have a problem - null active URL count for domain " + pld);
         } else {
-            // We want to find URLs that are candidates for fetching, and add to the queue. But we
-            // want to pick a random set of these, so start at a random offset and loop around,
-            // and only add some of them.
-            int urlsToAdd = Math.max(10, Math.min(100, numUrls / 5));
-            int urlsAdded = 0;
+            // Start at a random offset and loop around, until we've added one, or checked enough
+            // of them, or checked all of them.
+            int urlsToCheck = Math.min(numUrls, MAX_URLS_PER_DOMAIN_TO_CHECK);
             int startingIndex = _rand.nextInt(numUrls);
-            for (int i = 0; (i < numUrls) && (urlsAdded < urlsToAdd); i++) {
+            for (int i = 0; i < urlsToCheck; i++) {
                 int index = (startingIndex + i) % numUrls;
                 Long urlHash = _activeUrlsIndex.get(index);
                 CrawlStateUrl stateUrl = _activeUrls.get(urlHash);
-                FetchQueueResult queueResult = _fetchQueue.add(stateUrl);
-                
-                // TODO If in the process of adding something to the fetch queue we have to remove something else,
-                // then here we'll need to update the latter's state via our side channel.
-                
+                CrawlStateUrl rejectedUrl = _fetchQueue.add(stateUrl);
                 if (doTracing) {
                     LOGGER.trace(
                             "UrlDBFunction ({}/{}) got result {} adding '{}' to fetch queue",
-                            _partition, _parallelism, queueResult, stateUrl);
+                            _partition, _parallelism, rejectedUrl, stateUrl);
                 }
 
-                switch (queueResult) {
-                    case QUEUED:
-                        stateUrl.setStatus(FetchStatus.QUEUED);
-                        // TODO figure out if I have to actually do this put
-                        _activeUrls.put(urlHash, stateUrl);
-                        urlsAdded += 1;
-                        break;
-
-                    case DEFER:
-                        break;
-
-                    case ARCHIVE:
-                        // TODO remove from active url state, add to archive state, update
-                        // URL count and remove mapping from index to hash.
-                        break;
-
-                    default:
-                        throw new RuntimeException("Unknown fetch queue result: " + queueResult);
+                // If we get back null (there's space in the queue), or some other
+                // URL (our URL was better) then this URL is being fetched.
+                if (rejectedUrl != stateUrl) {
+                    stateUrl.setStatus(FetchStatus.FETCHING);
+                    // TODO figure out if I have to actually do this put
+                    _activeUrls.put(urlHash, stateUrl);
+                    CounterUtils.increment(getRuntimeContext(), FetchStatus.FETCHING);
+                    
+                    if (rejectedUrl != null) {
+                        // TODO(Schmed) need to change state back to whatever it was,
+                        // since we're no longer fetching it.
+                    }
+                    
+                    // We've added a URL from our 
+                    break;
                 }
             }
         }
@@ -249,7 +237,7 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
      * 
      * @param collector
      */
-    private void processTicklerUrl(Context context, Collector<FetchUrl> collector) {
+    private void processTicklerUrl(Collector<FetchUrl> collector) {
         final boolean doTracing = LOGGER.isTraceEnabled();
         if (doTracing) {
             LOGGER.trace("UrlDBFunction ({}/{}) checking for URLs to emit", _partition, _parallelism);
@@ -274,21 +262,6 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
                 int nowActive = _numInFlightUrls.incrementAndGet();
                 LOGGER.trace("UrlDBFunction ({}/{}) emitted URL '{}' ({} active)",
                         _partition, _parallelism, fetchUrl, nowActive);
-                
-                // TODO Replace this code with the CrawlStateUrl from the fetch queue:
-                CrawlStateUrl urlState;
-                try {
-                    urlState = new CrawlStateUrl(new RawUrl(fetchUrl.getUrl()));
-                } catch (MalformedURLException e) {
-                    throw new RuntimeException("URL should have been validated: " + fetchUrl, e);
-                }
-                
-                // We also need to update the state of the URL in the URL DB so we know it's no longer just queued,
-                // but now being fetched.
-                urlState.setStatus(FetchStatus.FETCHING);
-                context.output(STATUS_OUTPUT_TAG, urlState);
-
-                CounterUtils.increment(getRuntimeContext(), FetchStatus.FETCHING);
 
                 _inFlightUrls.put(fetchUrl.getUrl(), System.currentTimeMillis());
             } else {
