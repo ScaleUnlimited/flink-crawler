@@ -1,5 +1,6 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
+import java.net.MalformedURLException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -18,6 +19,7 @@ import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
 import org.apache.flink.util.Collector;
+import org.apache.flink.util.OutputTag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,6 +28,7 @@ import com.scaleunlimited.flinkcrawler.metrics.CrawlerMetrics;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
+import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.pojos.UrlType;
 import com.scaleunlimited.flinkcrawler.urldb.BaseUrlStateMerger;
 import com.scaleunlimited.flinkcrawler.urldb.BaseUrlStateMerger.MergeResult;
@@ -41,8 +44,11 @@ import com.scaleunlimited.flinkcrawler.utils.FetchQueue.FetchQueueResult;
  * to scan every URL.
  */
 @SuppressWarnings("serial")
-public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> implements CheckpointedFunction {
+public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> implements CheckpointedFunction {
     static final Logger LOGGER = LoggerFactory.getLogger(UrlDBFunction.class);
+
+    public static final OutputTag<CrawlStateUrl> STATUS_OUTPUT_TAG 
+        = new OutputTag<CrawlStateUrl>("status"){};
 
     private static final int URLS_PER_TICKLE = 10;
     private static final int MAX_IN_FLIGHT_URLS = URLS_PER_TICKLE * 10;
@@ -136,13 +142,13 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
     }
 
     @Override
-    public void flatMap(CrawlStateUrl url, Collector<FetchUrl> collector) throws Exception {
+    public void processElement(CrawlStateUrl url, Context context, Collector<FetchUrl> collector) throws Exception {
         if (url.getUrlType() == UrlType.REGULAR) {
             processRegularUrl(url, collector);
         } else if (url.getUrlType() == UrlType.TICKLER) {
-            processTicklerUrl(collector);
+            processTicklerUrl(context, collector);
         } else if (url.getUrlType() == UrlType.DOMAIN) {
-            processDomainUrl(url.getPld(), collector);
+            processDomainUrl(url.getPld(), context, collector);
         } else if (url.getUrlType() == UrlType.TERMINATION) {
             processTerminationUrl();
         } else {
@@ -184,7 +190,7 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
      * @param collector
      * @throws Exception
      */
-    private void processDomainUrl(String pld, Collector<FetchUrl> collector) throws Exception {
+    private void processDomainUrl(String pld, Context context, Collector<FetchUrl> collector) throws Exception {
         final boolean doTracing = LOGGER.isTraceEnabled();
         if (doTracing) {
             LOGGER.trace("Got domain URL for " + pld);
@@ -205,6 +211,10 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
                 Long urlHash = _activeUrlsIndex.get(index);
                 CrawlStateUrl stateUrl = _activeUrls.get(urlHash);
                 FetchQueueResult queueResult = _fetchQueue.add(stateUrl);
+                
+                // TODO If in the process of adding something to the fetch queue we have to remove something else,
+                // then here we'll need to update the latter's state via our side channel.
+                
                 if (doTracing) {
                     LOGGER.trace(
                             "UrlDBFunction ({}/{}) got result {} adding '{}' to fetch queue",
@@ -213,12 +223,10 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
 
                 switch (queueResult) {
                     case QUEUED:
-                        stateUrl.setStatus(FetchStatus.FETCHING);
+                        stateUrl.setStatus(FetchStatus.QUEUED);
                         // TODO figure out if I have to actually do this put
                         _activeUrls.put(urlHash, stateUrl);
                         urlsAdded += 1;
-
-                        CounterUtils.increment(getRuntimeContext(), FetchStatus.FETCHING);
                         break;
 
                     case DEFER:
@@ -241,7 +249,7 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
      * 
      * @param collector
      */
-    private void processTicklerUrl(Collector<FetchUrl> collector) {
+    private void processTicklerUrl(Context context, Collector<FetchUrl> collector) {
         final boolean doTracing = LOGGER.isTraceEnabled();
         if (doTracing) {
             LOGGER.trace("UrlDBFunction ({}/{}) checking for URLs to emit", _partition, _parallelism);
@@ -266,6 +274,21 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
                 int nowActive = _numInFlightUrls.incrementAndGet();
                 LOGGER.trace("UrlDBFunction ({}/{}) emitted URL '{}' ({} active)",
                         _partition, _parallelism, fetchUrl, nowActive);
+                
+                // TODO Replace this code with the CrawlStateUrl from the fetch queue:
+                CrawlStateUrl urlState;
+                try {
+                    urlState = new CrawlStateUrl(new RawUrl(fetchUrl.getUrl()));
+                } catch (MalformedURLException e) {
+                    throw new RuntimeException("URL should have been validated: " + fetchUrl, e);
+                }
+                
+                // We also need to update the state of the URL in the URL DB so we know it's no longer just queued,
+                // but now being fetched.
+                urlState.setStatus(FetchStatus.FETCHING);
+                context.output(STATUS_OUTPUT_TAG, urlState);
+
+                CounterUtils.increment(getRuntimeContext(), FetchStatus.FETCHING);
 
                 _inFlightUrls.put(fetchUrl.getUrl(), System.currentTimeMillis());
             } else {

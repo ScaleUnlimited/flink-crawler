@@ -46,7 +46,8 @@ public enum FetchStatus {
     // Not fetched during fetch operation, due to error
     ERROR_INVALID_URL, ERROR_IOEXCEPTION,
 
-    UNFETCHED(0), // Never processed.
+    UNFETCHED(0), // Never processed
+    QUEUED(10), // On the fetch queue but not yet being fetched
     FETCHING(10), // Being fetched
     FETCHED(25); // Successfully fetched
 

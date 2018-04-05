@@ -267,16 +267,17 @@ public class CrawlTopologyBuilder {
         // Update the Crawl DB, then run URLs it emits through robots filtering.
         IterativeStream<CrawlStateUrl> crawlDbIteration = cleanedUrls
                 .iterate(/* TicklerSource.TICKLE_INTERVAL * 5 */);
-        DataStream<FetchUrl> preRobotsUrls = crawlDbIteration
+        SingleOutputStreamOperator<FetchUrl> postUrlDbUrls = crawlDbIteration
                 .keyBy(new PldKeySelector<CrawlStateUrl>()).flatMap(new DomainDBFunction())
                 .name("DomainDBFunction")
 
                 // We have to re-key since flatMap destroys the keyed state, and UrlDBFunction
                 // needs to get the same set of URLs as DomainDBFunction is tracking.
                 .keyBy(new PldKeySelector<CrawlStateUrl>())
-                .flatMap(new UrlDBFunction(new DefaultUrlStateMerger(), _fetchQueue))
-                .name("UrlDBFunction")
+                .process(new UrlDBFunction(new DefaultUrlStateMerger(), _fetchQueue))
+                .name("UrlDBFunction");
 
+        DataStream<FetchUrl> preRobotsUrls = postUrlDbUrls
                 // We have to re-key since flatMap destroys the keyed state, and CheckUrlWithRobotsFunction
                 // needs to process URLs by PLD.
                 .keyBy(new PldKeySelector<FetchUrl>());
@@ -397,10 +398,11 @@ public class CrawlTopologyBuilder {
 
         DataStream<CrawlStateUrl> newUrls = cleanUrls(newRawUrls);
 
-        // We need to merge robotBlockedUrls with the "status" stream from fetchAttemptedUrls and status
-        // stream of the siteMapFetchAttemptedUrls and all of the new URLs from outlinks and sitemaps.
+        // We need to merge robotBlockedUrls with the "queued status" stream from putting URLs onto the
+        // fetch queue and the "status" stream from the fetch attempts and all of the new URLs from outlinks and sitemaps.
+        DataStream<CrawlStateUrl> queuedStatusUrls = postUrlDbUrls.getSideOutput(UrlDBFunction.STATUS_OUTPUT_TAG);
         DataStream<CrawlStateUrl> fetchStatusUrls = parsedUrls.getSideOutput(ParseFunction.STATUS_OUTPUT_TAG);
-        crawlDbIteration.closeWith(robotBlockedUrls.union(fetchStatusUrls, newUrls));
+        crawlDbIteration.closeWith(robotBlockedUrls.union(queuedStatusUrls, fetchStatusUrls, newUrls));
 
         // Save off parsed page content by passing it on to the provided content sink function.
         parsedUrls
