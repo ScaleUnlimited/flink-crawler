@@ -30,7 +30,6 @@ import com.scaleunlimited.flinkcrawler.pojos.UrlType;
 import com.scaleunlimited.flinkcrawler.urldb.BaseUrlStateMerger;
 import com.scaleunlimited.flinkcrawler.urldb.BaseUrlStateMerger.MergeResult;
 import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
-import com.scaleunlimited.flinkcrawler.utils.FetchQueue.FetchQueueResult;
 
 /**
  * The Flink operator that managed the "crawl DB". Incoming URLs are merged in memory, using MapState with key == URL
@@ -46,6 +45,10 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
 
     private static final int URLS_PER_TICKLE = 10;
     private static final int MAX_IN_FLIGHT_URLS = URLS_PER_TICKLE * 10;
+
+    // Number of URLs we'll check (for adding to queue) when we receive a domain
+    // tickler
+    private static final int MAX_URLS_PER_DOMAIN_TO_CHECK = 1000;
 
     private BaseUrlStateMerger _merger;
 
@@ -63,7 +66,7 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
 
     private transient CrawlStateUrl _mergedUrlState;
 
-    // TODO remove this debugging code.
+    // TODO(kkrugler) remove this debugging code.
     private transient Map<String, Long> _inFlightUrls;
 
     public UrlDBFunction(BaseUrlStateMerger merger, FetchQueue fetchQueue) {
@@ -178,7 +181,7 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
     }
 
     /**
-     * We got a "domain" URL, which triggers adding URLs for that domain to the fetch queue.
+     * We got a "domain" URL, which triggers adding a URL for that domain to the fetch queue.
      * 
      * @param pld
      * @param collector
@@ -194,43 +197,36 @@ public class UrlDBFunction extends BaseFlatMapFunction<CrawlStateUrl, FetchUrl> 
         if (numUrls == null) {
             LOGGER.warn("Houston, we have a problem - null active URL count for domain " + pld);
         } else {
-            // We want to find URLs that are candidates for fetching, and add to the queue. But we
-            // want to pick a random set of these, so start at a random offset and loop around,
-            // and only add some of them.
-            int urlsToAdd = Math.max(10, Math.min(100, numUrls / 5));
-            int urlsAdded = 0;
+            // Start at a random offset and loop around, until we've added one, or checked enough
+            // of them, or checked all of them.
+            int urlsToCheck = Math.min(numUrls, MAX_URLS_PER_DOMAIN_TO_CHECK);
             int startingIndex = _rand.nextInt(numUrls);
-            for (int i = 0; (i < numUrls) && (urlsAdded < urlsToAdd); i++) {
+            for (int i = 0; i < urlsToCheck; i++) {
                 int index = (startingIndex + i) % numUrls;
                 Long urlHash = _activeUrlsIndex.get(index);
                 CrawlStateUrl stateUrl = _activeUrls.get(urlHash);
-                FetchQueueResult queueResult = _fetchQueue.add(stateUrl);
+                CrawlStateUrl rejectedUrl = _fetchQueue.add(stateUrl);
                 if (doTracing) {
                     LOGGER.trace(
                             "UrlDBFunction ({}/{}) got result {} adding '{}' to fetch queue",
-                            _partition, _parallelism, queueResult, stateUrl);
+                            _partition, _parallelism, rejectedUrl, stateUrl);
                 }
 
-                switch (queueResult) {
-                    case QUEUED:
-                        stateUrl.setStatus(FetchStatus.FETCHING);
-                        // TODO figure out if I have to actually do this put
-                        _activeUrls.put(urlHash, stateUrl);
-                        urlsAdded += 1;
-
-                        CounterUtils.increment(getRuntimeContext(), FetchStatus.FETCHING);
-                        break;
-
-                    case DEFER:
-                        break;
-
-                    case ARCHIVE:
-                        // TODO remove from active url state, add to archive state, update
-                        // URL count and remove mapping from index to hash.
-                        break;
-
-                    default:
-                        throw new RuntimeException("Unknown fetch queue result: " + queueResult);
+                // If we get back null (there's space in the queue), or some other
+                // URL (our URL was better) then this URL is being fetched.
+                if (rejectedUrl != stateUrl) {
+                    stateUrl.setStatus(FetchStatus.FETCHING);
+                    // TODO figure out if I have to actually do this put
+                    _activeUrls.put(urlHash, stateUrl);
+                    CounterUtils.increment(getRuntimeContext(), FetchStatus.FETCHING);
+                    
+                    if (rejectedUrl != null) {
+                        // TODO(Schmed) need to change state back to whatever it was,
+                        // since we're no longer fetching it.
+                    }
+                    
+                    // We've added a URL from our 
+                    break;
                 }
             }
         }
