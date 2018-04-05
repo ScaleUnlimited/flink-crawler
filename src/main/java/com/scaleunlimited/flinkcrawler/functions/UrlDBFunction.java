@@ -1,6 +1,5 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
-import java.net.MalformedURLException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
@@ -28,7 +27,6 @@ import com.scaleunlimited.flinkcrawler.metrics.CrawlerMetrics;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
-import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.pojos.UrlType;
 import com.scaleunlimited.flinkcrawler.urldb.BaseUrlStateMerger;
 import com.scaleunlimited.flinkcrawler.urldb.BaseUrlStateMerger.MergeResult;
@@ -213,9 +211,6 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
                 CrawlStateUrl stateUrl = _activeUrls.get(urlHash);
                 CrawlStateUrl rejectedUrl = _fetchQueue.add(stateUrl);
 
-                // TODO If in the process of adding something to the fetch queue we have to remove something else,
-                // then here we'll need to update the latter's state via our side channel.
-
                 if (doTracing) {
                     LOGGER.trace(
                             "UrlDBFunction ({}/{}) got result {} adding '{}' to fetch queue",
@@ -228,14 +223,15 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
                     stateUrl.setStatus(FetchStatus.QUEUED);
                     // TODO figure out if I have to actually do this put
                     _activeUrls.put(urlHash, stateUrl);
-                    CounterUtils.increment(getRuntimeContext(), FetchStatus.FETCHING);
                     
+                    // If we just replaced a (lower scoring) URL on the fetch queue,
+                    // then we need to restore the rejected URL's status in the URL DB.
                     if (rejectedUrl != null) {
-                        // TODO(Schmed) need to change state back to whatever it was,
-                        // since we're no longer fetching it.
+                        rejectedUrl.restorePreviousStatus();
+                        context.output(STATUS_OUTPUT_TAG, rejectedUrl);
                     }
                     
-                    // We've added a URL from our 
+                    // We've successfully added a URL from our domain
                     break;
                 }
             }
@@ -265,30 +261,18 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
                 return;
             }
 
-            FetchUrl fetchUrl = _fetchQueue.poll();
+            CrawlStateUrl crawlStateUrl = _fetchQueue.poll();
 
-            if (fetchUrl != null) {
-                collector.collect(fetchUrl);
-                int nowActive = _numInFlightUrls.incrementAndGet();
-                LOGGER.trace("UrlDBFunction ({}/{}) emitted URL '{}' ({} active)",
-                        _partition, _parallelism, fetchUrl, nowActive);
-                
-                // TODO Replace this code with the CrawlStateUrl from the fetch queue:
-                CrawlStateUrl urlState;
-                try {
-                    urlState = new CrawlStateUrl(new RawUrl(fetchUrl.getUrl()));
-                } catch (MalformedURLException e) {
-                    throw new RuntimeException("URL should have been validated: " + fetchUrl, e);
-                }
-                
-                // We also need to update the state of the URL in the URL DB so we know it's no longer just queued,
-                // but now being fetched.
-                urlState.setStatus(FetchStatus.FETCHING);
-                context.output(STATUS_OUTPUT_TAG, urlState);
+            if (crawlStateUrl != null) {
 
-                CounterUtils.increment(getRuntimeContext(), FetchStatus.FETCHING);
+                // Update the state of the URL in the URL DB so we know it's no longer just queued,
+                // but now about to be fetched.  It now goes into our side channel where it will
+                // come back around to processRegularUrl which will save the state change 
+                // and then begin fetching it.
+                crawlStateUrl.setStatus(FetchStatus.FETCHING);
+                crawlStateUrl.setStatusTime(System.currentTimeMillis());
+                context.output(STATUS_OUTPUT_TAG, crawlStateUrl);
 
-                _inFlightUrls.put(fetchUrl.getUrl(), System.currentTimeMillis());
             } else {
                 break;
             }
@@ -308,13 +292,31 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
 
         // If it's not an unfetched URL, we can decrement our active URLs
         FetchStatus newStatus = url.getStatus();
-        if (newStatus != FetchStatus.UNFETCHED) {
-            if (url.getStatusTime() == 0) {
-                throw new RuntimeException(
-                        String.format("UrlDBFunction (%d/%d) got URL with invalid status time: %s",
-                                _partition, _parallelism, url));
-            }
+ 
+        if ((newStatus != FetchStatus.UNFETCHED) && (url.getStatusTime() == 0)) {
+            throw new RuntimeException(
+                    String.format("UrlDBFunction (%d/%d) got URL with invalid status time: %s",
+                            _partition, _parallelism, url));
+        }
+        
+        
+        // If it's a URL processTicklerUrl just pulled from the fetch queue, then we need to emit it
+        // for FetchUrlsFunction.  Its status time should be newer than what's in the URL DB, so it's
+        // guaranteed to win below and update the URL DB as well.
+        if (newStatus == FetchStatus.FETCHING) {
+            FetchUrl fetchUrl = new FetchUrl(url, url.getScore());
+            
+            collector.collect(fetchUrl);
+            int nowActive = _numInFlightUrls.incrementAndGet();
+            LOGGER.trace("UrlDBFunction ({}/{}) emitted URL '{}' ({} active)",
+                    _partition, _parallelism, fetchUrl, nowActive);
+            
+            CounterUtils.increment(getRuntimeContext(), FetchStatus.FETCHING);
 
+            _inFlightUrls.put(fetchUrl.getUrl(), System.currentTimeMillis());
+        
+        // Otherwise, if it's the result of the fetch attempt then it's no longer active.
+        } else if (newStatus != FetchStatus.UNFETCHED) {
             Long startTime = _inFlightUrls.remove(url.getUrl());
             if (startTime == null) {
                 throw new RuntimeException(

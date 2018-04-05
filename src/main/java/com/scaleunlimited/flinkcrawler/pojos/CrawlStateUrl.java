@@ -13,7 +13,7 @@ import com.scaleunlimited.flinkcrawler.utils.HashUtils;
 public class CrawlStateUrl extends ValidUrl {
 
     private FetchStatus _status;
-    private FetchStatus _previousStatus;
+    private FetchStatus _previousStatus = null;
     private long _statusTime;
     private float _score = 0.0f;
     private long _nextFetchTime = 0L;
@@ -47,7 +47,18 @@ public class CrawlStateUrl extends ValidUrl {
     }
 
     public void setStatus(FetchStatus status) {
-        _status = status;
+        if (status != _previousStatus) {
+            _previousStatus = _status;
+            _status = status;
+        }
+    }
+    
+    public void restorePreviousStatus() {
+        if (_previousStatus == null) {
+            throw new RuntimeException(this + "Has no saved previous status!");
+        }
+        _status = _previousStatus;
+        _previousStatus = null;
     }
 
     public float getScore() {

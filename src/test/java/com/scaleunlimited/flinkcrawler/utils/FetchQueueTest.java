@@ -1,14 +1,14 @@
 package com.scaleunlimited.flinkcrawler.utils;
 
-import static org.junit.Assert.*;
-
-import java.net.MalformedURLException;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
-import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 
 public class FetchQueueTest {
@@ -50,7 +50,7 @@ public class FetchQueueTest {
         assertTrue(queue.isEmpty());
     }
     
-    private void assertSameUrl(CrawlStateUrl a, FetchUrl b) {
+    private void assertSameUrl(CrawlStateUrl a, CrawlStateUrl b) {
         assertNotNull(a);
         assertNotNull(b);
         assertEquals(a.getUrl(), b.getUrl());
@@ -81,7 +81,7 @@ public class FetchQueueTest {
         CrawlStateUrl url = new CrawlStateUrl(new RawUrl(urlAsString));
         queue.add(url);
 
-        FetchUrl urlToFetch = queue.poll();
+        CrawlStateUrl urlToFetch = queue.poll();
         assertNotNull(urlToFetch);
         assertEquals(urlAsString, urlToFetch.getUrl());
     }
