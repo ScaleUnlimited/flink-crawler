@@ -13,6 +13,7 @@ import com.scaleunlimited.flinkcrawler.utils.HashUtils;
 public class CrawlStateUrl extends ValidUrl {
 
     private FetchStatus _status;
+    private FetchStatus _previousStatus;
     private long _statusTime;
     private float _score = 0.0f;
     private long _nextFetchTime = 0L;
