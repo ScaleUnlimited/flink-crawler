@@ -133,9 +133,9 @@ public class TestUrlLogger implements IUrlLogger {
             return assertUrlLoggedBy(clazz, url, 1, Integer.MAX_VALUE, targetMetaData);
         }
 
-        public UrlLoggerResults assertUrlLoggedBy(Class<?> clazz, String url, int minCalls,
+        public UrlLoggerResults assertUrlLoggedBy(Class<?> clazz, String url, int numCalls,
                 String... targetMetaData) {
-            return assertUrlLoggedBy(clazz, url, minCalls, minCalls, targetMetaData);
+            return assertUrlLoggedBy(clazz, url, numCalls, numCalls, targetMetaData);
         }
 
         public UrlLoggerResults assertUrlLoggedBy(Class<?> clazz, String url, int minCalls,

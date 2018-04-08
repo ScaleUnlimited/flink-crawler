@@ -6,7 +6,6 @@ import java.util.LinkedList;
 
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
-import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 
 @SuppressWarnings("serial")
 public class FetchQueue implements Serializable {
@@ -90,13 +89,8 @@ public class FetchQueue implements Serializable {
         });
     }
 
-    public FetchUrl poll() {
-        CrawlStateUrl url = _fetchQueue.poll();
-        if (url == null) {
-            return null;
-        } else {
-            return new FetchUrl(url, url.getScore());
-        }
+    public CrawlStateUrl poll() {
+        return _fetchQueue.poll();
     }
 
     public int size() {

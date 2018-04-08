@@ -142,17 +142,23 @@ public class CrawlTopologyTest {
         results.assertUrlLoggedBy(CheckUrlWithRobotsFunction.class, domain1page1, 1)
                 .assertUrlLoggedBy(FetchUrlsFunction.class, domain1page1, 1)
                 .assertUrlLoggedBy(UrlDBFunction.class, domain1page1, 1,
+                        FetchStatus.class.getSimpleName(), FetchStatus.FETCHING.toString())
+                .assertUrlLoggedBy(UrlDBFunction.class, domain1page1, 1,
                         FetchStatus.class.getSimpleName(), FetchStatus.FETCHED.toString())
                 .assertUrlLoggedBy(ParseFunction.class, domain1page1)
 
                 .assertUrlLoggedBy(CheckUrlWithRobotsFunction.class, domain1page2, 1)
                 .assertUrlLoggedBy(FetchUrlsFunction.class, domain1page2, 1)
                 .assertUrlLoggedBy(UrlDBFunction.class, domain1page2, 1,
+                        FetchStatus.class.getSimpleName(), FetchStatus.FETCHING.toString())
+                .assertUrlLoggedBy(UrlDBFunction.class, domain1page2, 1,
                         FetchStatus.class.getSimpleName(), FetchStatus.FETCHED.toString())
                 .assertUrlLoggedBy(ParseFunction.class, domain1page2)
 
                 .assertUrlLoggedBy(CheckUrlWithRobotsFunction.class, domain2page1, 1)
                 .assertUrlLoggedBy(FetchUrlsFunction.class, domain2page1, 1)
+                .assertUrlLoggedBy(UrlDBFunction.class, domain2page1, 1,
+                        FetchStatus.class.getSimpleName(), FetchStatus.FETCHING.toString())
                 .assertUrlLoggedBy(UrlDBFunction.class, domain2page1, 1,
                         FetchStatus.class.getSimpleName(), FetchStatus.HTTP_NOT_FOUND.toString())
                 .assertUrlNotLoggedBy(ParseFunction.class, domain2page1)
@@ -168,7 +174,10 @@ public class CrawlTopologyTest {
                 .assertUrlLoggedBy(CheckUrlWithRobotsFunction.class, domain1blockedPage)
                 .assertUrlNotLoggedBy(FetchUrlsFunction.class, domain1blockedPage)
                 .assertUrlNotLoggedBy(ParseFunction.class, domain1blockedPage)
-                .assertUrlLoggedBy(UrlDBFunction.class, domain1blockedPage, 2)
+                .assertUrlLoggedBy(UrlDBFunction.class, domain1blockedPage, 1,
+                        FetchStatus.class.getSimpleName(), FetchStatus.FETCHING.toString())
+                .assertUrlLoggedBy(UrlDBFunction.class, domain1blockedPage, 1,
+                        FetchStatus.class.getSimpleName(), FetchStatus.SKIPPED_BLOCKED.toString())
 
                 .assertUrlLoggedBy(ParseSiteMapFunction.class, domain4SiteMap)
                 .assertUrlLoggedBy(UrlDBFunction.class, domain4page1, 1,
