@@ -405,9 +405,10 @@ public class CrawlTopologyBuilder {
         crawlDbIteration.closeWith(robotBlockedUrls.union(queuedStatusUrls, fetchStatusUrls, newUrls));
 
         // Save off parsed page content by passing it on to the provided content sink function.
-        parsedUrls
-            .name("Select fetched content")
-            .addSink(_contentSink)
+        DataStreamSink<ParsedUrl> content = parsedUrls
+            .addSink(_contentSink);
+
+        content = content
             .name("ContentSink")
             .setParallelism(parseParallelism);
 
@@ -425,7 +426,6 @@ public class CrawlTopologyBuilder {
                     
                 })
                 .name("Select fetched content text")
-                .name("ContentTextSink")
                 .setParallelism(parseParallelism);
 
         DataStreamSink<String> contentTextSink;
@@ -438,7 +438,7 @@ public class CrawlTopologyBuilder {
         }
         
         contentTextSink.name("ContentTextSink")
-        .setParallelism(parseParallelism);
+            .setParallelism(parseParallelism);
 
         return new CrawlTopology(_env, _jobName);
     }
