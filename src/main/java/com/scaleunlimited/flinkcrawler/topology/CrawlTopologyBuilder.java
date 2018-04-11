@@ -405,14 +405,13 @@ public class CrawlTopologyBuilder {
         urlDbIteration.closeWith(robotBlockedUrls.union(queuedStatusUrls, fetchStatusUrls, newUrls));
 
         // Save off parsed page content by passing it on to the provided content sink function.
-        parsedUrls
-            .name("Select fetched content")
+       parsedUrls
             .addSink(_contentSink)
             .name("ContentSink")
             .setParallelism(parseParallelism);
 
-        // Save off parsed page content text. So just extract the parsed content text piece of the Tuple3, and
-        // then pass it on to the provided content sink function (or just send it to the console).
+        // Save off parsed page content text. But first replace all tabs and returns with a space, since we 
+        // are outputting one record per line.
         DataStream<String> contentText = parsedUrls
                 .map(new MapFunction<ParsedUrl, String>() {
         
@@ -425,7 +424,6 @@ public class CrawlTopologyBuilder {
                     
                 })
                 .name("Select fetched content text")
-                .name("ContentTextSink")
                 .setParallelism(parseParallelism);
 
         DataStreamSink<String> contentTextSink;
@@ -438,7 +436,7 @@ public class CrawlTopologyBuilder {
         }
         
         contentTextSink.name("ContentTextSink")
-        .setParallelism(parseParallelism);
+            .setParallelism(parseParallelism);
 
         return new CrawlTopology(_env, _jobName);
     }
