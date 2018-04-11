@@ -2,7 +2,6 @@ package com.scaleunlimited.flinkcrawler.topology;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.MalformedURLException;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.flink.api.common.JobExecutionResult;
@@ -13,7 +12,6 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.utils.FlinkUtils;
 import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 
@@ -102,7 +100,7 @@ public class CrawlTopology {
      *            Length of time w/no recorded activity after which we'll terminate.
      * @throws Exception
      */
-    public void execute(int maxDurationMS, int maxQuietTimeMS) throws Exception {
+    public void execute(long maxDurationMS, long maxQuietTimeMS) throws Exception {
         LOGGER.info("Starting async job {}", _jobName);
 
         // Reset time, since this is a static that can keep its value from a previous

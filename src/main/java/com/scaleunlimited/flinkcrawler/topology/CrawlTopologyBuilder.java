@@ -264,10 +264,10 @@ public class CrawlTopologyBuilder {
                     }
                 }));
 
-        // Update the Crawl DB, then run URLs it emits through robots filtering.
-        IterativeStream<CrawlStateUrl> crawlDbIteration = cleanedUrls
-                .iterate(/* TicklerSource.TICKLE_INTERVAL * 5 */);
-        SingleOutputStreamOperator<FetchUrl> postUrlDbUrls = crawlDbIteration
+        // Update the URL DB, then run URLs it emits through robots filtering.
+        IterativeStream<CrawlStateUrl> urlDbIteration = cleanedUrls
+                .iterate(SeedUrlSource.TICKLER_INTERVAL * 2);
+        SingleOutputStreamOperator<FetchUrl> postUrlDbUrls = urlDbIteration
                 .keyBy(new PldKeySelector<CrawlStateUrl>()).flatMap(new DomainDBFunction())
                 .name("DomainDBFunction")
 
@@ -402,7 +402,7 @@ public class CrawlTopologyBuilder {
         // fetch queue and the "status" stream from the fetch attempts and all of the new URLs from outlinks and sitemaps.
         DataStream<CrawlStateUrl> queuedStatusUrls = postUrlDbUrls.getSideOutput(UrlDBFunction.STATUS_OUTPUT_TAG);
         DataStream<CrawlStateUrl> fetchStatusUrls = parsedUrls.getSideOutput(ParseFunction.STATUS_OUTPUT_TAG);
-        crawlDbIteration.closeWith(robotBlockedUrls.union(queuedStatusUrls, fetchStatusUrls, newUrls));
+        urlDbIteration.closeWith(robotBlockedUrls.union(queuedStatusUrls, fetchStatusUrls, newUrls));
 
         // Save off parsed page content by passing it on to the provided content sink function.
         parsedUrls

@@ -14,6 +14,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.scaleunlimited.flinkcrawler.config.CrawlTerminator;
 import com.scaleunlimited.flinkcrawler.fetcher.MockRobotsFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.MockUrlLengthenerFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.SiteMapGraphFetcher;
@@ -93,10 +94,15 @@ public class CrawlTopologyTest {
         }
 
         final int crawlDbParallelism = 3;
+        final long maxQuietTime = 5_000L;
+        
+        SeedUrlSource seedUrlSource = new SeedUrlSource(crawlDbParallelism, 1.0f, "http://domain1.com");
+        seedUrlSource.setTerminator(new NoActivityCrawlTerminator(maxQuietTime));
+        
         CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
                 // Explicitly set parallelism so that it doesn't vary based on # of cores
                 .setParallelism(2)
-                .setUrlSource(new SeedUrlSource(crawlDbParallelism, 1.0f, "http://domain1.com"))
+                .setUrlSource(seedUrlSource)
                 .setUrlLengthener(new SimpleUrlLengthener(
                         new MockUrlLengthenerFetcher.MockUrlLengthenerFetcherBuilder(
                                 new MockUrlLengthenerFetcher(redirections))))
@@ -120,8 +126,8 @@ public class CrawlTopologyTest {
         ct.printDotFile(dotFile);
 
         // Execute for a maximum of 20 seconds, but terminate (successfully)
-        // if there's no activity for 5 seconds.
-        ct.execute(20_000, 5_000);
+        // if there's no activity for the max time.
+        ct.execute(20_000L, maxQuietTime * 2);
         // ct.execute(200_000, 200_000);
 
         for (Tuple3<Class<?>, String, Map<String, String>> entry : UrlLogger.getLog()) {
@@ -186,6 +192,31 @@ public class CrawlTopologyTest {
                         FetchStatus.class.getSimpleName(), FetchStatus.HTTP_NOT_FOUND.toString())
 
         ;
+    }
+    
+    @SuppressWarnings("serial")
+    private static class NoActivityCrawlTerminator extends CrawlTerminator {
+
+        private long _maxQuietTimeMS;
+        
+        public NoActivityCrawlTerminator(long maxQuietTimeMS) {
+            _maxQuietTimeMS = maxQuietTimeMS;
+        }
+        
+        @Override
+        public boolean isTerminated() {
+            long lastActivityTime = UrlLogger.getLastActivityTime();
+            if (lastActivityTime != UrlLogger.NO_ACTIVITY_TIME) {
+                long curTime = System.currentTimeMillis();
+                if ((curTime - lastActivityTime) > _maxQuietTimeMS) {
+                    LOGGER.info("Terminating seed URL source to lack of activity");
+                    return false;
+                }
+            }
+            
+            return false;
+        }
+        
     }
 
 }
