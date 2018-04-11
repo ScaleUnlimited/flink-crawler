@@ -127,7 +127,7 @@ public class CrawlTopologyTest {
 
         // Execute for a maximum of 20 seconds, but terminate (successfully)
         // if there's no activity for the max time.
-        ct.execute(20_000L, maxQuietTime * 2);
+        ct.execute(20_000L, maxQuietTime);
         // ct.execute(200_000, 200_000);
 
         for (Tuple3<Class<?>, String, Map<String, String>> entry : UrlLogger.getLog()) {
