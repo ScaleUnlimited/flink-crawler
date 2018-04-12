@@ -25,6 +25,7 @@ import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
 import com.scaleunlimited.flinkcrawler.topology.CrawlTopology;
 import com.scaleunlimited.flinkcrawler.topology.CrawlTopologyBuilder;
 import com.scaleunlimited.flinkcrawler.topology.CrawlTopologyTest;
+import com.scaleunlimited.flinkcrawler.topology.NoActivityCrawlTerminator;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlLengthener;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlValidator;
@@ -74,11 +75,19 @@ public class FocusedCrawlTest {
             FileUtils.deleteFileOrDirectory(contentTextFile);
         }
 
-        final int crawlDbParallelism = 2;
+        final long maxQuietTime = 2_000L;
+        SeedUrlSource seedUrlSource = new SeedUrlSource(1.0f, "http://domain1.com");
+        seedUrlSource.setTerminator(new NoActivityCrawlTerminator(maxQuietTime));
+        
         CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
                 // Explicitly set parallelism so that it doesn't vary based on # of cores
-                .setParallelism(1)
-                .setUrlSource(new SeedUrlSource(crawlDbParallelism, 1.0f, "http://domain1.com"))
+                .setParallelism(2)
+                
+                // Set a timeout that is safe during our test, given max latency with checkpointing
+                // during a run.
+                .setIterationTimeout(2000L)
+                
+                .setUrlSource(seedUrlSource)
                 .setUrlLengthener(new SimpleUrlLengthener(
                         new MockUrlLengthenerFetcher.MockUrlLengthenerFetcherBuilder(
                                 new MockUrlLengthenerFetcher())))
@@ -101,9 +110,8 @@ public class FocusedCrawlTest {
         File dotFile = new File(testDir, "topology.dot");
         ct.printDotFile(dotFile);
 
-        // Execute for a maximum of 20 seconds, but terminate (successfully)
-        // if there's no activity for 5 seconds.
-        ct.execute(20_000, 5_000);
+        // Execute for a maximum of 20 seconds.
+        ct.execute(20_000);
 
         for (Tuple3<Class<?>, String, Map<String, String>> entry : UrlLogger.getLog()) {
             LOGGER.debug("{}: {}", entry.f0, entry.f1);

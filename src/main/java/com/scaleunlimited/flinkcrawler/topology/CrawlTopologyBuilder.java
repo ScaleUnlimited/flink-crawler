@@ -69,14 +69,19 @@ public class CrawlTopologyBuilder {
     private static final String TABS_AND_RETURNS_PATTERN = "[\t\r\n]";
 
     public static final int DEFAULT_PARALLELISM = -1;
-
+    
+    // In production usage, it might take as long as 10 minutes for a checkpoint to
+    // complete, so we need to wait at least that long.
+    public static final long MAX_ITERATION_TIMEOUT = 10 * 60 * 1000L;
+            
     private StreamExecutionEnvironment _env;
     private String _jobName = "flink-crawler";
     private int _parallelism = DEFAULT_PARALLELISM;
     private long _forceCrawlDelay = CrawlTool.DO_NOT_FORCE_CRAWL_DELAY;
     private long _defaultCrawlDelay = 10_000L;
-
-    private BaseUrlSource _urlSource = new SeedUrlSource(1, makeDefaultSeedUrl());;
+    private long _iterationTimeout = MAX_ITERATION_TIMEOUT;
+    
+    private SeedUrlSource _urlSource = new SeedUrlSource(makeDefaultSeedUrl());;
     private FetchQueue _fetchQueue = new FetchQueue(10_000);
 
     private BaseHttpFetcherBuilder _robotsFetcherBuilder = new SimpleHttpFetcherBuilder(1,
@@ -116,7 +121,7 @@ public class CrawlTopologyBuilder {
         return this;
     }
 
-    public CrawlTopologyBuilder setUrlSource(BaseUrlSource urlSource) {
+    public CrawlTopologyBuilder setUrlSource(SeedUrlSource urlSource) {
         _urlSource = urlSource;
         return this;
     }
@@ -165,6 +170,11 @@ public class CrawlTopologyBuilder {
         return this;
     }
 
+    public CrawlTopologyBuilder setIterationTimeout(long iterationTimeout) {
+        _iterationTimeout = iterationTimeout;
+        return this;
+    }
+    
     public CrawlTopologyBuilder setFetchQueue(FetchQueue fetchQueue) {
         _fetchQueue = fetchQueue;
         return this;
@@ -243,7 +253,10 @@ public class CrawlTopologyBuilder {
                 Collections.unmodifiableList(new ArrayList<>()).getClass(),
                 UnmodifiableCollectionsSerializer.class);
 
-        SplitStream<RawUrl> seedUrls = _env.addSource(_urlSource).name("Seed urls source")
+        // Make sure the tickler parallelism is set for the urlSource
+        _urlSource.setCrawlDbParallelism(getRealParallelism());
+        SplitStream<RawUrl> seedUrls = _env.addSource(_urlSource)
+                .name("Seed urls source")
                 .split(new OutputSelector<RawUrl>() {
 
                     private final List<String> REGULAR_URLS = Arrays.asList("regular");
@@ -255,8 +268,11 @@ public class CrawlTopologyBuilder {
                     }
                 });
 
+        // Clean up the regular URLs, and then re-combine (union) with the special
+        // URLs that don't need cleaning.
         DataStream<CrawlStateUrl> cleanedUrls = cleanUrls(seedUrls.select("regular"))
-                .union(seedUrls.select("special").map(new MapFunction<RawUrl, CrawlStateUrl>() {
+                .union(seedUrls.select("special")
+                        .map(new MapFunction<RawUrl, CrawlStateUrl>() {
 
                     @Override
                     public CrawlStateUrl map(RawUrl url) throws Exception {
@@ -266,19 +282,19 @@ public class CrawlTopologyBuilder {
 
         // Update the URL DB, then run URLs it emits through robots filtering.
         IterativeStream<CrawlStateUrl> urlDbIteration = cleanedUrls
-                .iterate(SeedUrlSource.TICKLER_INTERVAL * 2);
-        SingleOutputStreamOperator<FetchUrl> postUrlDbUrls = urlDbIteration
-                .keyBy(new PldKeySelector<CrawlStateUrl>()).flatMap(new DomainDBFunction())
-                .name("DomainDBFunction")
-
-                // We have to re-key since flatMap destroys the keyed state, and UrlDBFunction
-                // needs to get the same set of URLs as DomainDBFunction is tracking.
+                .iterate(_iterationTimeout);
+        SingleOutputStreamOperator<CrawlStateUrl> postDomainDbUrls = urlDbIteration
+                .keyBy(new PldKeySelector<CrawlStateUrl>())
+                .process(new DomainDBFunction())
+                .name("DomainDBFunction");
+                
+        SingleOutputStreamOperator<FetchUrl> postUrlDbUrls = postDomainDbUrls
                 .keyBy(new PldKeySelector<CrawlStateUrl>())
                 .process(new UrlDBFunction(new DefaultUrlStateMerger(), _fetchQueue))
                 .name("UrlDBFunction");
 
         DataStream<FetchUrl> preRobotsUrls = postUrlDbUrls
-                // We have to re-key since flatMap destroys the keyed state, and CheckUrlWithRobotsFunction
+                // We have to re-key since process() destroys the keyed state, and CheckUrlWithRobotsFunction
                 // needs to process URLs by PLD.
                 .keyBy(new PldKeySelector<FetchUrl>());
 
@@ -400,9 +416,10 @@ public class CrawlTopologyBuilder {
 
         // We need to merge robotBlockedUrls with the "queued status" stream from putting URLs onto the
         // fetch queue and the "status" stream from the fetch attempts and all of the new URLs from outlinks and sitemaps.
+        DataStream<CrawlStateUrl> domainTicklerUrls = postDomainDbUrls.getSideOutput(DomainDBFunction.DOMAIN_TICKLER_TAG);
         DataStream<CrawlStateUrl> queuedStatusUrls = postUrlDbUrls.getSideOutput(UrlDBFunction.STATUS_OUTPUT_TAG);
         DataStream<CrawlStateUrl> fetchStatusUrls = parsedUrls.getSideOutput(ParseFunction.STATUS_OUTPUT_TAG);
-        urlDbIteration.closeWith(robotBlockedUrls.union(queuedStatusUrls, fetchStatusUrls, newUrls));
+        urlDbIteration.closeWith(robotBlockedUrls.union(domainTicklerUrls, queuedStatusUrls, fetchStatusUrls, newUrls));
 
         // Save off parsed page content by passing it on to the provided content sink function.
        parsedUrls

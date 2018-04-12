@@ -14,7 +14,6 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.scaleunlimited.flinkcrawler.config.CrawlTerminator;
 import com.scaleunlimited.flinkcrawler.fetcher.MockRobotsFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.MockUrlLengthenerFetcher;
 import com.scaleunlimited.flinkcrawler.fetcher.SiteMapGraphFetcher;
@@ -93,15 +92,18 @@ public class CrawlTopologyTest {
             FileUtils.deleteFileOrDirectory(contentTextFile);
         }
 
-        final int crawlDbParallelism = 3;
-        final long maxQuietTime = 5_000L;
-        
-        SeedUrlSource seedUrlSource = new SeedUrlSource(crawlDbParallelism, 1.0f, "http://domain1.com");
+        final long maxQuietTime = 2_000L;
+        SeedUrlSource seedUrlSource = new SeedUrlSource(1.0f, "http://domain1.com");
         seedUrlSource.setTerminator(new NoActivityCrawlTerminator(maxQuietTime));
         
         CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
                 // Explicitly set parallelism so that it doesn't vary based on # of cores
-                .setParallelism(2)
+                .setParallelism(3)
+                
+                // Set a timeout that is safe during our test, given max latency with checkpointing
+                // during a run.
+                .setIterationTimeout(2000L)
+                
                 .setUrlSource(seedUrlSource)
                 .setUrlLengthener(new SimpleUrlLengthener(
                         new MockUrlLengthenerFetcher.MockUrlLengthenerFetcherBuilder(
@@ -113,6 +115,7 @@ public class CrawlTopologyTest {
                 .setContentSink(new DiscardingSink<ParsedUrl>())
                 .setContentTextFile(contentTextFile.getAbsolutePath()).setUrlNormalizer(normalizer)
                 .setUrlFilter(new SimpleUrlValidator())
+                
                 // Create MockSitemapFetcher - that will return a valid sitemap
                 .setSiteMapFetcherBuilder(new SiteMapGraphFetcher.SiteMapGraphFetcherBuilder(
                         new SiteMapGraphFetcher(sitemapGraph)))
@@ -125,10 +128,9 @@ public class CrawlTopologyTest {
         File dotFile = new File(testDir, "topology.dot");
         ct.printDotFile(dotFile);
 
-        // Execute for a maximum of 20 seconds, but terminate (successfully)
-        // if there's no activity for the max time.
-        ct.execute(20_000L, maxQuietTime);
-        // ct.execute(200_000, 200_000);
+        // Execute for a maximum of 20 seconds.
+        ct.execute(20_000L);
+        // ct.execute(200_000);
 
         for (Tuple3<Class<?>, String, Map<String, String>> entry : UrlLogger.getLog()) {
             LOGGER.debug("{}: {}", entry.f0, entry.f1);
@@ -194,29 +196,4 @@ public class CrawlTopologyTest {
         ;
     }
     
-    @SuppressWarnings("serial")
-    private static class NoActivityCrawlTerminator extends CrawlTerminator {
-
-        private long _maxQuietTimeMS;
-        
-        public NoActivityCrawlTerminator(long maxQuietTimeMS) {
-            _maxQuietTimeMS = maxQuietTimeMS;
-        }
-        
-        @Override
-        public boolean isTerminated() {
-            long lastActivityTime = UrlLogger.getLastActivityTime();
-            if (lastActivityTime != UrlLogger.NO_ACTIVITY_TIME) {
-                long curTime = System.currentTimeMillis();
-                if ((curTime - lastActivityTime) > _maxQuietTimeMS) {
-                    LOGGER.info("Terminating seed URL source to lack of activity");
-                    return false;
-                }
-            }
-            
-            return false;
-        }
-        
-    }
-
 }

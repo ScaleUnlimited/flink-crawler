@@ -39,7 +39,7 @@ public class SeedUrlSource extends BaseUrlSource {
     
     private CrawlTerminator _terminator = new NullTerminator();
     private float _estimatedScore;
-    private int _crawlDbParallelism;
+    private int _crawlDbParallelism = -1;
 
     // For when we're reading from S3
     private String _seedUrlsS3Bucket;
@@ -62,9 +62,7 @@ public class SeedUrlSource extends BaseUrlSource {
      * @param estimatedScore
      * @throws Exception
      */
-    public SeedUrlSource(int crawlDbParallelism, String seedUrlsFilename, float estimatedScore)
-            throws Exception {
-        _crawlDbParallelism = crawlDbParallelism;
+    public SeedUrlSource(String seedUrlsFilename, float estimatedScore) throws Exception {
         _estimatedScore = estimatedScore;
 
         // If it's an S3 file, we delay processing until we're running, as the file could be really
@@ -97,9 +95,8 @@ public class SeedUrlSource extends BaseUrlSource {
         }
     }
 
-    public SeedUrlSource(int crawlDbParallelism, float estimatedScore, String... rawUrls)
+    public SeedUrlSource(float estimatedScore, String... rawUrls)
             throws Exception {
-        _crawlDbParallelism = crawlDbParallelism;
         _estimatedScore = estimatedScore;
 
         _urls = new RawUrl[rawUrls.length];
@@ -110,12 +107,14 @@ public class SeedUrlSource extends BaseUrlSource {
         }
     }
 
-    public SeedUrlSource(int crawlDbParallelism, RawUrl... rawUrls) {
-        _crawlDbParallelism = crawlDbParallelism;
-
+    public SeedUrlSource(RawUrl... rawUrls) {
         _urls = rawUrls;
     }
 
+    public void setCrawlDbParallelism(int parallelism) {
+        _crawlDbParallelism = parallelism;
+    }
+    
     public CrawlTerminator setTerminator(CrawlTerminator terminator) {
         CrawlTerminator oldTerminator = _terminator;
         _terminator = terminator;
@@ -124,8 +123,15 @@ public class SeedUrlSource extends BaseUrlSource {
     
     @Override
     public void open(Configuration parameters) throws Exception {
+        if (_crawlDbParallelism == -1) {
+            throw new IllegalStateException("CrawlDbParallelism must be explicitly set");
+        }
+        
         super.open(parameters);
 
+        // Open the terminator, so that it knows when we really started running.
+        _terminator.open();
+        
         _seedUrlIndex = 0;
 
         _ticklers = new RawUrl[_crawlDbParallelism];

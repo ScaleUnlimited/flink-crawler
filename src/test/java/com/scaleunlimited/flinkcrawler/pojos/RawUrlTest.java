@@ -8,8 +8,13 @@ public class RawUrlTest {
 
     @Test
     public void testTicklerGeneration() {
-        RawUrl url = RawUrl.makeRawTickerUrl(128, 2, 0);
-        assertFalse(url.isRegular());
+        final int maxParallelism = 128;
+        final int parallelism = 3;
+        
+        for (int operatorIndex = 0; operatorIndex < parallelism; operatorIndex++) {
+            RawUrl url = RawUrl.makeRawTickerUrl(maxParallelism, parallelism, operatorIndex);
+            System.out.format("%d: %s\n", operatorIndex, url.getUrl());
+            assertFalse(url.isRegular());
+        }
     }
-
 }

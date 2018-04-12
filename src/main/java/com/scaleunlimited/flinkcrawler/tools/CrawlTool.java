@@ -110,8 +110,7 @@ public class CrawlTool {
 
         CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env).setUserAgent(userAgent)
                 .setUrlLengthener(urlLengthener)
-                .setUrlSource(new SeedUrlSource(options.getCrawlDbParallelism(),
-                        options.getSeedUrlsFilename(), RawUrl.DEFAULT_SCORE))
+                .setUrlSource(new SeedUrlSource(options.getSeedUrlsFilename(), RawUrl.DEFAULT_SCORE))
                 .setRobotsFetcherBuilder(robotsFetcherBuilder).setUrlFilter(urlValidator)
                 .setSiteMapFetcherBuilder(siteMapFetcherBuilder)
                 .setPageFetcherBuilder(pageFetcherBuilder)

@@ -55,20 +55,26 @@ public class FetchQueue implements Serializable {
             // TODO refetch URL if fetch time is earlier than "now".
             return url;
         } else if (_fetchQueue.size() < _maxQueueSize) {
-            _fetchQueue.add(url);
-            sortQueue();
+            addToQueue(url);
             
             return null;
         } else if (url.getScore() <= _fetchQueue.getLast().getScore()) {
             return url;
         } else {
-            _fetchQueue.add(url);
-            sortQueue();
+            addToQueue(url);
+
             return _fetchQueue.removeLast();
         }
     }
 
-    private void sortQueue() {
+    private void addToQueue(CrawlStateUrl url) {
+        // We need to make a copy of this, so that if/when we change it,
+        // we're not also accidentally changing our state value.
+        CrawlStateUrl urlToQueue = new CrawlStateUrl();
+        urlToQueue.setFrom(url);
+        urlToQueue.setStatus(FetchStatus.QUEUED);
+        _fetchQueue.add(urlToQueue);
+        
         _fetchQueue.sort(new Comparator<CrawlStateUrl>() {
 
             @Override

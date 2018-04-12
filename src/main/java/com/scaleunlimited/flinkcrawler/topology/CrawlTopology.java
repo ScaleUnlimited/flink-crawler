@@ -96,11 +96,9 @@ public class CrawlTopology {
      * 
      * @param maxDurationMS
      *            Maximum allowable execution time.
-     * @param maxQuietTimeMS
-     *            Length of time w/no recorded activity after which we'll terminate.
      * @throws Exception
      */
-    public void execute(long maxDurationMS, long maxQuietTimeMS) throws Exception {
+    public void execute(long maxDurationMS) throws Exception {
         LOGGER.info("Starting async job {}", _jobName);
 
         // Reset time, since this is a static that can keep its value from a previous
@@ -108,28 +106,16 @@ public class CrawlTopology {
         UrlLogger.resetActivityTime();
         executeAsync();
 
-        boolean terminated = false;
         long endTime = System.currentTimeMillis() + maxDurationMS;
-        while (System.currentTimeMillis() < endTime) {
-            long lastActivityTime = UrlLogger.getLastActivityTime();
-            if (lastActivityTime != UrlLogger.NO_ACTIVITY_TIME) {
-                long curTime = System.currentTimeMillis();
-                if ((curTime - lastActivityTime) > maxQuietTimeMS) {
-                    LOGGER.info("Stopping async job {} due to lack of activity", _jobName);
-
-                    stop();
-                    terminated = true;
-                    break;
-                }
-            }
-
+        while ((System.currentTimeMillis() < endTime) && isRunning()) {
             Thread.sleep(100L);
         }
 
-        if (!terminated) {
-            LOGGER.info("Stopping async job {} due to timeout", _jobName);
+        if (isRunning()) {
+            LOGGER.error("Stopping async job {} due to timeout", _jobName);
             stop();
-            throw new RuntimeException("Job did not terminate in time");
+            
+            throw new RuntimeException(String.format("Job '%s' did not terminate in time", _jobName));
         }
     }
 }
