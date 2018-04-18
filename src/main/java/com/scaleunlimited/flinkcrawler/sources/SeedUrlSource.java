@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.S3Object;
+import com.scaleunlimited.flinkcrawler.config.CrawlTerminator;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.utils.S3Utils;
 
@@ -34,14 +35,16 @@ public class SeedUrlSource extends BaseUrlSource {
     static final Logger LOGGER = LoggerFactory.getLogger(SeedUrlSource.class);
 
     // Time between tickler URLs.
-    private static final long TICKLER_INTERVAL = 100L;
+    public static final long TICKLER_INTERVAL = 100L;
+    
+    private CrawlTerminator _terminator = new NullTerminator();
+    private float _estimatedScore;
+    private int _crawlDbParallelism = -1;
 
     // For when we're reading from S3
     private String _seedUrlsS3Bucket;
     private String _seedUrlsS3Path;
-    private float _estimatedScore;
-    private int _crawlDbParallelism;
-
+    
     // For when we've read from a local file
     private RawUrl[] _urls;
 
@@ -59,9 +62,7 @@ public class SeedUrlSource extends BaseUrlSource {
      * @param estimatedScore
      * @throws Exception
      */
-    public SeedUrlSource(int crawlDbParallelism, String seedUrlsFilename, float estimatedScore)
-            throws Exception {
-        _crawlDbParallelism = crawlDbParallelism;
+    public SeedUrlSource(String seedUrlsFilename, float estimatedScore) throws Exception {
         _estimatedScore = estimatedScore;
 
         // If it's an S3 file, we delay processing until we're running, as the file could be really
@@ -94,9 +95,8 @@ public class SeedUrlSource extends BaseUrlSource {
         }
     }
 
-    public SeedUrlSource(int crawlDbParallelism, float estimatedScore, String... rawUrls)
+    public SeedUrlSource(float estimatedScore, String... rawUrls)
             throws Exception {
-        _crawlDbParallelism = crawlDbParallelism;
         _estimatedScore = estimatedScore;
 
         _urls = new RawUrl[rawUrls.length];
@@ -107,16 +107,31 @@ public class SeedUrlSource extends BaseUrlSource {
         }
     }
 
-    public SeedUrlSource(int crawlDbParallelism, RawUrl... rawUrls) {
-        _crawlDbParallelism = crawlDbParallelism;
-
+    public SeedUrlSource(RawUrl... rawUrls) {
         _urls = rawUrls;
     }
 
+    public void setCrawlDbParallelism(int parallelism) {
+        _crawlDbParallelism = parallelism;
+    }
+    
+    public CrawlTerminator setTerminator(CrawlTerminator terminator) {
+        CrawlTerminator oldTerminator = _terminator;
+        _terminator = terminator;
+        return oldTerminator;
+    }
+    
     @Override
     public void open(Configuration parameters) throws Exception {
+        if (_crawlDbParallelism == -1) {
+            throw new IllegalStateException("CrawlDbParallelism must be explicitly set");
+        }
+        
         super.open(parameters);
 
+        // Open the terminator, so that it knows when we really started running.
+        _terminator.open();
+        
         _seedUrlIndex = 0;
 
         _ticklers = new RawUrl[_crawlDbParallelism];
@@ -153,7 +168,7 @@ public class SeedUrlSource extends BaseUrlSource {
         }
 
         long nextTickleTime = 0;
-        while (_keepRunning) {
+        while (_keepRunning && !_terminator.isTerminated()) {
             
             if (useS3File()) {
                 String sourceLine = s3FileReader.readLine();
@@ -221,6 +236,15 @@ public class SeedUrlSource extends BaseUrlSource {
         }
         
         return new RawUrl(seedUrl, _estimatedScore);
+    }
+    
+    private static class NullTerminator extends CrawlTerminator {
+
+        @Override
+        public boolean isTerminated() {
+            return false;
+        }
+        
     }
 
 }

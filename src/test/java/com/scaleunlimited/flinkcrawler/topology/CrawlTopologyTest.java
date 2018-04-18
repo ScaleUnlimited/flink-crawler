@@ -92,11 +92,19 @@ public class CrawlTopologyTest {
             FileUtils.deleteFileOrDirectory(contentTextFile);
         }
 
-        final int crawlDbParallelism = 3;
+        final long maxQuietTime = 2_000L;
+        SeedUrlSource seedUrlSource = new SeedUrlSource(1.0f, "http://domain1.com");
+        seedUrlSource.setTerminator(new NoActivityCrawlTerminator(maxQuietTime));
+        
         CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
                 // Explicitly set parallelism so that it doesn't vary based on # of cores
-                .setParallelism(2)
-                .setUrlSource(new SeedUrlSource(crawlDbParallelism, 1.0f, "http://domain1.com"))
+                .setParallelism(3)
+                
+                // Set a timeout that is safe during our test, given max latency with checkpointing
+                // during a run.
+                .setIterationTimeout(2000L)
+                
+                .setUrlSource(seedUrlSource)
                 .setUrlLengthener(new SimpleUrlLengthener(
                         new MockUrlLengthenerFetcher.MockUrlLengthenerFetcherBuilder(
                                 new MockUrlLengthenerFetcher(redirections))))
@@ -107,6 +115,7 @@ public class CrawlTopologyTest {
                 .setContentSink(new DiscardingSink<ParsedUrl>())
                 .setContentTextFile(contentTextFile.getAbsolutePath()).setUrlNormalizer(normalizer)
                 .setUrlFilter(new SimpleUrlValidator())
+                
                 // Create MockSitemapFetcher - that will return a valid sitemap
                 .setSiteMapFetcherBuilder(new SiteMapGraphFetcher.SiteMapGraphFetcherBuilder(
                         new SiteMapGraphFetcher(sitemapGraph)))
@@ -119,10 +128,9 @@ public class CrawlTopologyTest {
         File dotFile = new File(testDir, "topology.dot");
         ct.printDotFile(dotFile);
 
-        // Execute for a maximum of 20 seconds, but terminate (successfully)
-        // if there's no activity for 5 seconds.
-        ct.execute(20_000, 5_000);
-        // ct.execute(200_000, 200_000);
+        // Execute for a maximum of 20 seconds.
+        ct.execute(20_000L);
+        // ct.execute(200_000);
 
         for (Tuple3<Class<?>, String, Map<String, String>> entry : UrlLogger.getLog()) {
             LOGGER.debug("{}: {}", entry.f0, entry.f1);
@@ -187,5 +195,5 @@ public class CrawlTopologyTest {
 
         ;
     }
-
+    
 }

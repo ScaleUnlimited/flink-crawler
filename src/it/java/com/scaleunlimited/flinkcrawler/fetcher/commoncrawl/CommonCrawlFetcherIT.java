@@ -64,10 +64,8 @@ public class CommonCrawlFetcherIT {
     public void testSpecificUrl() throws Exception {
         BaseHttpFetcher fetcher = makeFetcher(1);
 
-        FetchedResult result = fetcher.get("http://www.domain.com/");
+        FetchedResult result = fetcher.get("https://customer.xfinity.com/");
         assertEquals(200, result.getStatusCode());
-        assertEquals("http://www.domain.com//", result.getBaseUrl());
-        assertEquals("http://www.domain.com/", result.getFetchedUrl());
     }
 
     @Test

@@ -47,7 +47,7 @@ public class CrawlStateUrl extends ValidUrl {
     }
 
     public void setStatus(FetchStatus status) {
-        if (status != _previousStatus) {
+        if (status != _status) {
             _previousStatus = _status;
             _status = status;
         }
@@ -55,8 +55,9 @@ public class CrawlStateUrl extends ValidUrl {
     
     public void restorePreviousStatus() {
         if (_previousStatus == null) {
-            throw new RuntimeException(this + "Has no saved previous status!");
+            throw new IllegalStateException("No previous status for " + toString());
         }
+        
         _status = _previousStatus;
         _previousStatus = null;
     }
@@ -97,6 +98,7 @@ public class CrawlStateUrl extends ValidUrl {
         _score = url._score;
         _status = url._status;
         _statusTime = url._statusTime;
+        _previousStatus = url._previousStatus;
     }
 
     @Override
@@ -104,6 +106,8 @@ public class CrawlStateUrl extends ValidUrl {
         // TODO add more fields to the response.
         if (getUrlType() == UrlType.REGULAR) {
             return String.format("%s (%s at %d)", getUrl(), _status, _statusTime);
+        } else if (getUrlType() == UrlType.DOMAIN) {
+            return String.format("%s (%s)", getUrl(), getUrlType());
         } else {
             return String.format("%s", getUrlType());
         }
@@ -114,6 +118,7 @@ public class CrawlStateUrl extends ValidUrl {
         final int prime = 31;
         int result = super.hashCode();
         result = prime * result + (int) (_nextFetchTime ^ (_nextFetchTime >>> 32));
+        result = prime * result + ((_previousStatus == null) ? 0 : _previousStatus.hashCode());
         result = prime * result + Float.floatToIntBits(_score);
         result = prime * result + ((_status == null) ? 0 : _status.hashCode());
         result = prime * result + (int) (_statusTime ^ (_statusTime >>> 32));
@@ -130,6 +135,8 @@ public class CrawlStateUrl extends ValidUrl {
             return false;
         CrawlStateUrl other = (CrawlStateUrl) obj;
         if (_nextFetchTime != other._nextFetchTime)
+            return false;
+        if (_previousStatus != other._previousStatus)
             return false;
         if (Float.floatToIntBits(_score) != Float.floatToIntBits(other._score))
             return false;
