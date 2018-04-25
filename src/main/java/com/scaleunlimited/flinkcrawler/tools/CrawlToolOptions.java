@@ -21,7 +21,6 @@ public class CrawlToolOptions {
     private String _outputFile = null;
     private boolean _htmlOnly = false;
     private boolean _noLengthen = false;
-    private int _crawlDbParallelism = 1;
     private String _checkpointDir = null;
     private int _maxOutlinksPerPage = SimpleLinkExtractor.DEFAULT_MAX_EXTRACTED_LINKS_SIZE;
 
@@ -78,11 +77,6 @@ public class CrawlToolOptions {
     @Option(name = "-maxcontentsize", usage = "maximum content size", required = false)
     public void setMaxContentSize(int maxContentSize) {
         _maxContentSize = maxContentSize;
-    }
-
-    @Option(name = "-crawldbparallelism", usage = "parallelism for crawl DB", required = false)
-    public void setCrawlDbParallelism(int parallelism) {
-        _crawlDbParallelism = parallelism;
     }
 
     @Option(name = "-commoncrawl", usage = "crawl id for CommonCrawl.org dataset", required = false)
@@ -175,10 +169,6 @@ public class CrawlToolOptions {
     public int getMaxContentSize() {
         validate();
         return _maxContentSize;
-    }
-
-    public int getCrawlDbParallelism() {
-        return _crawlDbParallelism;
     }
 
     public boolean isCommonCrawl() {

@@ -5,7 +5,7 @@ import java.net.MalformedURLException;
 import com.scaleunlimited.flinkcrawler.utils.HashUtils;
 
 /**
- * The CrawlStateUrl is the fundamental unit of state in the CrawlDB. It consists of the actual URL, plus other fields
+ * The CrawlStateUrl is the fundamental unit of state in the workflow. It consists of the actual URL, plus other fields
  * necessary to handle merging of URLs and prioritizing of URLs to be fetched.
  * 
  */

@@ -73,7 +73,7 @@ public class CrawlTopologyBuilder {
     // In production usage, it might take as long as 10 minutes for a checkpoint to
     // complete, so we need to wait at least that long.
     public static final long MAX_ITERATION_TIMEOUT = 10 * 60 * 1000L;
-            
+    
     private StreamExecutionEnvironment _env;
     private String _jobName = "flink-crawler";
     private int _parallelism = DEFAULT_PARALLELISM;
@@ -254,7 +254,7 @@ public class CrawlTopologyBuilder {
                 UnmodifiableCollectionsSerializer.class);
 
         // Make sure the tickler parallelism is set for the urlSource
-        _urlSource.setCrawlDbParallelism(getRealParallelism());
+        _urlSource.setParallelism(getRealParallelism());
         SplitStream<RawUrl> seedUrls = _env.addSource(_urlSource)
                 .name("Seed urls source")
                 .split(new OutputSelector<RawUrl>() {

@@ -24,7 +24,7 @@ import com.scaleunlimited.flinkcrawler.utils.S3Utils;
  * Source for seed URLs.
  * 
  * Generate special CrawlStateUrl values (ticklers) that keep the iteration running, until we're stopped. When that
- * happens, generate termination CrawStateUrls that tell the CrawlDB to flush the fetch queue and not fill it any
+ * happens, generate termination CrawStateUrls that tell the workflow to flush the fetch queue and not fill it any
  * longer.
  * 
  * TODO add checkpointing - see FromElementsFunction.java
@@ -39,7 +39,7 @@ public class SeedUrlSource extends BaseUrlSource {
     
     private CrawlTerminator _terminator = new NullTerminator();
     private float _estimatedScore;
-    private int _crawlDbParallelism = -1;
+    private int _parallelism = -1;
 
     // For when we're reading from S3
     private String _seedUrlsS3Bucket;
@@ -111,8 +111,8 @@ public class SeedUrlSource extends BaseUrlSource {
         _urls = rawUrls;
     }
 
-    public void setCrawlDbParallelism(int parallelism) {
-        _crawlDbParallelism = parallelism;
+    public void setParallelism(int parallelism) {
+        _parallelism = parallelism;
     }
     
     public CrawlTerminator setTerminator(CrawlTerminator terminator) {
@@ -123,8 +123,8 @@ public class SeedUrlSource extends BaseUrlSource {
     
     @Override
     public void open(Configuration parameters) throws Exception {
-        if (_crawlDbParallelism == -1) {
-            throw new IllegalStateException("CrawlDbParallelism must be explicitly set");
+        if (_parallelism == -1) {
+            throw new IllegalStateException("Parallelism must be explicitly set");
         }
         
         super.open(parameters);
@@ -134,9 +134,9 @@ public class SeedUrlSource extends BaseUrlSource {
         
         _seedUrlIndex = 0;
 
-        _ticklers = new RawUrl[_crawlDbParallelism];
-        for (int i = 0; i < _crawlDbParallelism; i++) {
-            _ticklers[i] = RawUrl.makeRawTickerUrl(getMaxParallelism(), _crawlDbParallelism, i);
+        _ticklers = new RawUrl[_parallelism];
+        for (int i = 0; i < _parallelism; i++) {
+            _ticklers[i] = RawUrl.makeRawTickerUrl(getMaxParallelism(), _parallelism, i);
         }
 
         if (useS3File()) {
