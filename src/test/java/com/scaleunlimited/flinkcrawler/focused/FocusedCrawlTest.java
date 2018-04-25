@@ -72,9 +72,16 @@ public class FocusedCrawlTest {
 
         File testDir = new File("target/FocusedCrawlTest/");
         testDir.mkdirs();
-        File contentTextFile = new File(testDir, "content.txt");
+        File textDir = new File(testDir, "text");
+        File contentTextFile = new File(textDir, "content.txt");
         if (contentTextFile.exists()) {
             FileUtils.deleteFileOrDirectory(contentTextFile);
+        }
+
+        File warcDir = new File(testDir, "warc");
+        File warcFile = new File(warcDir, "content-warc");
+        if (warcFile.exists()) {
+            FileUtils.deleteFileOrDirectory(warcFile);
         }
 
         final long maxQuietTime = 2_000L;
@@ -97,7 +104,7 @@ public class FocusedCrawlTest {
                         new MockRobotsFetcher.MockRobotsFetcherBuilder(new MockRobotsFetcher()))
                 .setRobotsParser(new SimpleRobotRulesParser())
                 .setPageParser(new FocusedPageParser(new PageNumberScorer()))
-                .setContentSink(new DiscardingSink<Tuple2<NullWritable, WARCWritable>>())
+                .setContentFile(warcFile.getAbsolutePath())
                 .setContentTextFile(contentTextFile.getAbsolutePath()).setUrlNormalizer(normalizer)
                 .setUrlFilter(new SimpleUrlValidator())
                 .setSiteMapFetcherBuilder(new SiteMapGraphFetcher.SiteMapGraphFetcherBuilder(
