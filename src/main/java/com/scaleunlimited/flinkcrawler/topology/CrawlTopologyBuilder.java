@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.core.fs.FileSystem.WriteMode;
 import org.apache.flink.streaming.api.collector.selector.OutputSelector;
@@ -21,6 +22,7 @@ import org.apache.flink.streaming.api.datastream.SplitStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
+import org.apache.hadoop.io.NullWritable;
 
 import com.scaleunlimited.flinkcrawler.fetcher.BaseHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.fetcher.SimpleHttpFetcherBuilder;
@@ -35,6 +37,8 @@ import com.scaleunlimited.flinkcrawler.functions.ParseSiteMapFunction;
 import com.scaleunlimited.flinkcrawler.functions.PldKeySelector;
 import com.scaleunlimited.flinkcrawler.functions.UrlDBFunction;
 import com.scaleunlimited.flinkcrawler.functions.ValidUrlsFilter;
+import com.scaleunlimited.flinkcrawler.io.CreateWARCWritableFunction;
+import com.scaleunlimited.flinkcrawler.io.WARCWritable;
 import com.scaleunlimited.flinkcrawler.parser.BasePageParser;
 import com.scaleunlimited.flinkcrawler.parser.SimpleLinkExtractor;
 import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
@@ -44,7 +48,6 @@ import com.scaleunlimited.flinkcrawler.pojos.FetchResultUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
-import com.scaleunlimited.flinkcrawler.sources.BaseUrlSource;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
 import com.scaleunlimited.flinkcrawler.tools.CrawlTool;
 import com.scaleunlimited.flinkcrawler.urldb.DefaultUrlStateMerger;
@@ -89,7 +92,7 @@ public class CrawlTopologyBuilder {
     private SimpleRobotRulesParser _robotsParser = new SimpleRobotRulesParser();
 
     private BaseUrlLengthener _urlLengthener = new SimpleUrlLengthener(INVALID_USER_AGENT, 1);
-    private SinkFunction<ParsedUrl> _contentSink = new DiscardingSink<ParsedUrl>();
+    private SinkFunction<Tuple2<NullWritable, WARCWritable>> _contentSink = new DiscardingSink<Tuple2<NullWritable, WARCWritable>>();
     private SinkFunction<String> _contentTextSink;
     private String _contentTextFilePathString;
     private BaseUrlNormalizer _urlNormalizer = new SimpleUrlNormalizer();
@@ -185,7 +188,7 @@ public class CrawlTopologyBuilder {
         return this;
     }
 
-    public CrawlTopologyBuilder setContentSink(SinkFunction<ParsedUrl> contentSink) {
+    public CrawlTopologyBuilder setContentSink(SinkFunction<Tuple2<NullWritable, WARCWritable>> contentSink) {
         _contentSink = contentSink;
         return this;
     }
@@ -399,6 +402,16 @@ public class CrawlTopologyBuilder {
                                 TimeUnit.SECONDS, 10000)
                         .name("FetchUrlsFunction");
 
+        // Save off the content by converting it to a WARC record and passing it on to the provided
+        // content sink function.
+        DataStream<FetchResultUrl> fetchResultUrlsToSave = fetchResultUrls;
+        SingleOutputStreamOperator<Tuple2<NullWritable, WARCWritable>> warcStream = fetchResultUrlsToSave
+                .flatMap(new CreateWARCWritableFunction())
+                .name("Create WARC writable");
+        warcStream
+            .addSink(_contentSink)
+            .name("Content Sink");
+        
         final int parseParallelism = getRealParallelism() * 4;
         SingleOutputStreamOperator<ParsedUrl> parsedUrls = fetchResultUrls
                 .process(new ParseFunction(_pageParser, _maxOutlinksPerPage))
@@ -420,12 +433,6 @@ public class CrawlTopologyBuilder {
         DataStream<CrawlStateUrl> queuedStatusUrls = postUrlDbUrls.getSideOutput(UrlDBFunction.STATUS_OUTPUT_TAG);
         DataStream<CrawlStateUrl> fetchStatusUrls = parsedUrls.getSideOutput(ParseFunction.STATUS_OUTPUT_TAG);
         urlDbIteration.closeWith(robotBlockedUrls.union(domainTicklerUrls, queuedStatusUrls, fetchStatusUrls, newUrls));
-
-        // Save off parsed page content by passing it on to the provided content sink function.
-       parsedUrls
-            .addSink(_contentSink)
-            .name("ContentSink")
-            .setParallelism(parseParallelism);
 
         // Save off parsed page content text. But first replace all tabs and returns with a space, since we 
         // are outputting one record per line.

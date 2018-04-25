@@ -10,10 +10,10 @@ import org.apache.flink.util.Collector;
 import org.apache.hadoop.io.NullWritable;
 
 import com.scaleunlimited.flinkcrawler.functions.BaseFlatMapFunction;
-import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
+import com.scaleunlimited.flinkcrawler.pojos.FetchResultUrl;
 
 @SuppressWarnings("serial")
-public class CreateWARCWritableFunction extends BaseFlatMapFunction<ParsedUrl, Tuple2<NullWritable, WARCWritable>> {
+public class CreateWARCWritableFunction extends BaseFlatMapFunction<FetchResultUrl, Tuple2<NullWritable, WARCWritable>> {
 
     SimpleDateFormat _dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
     
@@ -28,29 +28,31 @@ public class CreateWARCWritableFunction extends BaseFlatMapFunction<ParsedUrl, T
         _publisher = publisher;
     }
     @Override
-    public void flatMap(ParsedUrl parsedUrl, Collector<Tuple2<NullWritable, WARCWritable>> collector)
+    public void flatMap(FetchResultUrl fetchResultUrl, Collector<Tuple2<NullWritable, WARCWritable>> collector)
             throws Exception {
         
         // TODO - fill in the actual warc info here
-        String parsedText = parsedUrl.getParsedText();
+        
+        // TODO - what we want is the warcinfo written out once at the start and then we want to follow that with
+        // a resource record.
         
         StringBuffer content = new StringBuffer();
 
-        content.append(String.format("url: %s\r\n", parsedUrl.getUrl())); // TODO verify if this field is correct 
-        content.append(String.format("hostname: %s\r\n", parsedUrl.getHostname()));
+        content.append(String.format("url: %s\r\n", fetchResultUrl.getUrl())); // TODO verify if this field is correct
+        content.append(String.format("hostname: %s\r\n", fetchResultUrl.getHostname()));
         content.append(String.format("description: %s\r\n", _description));
         if (_publisher != null) {
             content.append(String.format("publisher: %s\r\n", _publisher));
         }
         content.append("format: WARC File Format 1.0\r\n");
         content.append("conformsTo: http://bibnum.bnf.fr/WARC/WARC_ISO_28500_version1_latestdraft.pdf\r\n");
-        // TODO add the parsedContent ?
+        // TODO add the actual fetched content ?
         
         StringBuffer buffer = new StringBuffer();
         buffer.append("WARC/1.0\r\n");
         buffer.append("WARC-Type: warcinfo\r\n");
         buffer.append(String.format("WARC-Date: %s\r\n", _dateFormat.format(new Date())));
-        buffer.append("WARC-Record-ID: <urn:uuid:d9bbb325-c09f-473c-8600-1c9dbd4ec443>\r\n"); // TODO create uuid
+        buffer.append("WARC-Record-ID: <urn:uuid:d9bbb325-c09f-473c-8600-1c9dbd4ec443>\r\n"); // TODO create uuid ?
         buffer.append(String.format("Content-Length: %d\r\n", content.length()));
         buffer.append("Content-Type: application/warc-fields\r\n");
         buffer.append("WARC-Filename: CC-MAIN-20140313024455-00000-ip-10-183-142-35.ec2.internal.warc.gz\r\n"); // TODO where do we get the filename ?
