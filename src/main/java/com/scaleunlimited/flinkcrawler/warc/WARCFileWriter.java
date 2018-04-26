@@ -1,4 +1,4 @@
-package com.scaleunlimited.flinkcrawler.io;
+package com.scaleunlimited.flinkcrawler.warc;
 
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;

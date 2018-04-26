@@ -2,7 +2,7 @@
  * (c) 2014 Martin Kleppmann. MIT License
  */
 
-package com.scaleunlimited.flinkcrawler.io;
+package com.scaleunlimited.flinkcrawler.warc;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataInput;
