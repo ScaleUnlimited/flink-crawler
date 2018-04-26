@@ -35,13 +35,13 @@ public class FetchQueueTest {
 
         CrawlStateUrl url3 = new CrawlStateUrl(new RawUrl("http://domain.com/page3"));
         url3.setScore(0.5f);
-        assertEquals(url3, queue.add(url3));
+        assertTrue(url3 == queue.add(url3));
         
         // Add a higher-scoring URL. We should get back the lowest-scoring URL in the
         // fetch queue.
         CrawlStateUrl url4 = new CrawlStateUrl(new RawUrl("http://domain.com/page4"));
         url4.setScore(2.0f);
-        assertEquals(url1, queue.add(url4));
+        assertSameUrl(url1, queue.add(url4));
 
         // Verify we get URLs from the queue in priority order.
         assertSameUrl(url4, queue.poll());

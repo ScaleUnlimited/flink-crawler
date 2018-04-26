@@ -1,15 +1,18 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import java.net.MalformedURLException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.runtime.checkpoint.OperatorSubtaskState;
 import org.apache.flink.runtime.state.memory.MemoryStateBackend;
-import org.apache.flink.streaming.api.operators.StreamFlatMap;
+import org.apache.flink.streaming.api.operators.ProcessOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
 import org.apache.flink.streaming.util.KeyedOneInputStreamOperatorTestHarness;
 import org.apache.flink.streaming.util.OneInputStreamOperatorTestHarness;
@@ -20,13 +23,12 @@ import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
-import com.scaleunlimited.flinkcrawler.pojos.UrlType;
 import com.scaleunlimited.flinkcrawler.utils.FlinkUtils;
 
 public class DomainDBFunctionTest {
     static final Logger LOGGER = LoggerFactory.getLogger(DomainDBFunctionTest.class);
 
-    private static final int NUM_INPUT_URLS = 100;
+    private static final int NUM_INPUT_URLS = 50;
     private static final int MAX_PARALLELISM = 10;
 
     PldKeySelector<CrawlStateUrl> _pldKeySelector;
@@ -41,7 +43,7 @@ public class DomainDBFunctionTest {
     public void testDemo() throws Throwable {
         KeyedOneInputStreamOperatorTestHarness<String, CrawlStateUrl, CrawlStateUrl> testHarness =
             new KeyedOneInputStreamOperatorTestHarness<String, CrawlStateUrl, CrawlStateUrl>(
-                new StreamFlatMap<>(new DomainDBFunction()),
+                new ProcessOperator<>(new DomainDBFunction()),
                 new PldKeySelector<CrawlStateUrl>(),
                 BasicTypeInfo.STRING_TYPE_INFO,
                 1,
@@ -49,7 +51,7 @@ public class DomainDBFunctionTest {
                 0);
         testHarness.setup();
         testHarness.open();
-
+        
         for (int i = 0; i < 10; i++) {
             String urlString = String.format("https://domain-%d.com/page1", i);
             CrawlStateUrl url = new CrawlStateUrl(new RawUrl(urlString));
@@ -86,25 +88,37 @@ public class DomainDBFunctionTest {
         closeTestHarnesses();
         
         // There should be no overlap and we should have a complete set
-//        assertEquals(   NUM_INPUT_URLS, 
-//                        (outputDomains0.size() + outputDomains1.size()));
-        for (CrawlStateUrl url : outputDomains0) {
-            assertFalse(outputDomains1.contains(url));
-        }
-        for (CrawlStateUrl url : outputDomains1) {
-            assertFalse(outputDomains0.contains(url));
+        checkNoOverlap(outputDomains0, outputDomains1, inputUrls);
+        checkNoOverlap(outputDomains1, outputDomains0, inputUrls);
+        assertTrue(inputUrls.isEmpty());
+    }
+
+    private void checkNoOverlap(List<CrawlStateUrl> outputDomains0,
+                                List<CrawlStateUrl> outputDomains1, 
+                                List<CrawlStateUrl> inputUrls) {
+        for (CrawlStateUrl outputDomain : outputDomains0) {
+            String domainString = outputDomain.getPld();
+            for (CrawlStateUrl otherDomain : outputDomains1) {
+                assertFalse(domainString.equals(otherDomain.getPld()));
+            }
+            for (CrawlStateUrl inputUrl : inputUrls) {
+                String inputDomainString = inputUrl.getPld();
+                if (domainString.equals(inputDomainString)) {
+                    inputUrls.remove(inputUrl);
+                    break;
+                }
+            }
         }
     }
 
     private List<CrawlStateUrl> getOutputDomains(int subTaskIndex) {
-        List<StreamRecord<? extends CrawlStateUrl>> outputStreamRecords =
-            _testHarnesses[subTaskIndex].extractOutputStreamRecords();
+        ConcurrentLinkedQueue<StreamRecord<CrawlStateUrl>> recordQueue =
+            _testHarnesses[subTaskIndex].getSideOutput(DomainDBFunction.DOMAIN_TICKLER_TAG);
         List<CrawlStateUrl> result = new ArrayList<CrawlStateUrl>();
-        for (StreamRecord<? extends CrawlStateUrl> record : outputStreamRecords) {
-            CrawlStateUrl url = record.getValue();
-            if (url.getUrlType() == UrlType.DOMAIN) {
-                result.add(url);
-            }
+        Iterator<StreamRecord<CrawlStateUrl>> iterator = recordQueue.iterator();
+        while (iterator.hasNext()) {
+            CrawlStateUrl url = iterator.next().getValue();
+            result.add(url);
         }
         return result;
     }
@@ -165,13 +179,13 @@ public class DomainDBFunctionTest {
         throws Exception {
         
         OneInputStreamOperatorTestHarness<CrawlStateUrl, CrawlStateUrl> result =
-            new KeyedOneInputStreamOperatorTestHarness<String, CrawlStateUrl, CrawlStateUrl>(
-                    new StreamFlatMap<>(new DomainDBFunction()),
-                    _pldKeySelector,
-                    BasicTypeInfo.STRING_TYPE_INFO,
-                    MAX_PARALLELISM,
-                    parallelism,
-                    subTaskIndex);
+                new KeyedOneInputStreamOperatorTestHarness<String, CrawlStateUrl, CrawlStateUrl>(
+                        new ProcessOperator<>(new DomainDBFunction()),
+                        _pldKeySelector,
+                        BasicTypeInfo.STRING_TYPE_INFO,
+                        MAX_PARALLELISM,
+                        parallelism,
+                        subTaskIndex);
         result.setStateBackend(new MemoryStateBackend());
         result.setup();
         result.open();

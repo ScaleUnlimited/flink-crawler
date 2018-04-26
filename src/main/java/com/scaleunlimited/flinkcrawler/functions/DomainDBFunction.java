@@ -10,11 +10,13 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.metrics.Gauge;
 import org.apache.flink.streaming.api.checkpoint.ListCheckpointed;
 import org.apache.flink.util.Collector;
+import org.apache.flink.util.OutputTag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.metrics.CrawlerMetrics;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
+import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.UrlType;
 
 /**
@@ -28,9 +30,12 @@ import com.scaleunlimited.flinkcrawler.pojos.UrlType;
  *
  */
 @SuppressWarnings("serial")
-public class DomainDBFunction extends BaseFlatMapFunction<CrawlStateUrl, CrawlStateUrl>
+public class DomainDBFunction extends BaseProcessFunction<CrawlStateUrl, CrawlStateUrl>
         implements ListCheckpointed<String> {
     static final Logger LOGGER = LoggerFactory.getLogger(DomainDBFunction.class);
+
+    public static final OutputTag<CrawlStateUrl> DOMAIN_TICKLER_TAG 
+        = new OutputTag<CrawlStateUrl>("domain-tickler"){};
 
     private static int DOMAINS_PER_TICKLE = 100;
 
@@ -67,23 +72,33 @@ public class DomainDBFunction extends BaseFlatMapFunction<CrawlStateUrl, CrawlSt
     }
 
     @Override
-    public void flatMap(CrawlStateUrl url, Collector<CrawlStateUrl> collector) throws Exception {
+    public void processElement(CrawlStateUrl url, Context context, Collector<CrawlStateUrl> collector) throws Exception {
         // Emit the URL we were passed.
         collector.collect(url);
 
-        String domain = url.getPld();
         if (url.getUrlType() == UrlType.REGULAR) {
-            processRegularUrl(domain, collector);
+            processRegularUrl(url.getPld());
         } else if (url.getUrlType() == UrlType.TICKLER) {
             if (LOGGER.isTraceEnabled()) {
-                LOGGER.trace("(partition {} of {}) Processing tickler URL {}...", _partition, _parallelism, url);
+                LOGGER.trace("DomainDBFunction ({}/{}) processing tickler URL {}...", _partition, _parallelism, url);
             }
-            processTicklerUrl(collector);
+            processTicklerUrl(url, context);
         }
     }
 
-    private void processTicklerUrl(Collector<CrawlStateUrl> collector) {
+    private void processTicklerUrl(CrawlStateUrl url, Context context) {
         if (_domains.isEmpty()) {
+            // We still need to emit something, so that the iteration doesn't
+            // terminate. But we don't want to cause fan-out, so emit a tickler
+            // that's the same as what we got, but with a different status, so
+            // that we can tell the difference.
+            if (url.getStatus() == FetchStatus.UNFETCHED) {
+                CrawlStateUrl newUrl = new CrawlStateUrl();
+                newUrl.setFrom(url);
+                newUrl.setStatus(FetchStatus.FETCHED);
+                context.output(DOMAIN_TICKLER_TAG, newUrl);
+            }
+            
             return;
         }
 
@@ -92,13 +107,14 @@ public class DomainDBFunction extends BaseFlatMapFunction<CrawlStateUrl, CrawlSt
         int startingIndex = _domainIndex;
         for (int i = 0; i < DOMAINS_PER_TICKLE; i++) {
             if (LOGGER.isTraceEnabled()) {
-                LOGGER.trace("(partition {} of {}) Emitting domain tickler for index {}", _partition, _parallelism, _domainIndex);
+                LOGGER.trace("DomainDBFunction ({}/{}) emitting domain tickler for '{}'", 
+                        _partition, _parallelism, _urls.get(_domainIndex));
             }
 
-            collector.collect(_urls.get(_domainIndex));
-            _domainIndex += 1;
+            context.output(DOMAIN_TICKLER_TAG, _urls.get(_domainIndex));
 
             // Wrap around
+            _domainIndex += 1;
             if (_domainIndex >= _urls.size()) {
                 _domainIndex = 0;
             }
@@ -110,12 +126,13 @@ public class DomainDBFunction extends BaseFlatMapFunction<CrawlStateUrl, CrawlSt
         }
     }
 
-    private void processRegularUrl(String domain, Collector<CrawlStateUrl> collector) {
+    private void processRegularUrl(String domain) {
         int position = Collections.binarySearch(_domains, domain);
         if (position < 0) {
             try {
                 if (LOGGER.isTraceEnabled()) {
-                    LOGGER.trace("(partition {} of {}) Adding domain '{}' to tickler list", _partition, _parallelism, domain);
+                    LOGGER.trace("DomainDBFunction ({}/{}) adding domain '{}'", 
+                            _partition, _parallelism, domain);
                 }
 
                 CrawlStateUrl url = CrawlStateUrl.makeDomainUrl(domain);
@@ -130,7 +147,6 @@ public class DomainDBFunction extends BaseFlatMapFunction<CrawlStateUrl, CrawlSt
                 LOGGER.trace("(partition {} of {}) Domain '{}' already in tickler list", _partition, _parallelism, domain);
             }
         }
-
     }
 
     @Override
@@ -157,5 +173,6 @@ public class DomainDBFunction extends BaseFlatMapFunction<CrawlStateUrl, CrawlSt
             _urls.add(CrawlStateUrl.makeDomainUrl(domain));
         }
     }
+
 
 }

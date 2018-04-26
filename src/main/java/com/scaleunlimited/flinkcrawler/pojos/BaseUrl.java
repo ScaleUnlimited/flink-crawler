@@ -8,8 +8,8 @@ import com.scaleunlimited.flinkcrawler.utils.FlinkUtils;
 @SuppressWarnings("serial")
 public abstract class BaseUrl implements Serializable {
 
-    private static String TICKLER_URL_FORMAT = "http://flickcrawler-tickler-url-%d.com";
-    private static String TERMINATE_URL_FORMAT = "http://flickcrawler-terminate-url-%d.com";
+    private static String TICKLER_URL_FORMAT = "flickcrawler-tickler-url-%d.com";
+    private static String TERMINATE_URL_FORMAT = "flickcrawler-terminate-url-%d.com";
 
     private String _url;
     private UrlType _urlType;
@@ -95,13 +95,13 @@ public abstract class BaseUrl implements Serializable {
     }
 
     public static BaseUrl makeTicklerUrl(int maxParallelism, int parallelism, int operatorIndex) {
-        return new BaseUrl(FlinkUtils.makeKeyForOperatorIndex(TICKLER_URL_FORMAT, maxParallelism,
+        return new BaseUrl("http://" + FlinkUtils.makeKeyForOperatorIndex(TICKLER_URL_FORMAT, maxParallelism,
                 parallelism, operatorIndex), UrlType.TICKLER) {
         };
     }
 
     public static BaseUrl makeTerminateUrl(int maxParallelism, int parallelism, int operatorIndex) {
-        return new BaseUrl(FlinkUtils.makeKeyForOperatorIndex(TERMINATE_URL_FORMAT, maxParallelism,
+        return new BaseUrl("http://" + FlinkUtils.makeKeyForOperatorIndex(TERMINATE_URL_FORMAT, maxParallelism,
                 parallelism, operatorIndex), UrlType.TERMINATION) {
         };
     }
