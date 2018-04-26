@@ -75,6 +75,9 @@ public class DomainDBFunction extends BaseFlatMapFunction<CrawlStateUrl, CrawlSt
         if (url.getUrlType() == UrlType.REGULAR) {
             processRegularUrl(domain, collector);
         } else if (url.getUrlType() == UrlType.TICKLER) {
+            if (LOGGER.isTraceEnabled()) {
+                LOGGER.trace("(partition {} of {}) Processing tickler URL {}...", _partition, _parallelism, url);
+            }
             processTicklerUrl(collector);
         }
     }
@@ -89,7 +92,7 @@ public class DomainDBFunction extends BaseFlatMapFunction<CrawlStateUrl, CrawlSt
         int startingIndex = _domainIndex;
         for (int i = 0; i < DOMAINS_PER_TICKLE; i++) {
             if (LOGGER.isTraceEnabled()) {
-                LOGGER.trace("Emitting domain tickler for index " + _domainIndex);
+                LOGGER.trace("(partition {} of {}) Emitting domain tickler for index {}", _partition, _parallelism, _domainIndex);
             }
 
             collector.collect(_urls.get(_domainIndex));
@@ -112,7 +115,7 @@ public class DomainDBFunction extends BaseFlatMapFunction<CrawlStateUrl, CrawlSt
         if (position < 0) {
             try {
                 if (LOGGER.isTraceEnabled()) {
-                    LOGGER.trace("Adding domain '{}' to tickler list", domain);
+                    LOGGER.trace("(partition {} of {}) Adding domain '{}' to tickler list", _partition, _parallelism, domain);
                 }
 
                 CrawlStateUrl url = CrawlStateUrl.makeDomainUrl(domain);
@@ -122,20 +125,24 @@ public class DomainDBFunction extends BaseFlatMapFunction<CrawlStateUrl, CrawlSt
             } catch (MalformedURLException e) {
                 LOGGER.error("Got invalid domain name: " + domain);
             }
+        } else {
+            if (LOGGER.isTraceEnabled()) {
+                LOGGER.trace("(partition {} of {}) Domain '{}' already in tickler list", _partition, _parallelism, domain);
+            }
         }
 
     }
 
     @Override
     public List<String> snapshotState(long checkpointId, long timestamp) throws Exception {
-        LOGGER.info("Checkpointing DomainDBFunction (id {} at {})", checkpointId, timestamp);
+        LOGGER.info("(partition {} of {}) Checkpointing DomainDBFunction (id {} at {})", _partition, _parallelism, checkpointId, timestamp);
 
         return _domains;
     }
 
     @Override
     public void restoreState(List<String> state) throws Exception {
-        LOGGER.info("Restoring DomainDBFunction state with {} entries", state.size());
+        LOGGER.info("(partition {} of {}) Restoring DomainDBFunction state with {} entries", _partition, _parallelism, state.size());
 
         _domains.clear();
         _domains.addAll(state);

@@ -104,6 +104,10 @@ public class CrawlStateUrl extends ValidUrl {
         // TODO add more fields to the response.
         if (getUrlType() == UrlType.REGULAR) {
             return String.format("%s (%s at %d)", getUrl(), _status, _statusTime);
+        } else if (getUrlType() == UrlType.DOMAIN) {
+            return String.format("DOMAIN %s", getHostname());
+        } else if (getUrlType() == UrlType.TICKLER) {
+            return String.format("TICKLER %s", getPld());
         } else {
             return String.format("%s", getUrlType());
         }

@@ -194,9 +194,7 @@ public class FlinkUtils {
 
         for (int i = 0; i < maxParallelism * 2; i++) {
             String key = String.format(format, i);
-            int keyGroup = KeyGroupRangeAssignment.assignToKeyGroup(key, maxParallelism);
-            int index = KeyGroupRangeAssignment.computeOperatorIndexForKeyGroup(maxParallelism,
-                    parallelism, keyGroup);
+            int index = getOperatorIndexForKey(key, maxParallelism, parallelism);
             if (index == operatorIndex) {
                 return key;
             }
@@ -205,6 +203,12 @@ public class FlinkUtils {
         throw new RuntimeException(String.format(
                 "Unable to find key for target operator index %d (max parallelism = %d, parallelism = %d",
                 operatorIndex, maxParallelism, parallelism));
+    }
+    
+    public static int getOperatorIndexForKey(String key, int maxParallelism, int parallelism) {
+        int keyGroup = KeyGroupRangeAssignment.assignToKeyGroup(key, maxParallelism);
+        return KeyGroupRangeAssignment.computeOperatorIndexForKeyGroup(maxParallelism,
+                parallelism, keyGroup);
     }
 
 }
