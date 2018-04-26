@@ -121,7 +121,6 @@ public class FocusedCrawlTest {
 
         // Execute for a maximum of 20 seconds.
         ct.execute(20_000);
-
         for (Tuple3<Class<?>, String, Map<String, String>> entry : UrlLogger.getLog()) {
             LOGGER.debug("{}: {}", entry.f0, entry.f1);
         }
