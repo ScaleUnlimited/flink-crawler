@@ -37,29 +37,7 @@ public class DomainDBFunctionTest {
     @Before
     public void setUp() throws Exception {
         _pldKeySelector = new PldKeySelector<CrawlStateUrl>();
-    }
-
-    @Test
-    public void testDemo() throws Throwable {
-        KeyedOneInputStreamOperatorTestHarness<String, CrawlStateUrl, CrawlStateUrl> testHarness =
-            new KeyedOneInputStreamOperatorTestHarness<String, CrawlStateUrl, CrawlStateUrl>(
-                new ProcessOperator<>(new DomainDBFunction()),
-                new PldKeySelector<CrawlStateUrl>(),
-                BasicTypeInfo.STRING_TYPE_INFO,
-                1,
-                1,
-                0);
-        testHarness.setup();
-        testHarness.open();
-        
-        for (int i = 0; i < 10; i++) {
-            String urlString = String.format("https://domain-%d.com/page1", i);
-            CrawlStateUrl url = new CrawlStateUrl(new RawUrl(urlString));
-            testHarness.processElement(new StreamRecord<>(url));
-        }
-        testHarness.snapshot(0L, 0L);
-    }
-        
+    }        
 
     @Test
     public void test() throws Throwable {
