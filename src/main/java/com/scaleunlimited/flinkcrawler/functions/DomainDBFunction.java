@@ -18,6 +18,7 @@ import com.scaleunlimited.flinkcrawler.metrics.CrawlerMetrics;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.UrlType;
+import com.scaleunlimited.flinkcrawler.utils.FlinkUtils;
 
 /**
  * We maintain a set of unique domains that we've seen as our state.
@@ -43,15 +44,21 @@ public class DomainDBFunction extends BaseProcessFunction<CrawlStateUrl, CrawlSt
     private List<String> _domains;
 
     // Unsorted list of domain tickler URLs that we
-    // iterate over.
+    // iterate over, using _domainIndex.
     private List<CrawlStateUrl> _urls;
     private int _domainIndex;
 
+    // HACK!!! When we get a restore state call, we can get domains that should
+    // in the state for other operators. So we'll need to emit those via our
+    // side output, so that they get distributed properly.
+    private List<String> _otherDomains;
+    
     public DomainDBFunction() {
         
         // Note we have to set up our state-related variables here,
         // as open() isn't called before restoreState().
         _domains = new ArrayList<>();
+        _otherDomains = new ArrayList<>();
         _urls = new ArrayList<>();
         _domainIndex = 0;
     }
@@ -77,16 +84,32 @@ public class DomainDBFunction extends BaseProcessFunction<CrawlStateUrl, CrawlSt
         collector.collect(url);
 
         if (url.getUrlType() == UrlType.REGULAR) {
-            processRegularUrl(url.getPld());
+            addDomainIfNew(url.getPld());
         } else if (url.getUrlType() == UrlType.TICKLER) {
             if (LOGGER.isTraceEnabled()) {
-                LOGGER.trace("DomainDBFunction ({}/{}) processing tickler URL {}...", _partition, _parallelism, url);
+                LOGGER.trace("DomainDBFunction ({}/{}) processing tickler URL {}...", _operatorIndex, _parallelism, url);
             }
+            
             processTicklerUrl(url, context);
+        } else if (url.getUrlType() == UrlType.DOMAIN) {
+            // We might get a domain that was in some other operator's state,
+            // which is being re-emitted so we can get it here.
+            addDomainIfNew(url.getPld());
         }
     }
 
-    private void processTicklerUrl(CrawlStateUrl url, Context context) {
+    private void processTicklerUrl(CrawlStateUrl url, Context context) throws MalformedURLException {
+        
+        // First see if we have any stashed domains from state restoration
+        // that we need to recycle.
+        if (!_otherDomains.isEmpty()) {
+            for (String otherDomain : _otherDomains) {
+                context.output(DOMAIN_TICKLER_TAG, CrawlStateUrl.makeDomainUrl(otherDomain));
+            }
+            
+            _otherDomains.clear();
+        }
+        
         if (_domains.isEmpty()) {
             // We still need to emit something, so that the iteration doesn't
             // terminate. But we don't want to cause fan-out, so emit a tickler
@@ -108,7 +131,7 @@ public class DomainDBFunction extends BaseProcessFunction<CrawlStateUrl, CrawlSt
         for (int i = 0; i < DOMAINS_PER_TICKLE; i++) {
             if (LOGGER.isTraceEnabled()) {
                 LOGGER.trace("DomainDBFunction ({}/{}) emitting domain tickler for '{}'", 
-                        _partition, _parallelism, _urls.get(_domainIndex));
+                        _operatorIndex, _parallelism, _urls.get(_domainIndex));
             }
 
             context.output(DOMAIN_TICKLER_TAG, _urls.get(_domainIndex));
@@ -126,13 +149,13 @@ public class DomainDBFunction extends BaseProcessFunction<CrawlStateUrl, CrawlSt
         }
     }
 
-    private void processRegularUrl(String domain) {
+    private void addDomainIfNew(String domain) {
         int position = Collections.binarySearch(_domains, domain);
         if (position < 0) {
             try {
                 if (LOGGER.isTraceEnabled()) {
                     LOGGER.trace("DomainDBFunction ({}/{}) adding domain '{}'", 
-                            _partition, _parallelism, domain);
+                            _operatorIndex, _parallelism, domain);
                 }
 
                 CrawlStateUrl url = CrawlStateUrl.makeDomainUrl(domain);
@@ -144,29 +167,51 @@ public class DomainDBFunction extends BaseProcessFunction<CrawlStateUrl, CrawlSt
             }
         } else {
             if (LOGGER.isTraceEnabled()) {
-                LOGGER.trace("(partition {} of {}) Domain '{}' already in tickler list", _partition, _parallelism, domain);
+                LOGGER.trace("(partition {} of {}) Domain '{}' already in tickler list", _operatorIndex, _parallelism, domain);
             }
         }
     }
 
     @Override
     public List<String> snapshotState(long checkpointId, long timestamp) throws Exception {
-        LOGGER.info("(partition {} of {}) Checkpointing DomainDBFunction (id {} at {})", _partition, _parallelism, checkpointId, timestamp);
+        LOGGER.info("(partition {} of {}) Checkpointing DomainDBFunction (id {} at {})", _operatorIndex, _parallelism, checkpointId, timestamp);
 
+        // FUTURE if we have _otherDomains, add them to _domains?
         return _domains;
     }
 
     @Override
     public void restoreState(List<String> state) throws Exception {
-        LOGGER.info("(partition {} of {}) Restoring DomainDBFunction state with {} entries", _partition, _parallelism, state.size());
+        LOGGER.info("(partition {} of {}) Restoring DomainDBFunction state with {} entries", _operatorIndex, _parallelism, state.size());
 
         _domains.clear();
         _domains.addAll(state);
-
         Collections.sort(_domains);
+        
+        // Verify that every entry belongs to us, as the state we get is randomly distributed (not keyed)
+        // If we get an entry that doesn't belong, then we will want to send that out (iterate on it) so
+        // that it gets added to the other operators. Note that we only have to do this if the parallelism
+        // is > 1.
+        _otherDomains.clear();
+        if (_parallelism > 1) {
+            for (int i = 0; i < _domains.size(); i++) {
+                String domain = _domains.get(i);
+                int operatorIndex = FlinkUtils.getOperatorIndexForKey(domain, _maxParallelism, _parallelism);
+                if (operatorIndex != _operatorIndex - 1) {
+                    _domains.remove(i);
+                    i--;
+                    
+                    // Set up for recycling of domain, so it gets partitioned to the correct operator.
+                    _otherDomains.add(domain);
+                } else if ((i > 0) && _domains.get(i-1).equals(domain)) {
+                    // Sanity check - remove duplicates.
+                    _domains.remove(i);
+                    i--;
+                }
+            }
+        }
+        
         _domainIndex = 0;
-
-        // TODO verify no duplicates?
 
         _urls = new ArrayList<>(_domains.size());
         for (String domain : _domains) {

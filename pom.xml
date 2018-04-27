@@ -725,7 +725,7 @@
                 <version>2.19.1</version>
 
                 <configuration>
-                    <argLine>-Xms1g -Xmx1g -XX:PermSize=1g -XX:MaxPermSize=1g</argLine>
+                    <argLine>-Xms1g -Xmx1g</argLine>
                     <systemProperties>
                         <property>
                             <name>log4j.configuration</name>

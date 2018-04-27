@@ -53,6 +53,16 @@ public class CrawlStateUrl extends ValidUrl {
         }
     }
     
+    // Only so it's a valid POJO.
+    public FetchStatus getPreviousStatus() {
+        return _previousStatus;
+    }
+    
+    // Only so it's a valid POJO.
+    public void setPreviousStatus(FetchStatus previousStatus) {
+        _previousStatus = previousStatus;
+    }
+    
     public void restorePreviousStatus() {
         if (_previousStatus == null) {
             throw new IllegalStateException("No previous status for " + toString());

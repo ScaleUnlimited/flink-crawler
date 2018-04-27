@@ -183,7 +183,7 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
      * (ignore domain URLs).
      */
     private void processTerminationUrl() {
-        LOGGER.info("UrlDBFunction ({}/{}) terminating", _partition, _parallelism);
+        LOGGER.info("UrlDBFunction ({}/{}) terminating", _operatorIndex, _parallelism);
         // TODO flush queue, set flag
     }
 
@@ -225,15 +225,15 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
                 if (rejectedUrl == null) {
                     LOGGER.trace(
                             "UrlDBFunction ({}/{}) added '{}' to fetch queue",
-                            _partition, _parallelism, stateUrl);
+                            _operatorIndex, _parallelism, stateUrl);
                 } else if (rejectedUrl == stateUrl) {
                     LOGGER.trace(
                             "UrlDBFunction ({}/{}) couldn't add '{}' to fetch queue",
-                            _partition, _parallelism, stateUrl);
+                            _operatorIndex, _parallelism, stateUrl);
                 } else {
                     LOGGER.trace(
                             "UrlDBFunction ({}/{}) added '{}' to fetch queue, removing '{}'",
-                            _partition, _parallelism, stateUrl, rejectedUrl);
+                            _operatorIndex, _parallelism, stateUrl, rejectedUrl);
                 }
             }
 
@@ -242,7 +242,7 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
             if (rejectedUrl != stateUrl) {
                 LOGGER.trace(
                         "UrlDBFunction ({}/{}) setting '{}' state status to QUEUED",
-                        _partition, _parallelism, stateUrl);
+                        _operatorIndex, _parallelism, stateUrl);
 
                 stateUrl.setStatus(FetchStatus.QUEUED);
                 _activeUrls.put(urlHash, stateUrl);
@@ -253,7 +253,7 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
                     rejectedUrl.restorePreviousStatus();
                     LOGGER.trace(
                             "UrlDBFunction ({}/{}) restored '{}' to previous status via side output",
-                            _partition, _parallelism, rejectedUrl);
+                            _operatorIndex, _parallelism, rejectedUrl);
 
                     context.output(STATUS_OUTPUT_TAG, rejectedUrl);
                 }
@@ -282,7 +282,7 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
                 if (doTracing) {
                     LOGGER.trace(
                             "UrlDBFunction ({}/{}) skipping emit, too many active URLs ({})",
-                            _partition, _parallelism, activeUrls);
+                            _operatorIndex, _parallelism, activeUrls);
                 }
 
                 return;
@@ -298,7 +298,7 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
                 // and then begin fetching it.
                 LOGGER.trace(
                         "UrlDBFunction ({}/{}) setting '{}' status to FETCHING via side output",
-                        _partition, _parallelism, crawlStateUrl);
+                        _operatorIndex, _parallelism, crawlStateUrl);
 
                 crawlStateUrl.setStatus(FetchStatus.FETCHING);
                 crawlStateUrl.setStatusTime(System.currentTimeMillis());
@@ -326,7 +326,7 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
         if ((newStatus != FetchStatus.UNFETCHED) && (url.getStatusTime() == 0)) {
             throw new RuntimeException(
                     String.format("UrlDBFunction (%d/%d) got URL with invalid status time: %s",
-                            _partition, _parallelism, url));
+                            _operatorIndex, _parallelism, url));
         }
         
         // If it's a URL just pulled from the fetch queue, then we need to emit it
@@ -338,7 +338,7 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
             collector.collect(fetchUrl);
             int nowActive = _numInFlightUrls.incrementAndGet();
             LOGGER.trace("UrlDBFunction ({}/{}) emitted URL '{}' ({} active)",
-                    _partition, _parallelism, fetchUrl, nowActive);
+                    _operatorIndex, _parallelism, fetchUrl, nowActive);
             
             CounterUtils.increment(getRuntimeContext(), FetchStatus.FETCHING);
 
@@ -350,19 +350,19 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
             if (startTime == null) {
                 throw new RuntimeException(
                         String.format("UrlDBFunction (%d/%d) got URL not in active state: %s",
-                                _partition, _parallelism, url));
+                                _operatorIndex, _parallelism, url));
             }
 
             LOGGER.trace("{}ms to process '{}'", System.currentTimeMillis() - startTime, url);
 
             int nowActive = _numInFlightUrls.decrementAndGet();
             LOGGER.trace("UrlDBFunction ({}/{}) receiving URL {} ({} active)",
-                    _partition, _parallelism, url, nowActive);
+                    _operatorIndex, _parallelism, url, nowActive);
 
             if (nowActive < 0) {
                 throw new RuntimeException(
                         String.format("UrlDBFunction (%d/%d) has negative in-flight URLs",
-                                _partition, _parallelism));
+                                _operatorIndex, _parallelism));
             }
         }
 
@@ -372,7 +372,7 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
 
             if (LOGGER.isTraceEnabled()) {
                 LOGGER.trace("UrlDBFunction ({}/{}) ignoring archived URL '{}'",
-                                _partition, _parallelism, url);
+                                _operatorIndex, _parallelism, url);
             }
 
             // If the state is unfetched, we're all good, but if not then that's a logical error
@@ -380,7 +380,7 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
             if (newStatus != FetchStatus.UNFETCHED) {
                 throw new RuntimeException(String.format(
                         "UrlDBFunction (%d/%d) got archived URL %s with active status %s",
-                        _partition, _parallelism, url, newStatus));
+                        _operatorIndex, _parallelism, url, newStatus));
             }
         } else {
             CrawlStateUrl stateUrl = _activeUrls.get(urlHash);
@@ -391,14 +391,14 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
                 if (newStatus != FetchStatus.UNFETCHED) {
                     throw new RuntimeException(String.format(
                             "UrlDBFunction (%d/%d) got new URL '%s' with active status %s",
-                            _partition, _parallelism, url, newStatus));
+                            _operatorIndex, _parallelism, url, newStatus));
                 }
 
                 CounterUtils.increment(getRuntimeContext(), FetchStatus.UNFETCHED);
 
                 if (LOGGER.isTraceEnabled()) {
                     LOGGER.trace("UrlDBFunction ({}/{}) adding new URL '{}' to state",
-                                    _partition, _parallelism, url);
+                                    _operatorIndex, _parallelism, url);
                 }
 
                 // TODO need to copy URL if object reuse enabled?
@@ -414,7 +414,7 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
             } else {
                 if (LOGGER.isTraceEnabled()) {
                     LOGGER.trace("UrlDBFunction ({}/{}) needs to merge incoming URL '{}' with '{}' (hash {})",
-                            _partition, _parallelism, url, stateUrl, urlHash);
+                            _operatorIndex, _parallelism, url, stateUrl, urlHash);
                 }
 
                 FetchStatus oldStatus = stateUrl.getStatus();
@@ -423,7 +423,7 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
 
                     if (LOGGER.isTraceEnabled()) {
                         LOGGER.trace("UrlDBFunction (({}/{}) updated state of URL '{}' (hash {})",
-                                _partition, _parallelism, stateUrl, urlHash);
+                                _operatorIndex, _parallelism, stateUrl, urlHash);
                     }
 
                     CounterUtils.decrement(getRuntimeContext(), oldStatus);

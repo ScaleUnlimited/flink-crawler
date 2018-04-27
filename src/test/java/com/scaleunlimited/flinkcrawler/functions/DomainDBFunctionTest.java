@@ -54,9 +54,6 @@ public class DomainDBFunctionTest {
         closeTestHarnesses();
         _testHarnesses = makeTestHarnesses(2, savedState);
         
-        LOGGER.info("Processing the same input URLs again...");
-        processUrls(inputUrls);
-        
         LOGGER.info("Processing tickler URLs...");
         processTicklerUrls();
         
@@ -68,7 +65,7 @@ public class DomainDBFunctionTest {
         // There should be no overlap and we should have a complete set
         checkNoOverlap(outputDomains0, outputDomains1, inputUrls);
         checkNoOverlap(outputDomains1, outputDomains0, inputUrls);
-        assertTrue(inputUrls.isEmpty());
+        assertTrue("Not every input URL has a matching domain URL", inputUrls.isEmpty());
     }
 
     private void checkNoOverlap(List<CrawlStateUrl> outputDomains0,
