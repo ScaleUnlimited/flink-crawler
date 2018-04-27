@@ -114,8 +114,9 @@ public class CrawlTopology {
         if (isRunning()) {
             LOGGER.error("Stopping async job {} due to timeout", _jobName);
             stop();
-            
-            throw new RuntimeException(String.format("Job '%s' did not terminate in time", _jobName));
+
+            throw new RuntimeException(
+                    String.format("Job '%s' did not terminate in time", _jobName));
         }
     }
 }
