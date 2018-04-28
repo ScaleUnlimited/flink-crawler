@@ -126,8 +126,7 @@ public class CrawlTool {
         builder.build().execute();
     }
 
-    private static BaseUrlLengthener getUrlLengthener(CrawlToolOptions options,
-            UserAgent userAgent) {
+    private static BaseUrlLengthener getUrlLengthener(CrawlToolOptions options, UserAgent userAgent) {
         if (options.isNoLengthen()) {
             return new NoopUrlLengthener();
         }
