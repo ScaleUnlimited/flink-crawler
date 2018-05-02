@@ -1,6 +1,5 @@
 package com.scaleunlimited.flinkcrawler.tools;
 
-import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -15,27 +14,19 @@ import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 
 import com.scaleunlimited.flinkcrawler.fetcher.BaseHttpFetcherBuilder;
-import com.scaleunlimited.flinkcrawler.fetcher.NoopHttpFetcherBuilder;
-import com.scaleunlimited.flinkcrawler.fetcher.SimpleHttpFetcherBuilder;
-import com.scaleunlimited.flinkcrawler.fetcher.commoncrawl.CommonCrawlFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
 import com.scaleunlimited.flinkcrawler.topology.CrawlTopologyBuilder;
 import com.scaleunlimited.flinkcrawler.urls.BaseUrlLengthener;
-import com.scaleunlimited.flinkcrawler.urls.NoopUrlLengthener;
-import com.scaleunlimited.flinkcrawler.urls.SimpleUrlLengthener;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlValidator;
 import com.scaleunlimited.flinkcrawler.urls.SingleDomainUrlValidator;
+import com.scaleunlimited.flinkcrawler.utils.CrawlToolUtils;
 
 import crawlercommons.fetcher.http.UserAgent;
-import crawlercommons.sitemaps.SiteMapParser;
 
 public class CrawlTool {
 
     public static final long DO_NOT_FORCE_CRAWL_DELAY = -1L;
-
-    // As per https://developers.google.com/search/reference/robots_txt
-    private static final int MAX_ROBOTS_TXT_SIZE = 500 * 1024;
 
     private static void printUsageAndExit(CmdLineParser parser) {
         parser.printUsage(System.err);
@@ -93,10 +84,10 @@ public class CrawlTool {
         UserAgent userAgent = (options.isCommonCrawl()
                 ? new UserAgent("unused-common-crawl-user-agent", "", "") : options.getUserAgent());
 
-        BaseUrlLengthener urlLengthener = getUrlLengthener(options, userAgent);
-        BaseHttpFetcherBuilder siteMapFetcherBuilder = getSitemapFetcherBuilder(options, userAgent);
-        BaseHttpFetcherBuilder robotsFetcherBuilder = getRobotsFetcherBuilder(options, userAgent);
-        BaseHttpFetcherBuilder pageFetcherBuilder = getPageFetcherBuilder(options, userAgent);
+        BaseUrlLengthener urlLengthener = CrawlToolUtils.getUrlLengthener(options, userAgent);
+        BaseHttpFetcherBuilder siteMapFetcherBuilder = CrawlToolUtils.getSitemapFetcherBuilder(options, userAgent);
+        BaseHttpFetcherBuilder robotsFetcherBuilder = CrawlToolUtils.getRobotsFetcherBuilder(options, userAgent);
+        BaseHttpFetcherBuilder pageFetcherBuilder = CrawlToolUtils.getPageFetcherBuilder(options, userAgent);
 
         // See if we need to restrict what mime types we download.
         if (options.isHtmlOnly()) {
@@ -125,56 +116,4 @@ public class CrawlTool {
 
         builder.build().execute();
     }
-
-    private static BaseUrlLengthener getUrlLengthener(CrawlToolOptions options, UserAgent userAgent) {
-        if (options.isNoLengthen()) {
-            return new NoopUrlLengthener();
-        }
-
-        int maxConnectionsPerHost = options.getFetchersPerTask();
-        return new SimpleUrlLengthener(userAgent, maxConnectionsPerHost);
-    }
-
-    private static BaseHttpFetcherBuilder getPageFetcherBuilder(CrawlToolOptions options,
-            UserAgent userAgent) throws IOException {
-        if (options.isCommonCrawl()) {
-            return new CommonCrawlFetcherBuilder(options.getFetchersPerTask(), userAgent,
-                    options.getCommonCrawlId(), options.getCommonCrawlCacheDir());
-        }
-
-        return new SimpleHttpFetcherBuilder(options.getFetchersPerTask(), userAgent)
-                .setDefaultMaxContentSize(options.getMaxContentSize());
-    }
-
-    private static BaseHttpFetcherBuilder getSitemapFetcherBuilder(CrawlToolOptions options,
-            UserAgent userAgent) throws IOException {
-        if (options.isCommonCrawl()) {
-            // Common crawl index doesn't have sitemap files.
-            return new NoopHttpFetcherBuilder(userAgent);
-        }
-
-        // By default, give site map fetcher 20% of #threads page fetcher has
-        int maxSimultaneousRequests = Math.max(1, options.getFetchersPerTask() / 5);
-        return new SimpleHttpFetcherBuilder(maxSimultaneousRequests, userAgent)
-                .setDefaultMaxContentSize(SiteMapParser.MAX_BYTES_ALLOWED);
-    }
-
-    private static BaseHttpFetcherBuilder getRobotsFetcherBuilder(CrawlToolOptions options,
-            UserAgent userAgent) throws IOException {
-
-        // Although the static Common Crawl data does have robots.txt files
-        // (in a separate location), there's no index, so it would be ugly to
-        // have to download the whole thing. For now, let's just pretend that
-        // nobody has a robots.txt file by using a fetcher that always returns
-        // a 404.
-        if (options.isCommonCrawl()) {
-            return new NoopHttpFetcherBuilder(userAgent);
-        }
-
-        // By default, give robots fetcher 20% of #threads page fetcher has
-        int maxSimultaneousRequests = Math.max(1, options.getFetchersPerTask() / 5);
-        return new SimpleHttpFetcherBuilder(maxSimultaneousRequests, userAgent)
-                .setDefaultMaxContentSize(MAX_ROBOTS_TXT_SIZE);
-    }
-
 }
