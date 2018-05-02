@@ -31,6 +31,7 @@
         <javac.src.version>1.8</javac.src.version>
         <javac.target.version>1.8</javac.target.version>
         <scala.binary.version>2.11</scala.binary.version>
+		<maven.build.timestamp.format>yyyy-MM-dd HH:mm:ssZ</maven.build.timestamp.format>
     </properties>
 
     <repositories>
@@ -771,6 +772,16 @@
                     </execution>
                 </executions>
             </plugin>
+            
+            <plugin>
+				<groupId>com.googlecode.maven-java-formatter-plugin</groupId>
+				<artifactId>maven-java-formatter-plugin</artifactId>
+				<version>0.4</version>
+				<configuration>
+					<configFile>${project.basedir}/docs/eclipse-formatter.xml</configFile>
+				</configuration>
+            </plugin>
+
         </plugins>
 
     </build>

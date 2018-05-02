@@ -41,7 +41,7 @@ public class CommonCrawlUrls {
         boolean hasPath = !url.getPath().isEmpty();
         boolean hasQuery = url.getQuery() != null;
         boolean hasHash = url.getRef() != null;
-        
+
         if (hasPath) {
             // reversedUrl.append(lowerCaseEncodedChars(url.getPath()));
             reversedUrl.append(normalizePath(url.getPath()));
@@ -64,15 +64,15 @@ public class CommonCrawlUrls {
 
         return reversedUrl.toString();
     }
-    
+
     private static String normalizePath(String path) {
         if (path.equals("/")) {
             return path;
         }
-        
+
         return path.toLowerCase(Locale.ROOT).replaceAll("/$", "");
     }
-    
+
     private static String normalizeQuery(String query) {
         StringBuilder result = new StringBuilder();
         Map<String, String> paramMap = new HashMap<>();
