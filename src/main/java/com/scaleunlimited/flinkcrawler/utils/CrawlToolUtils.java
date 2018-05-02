@@ -19,7 +19,8 @@ public class CrawlToolUtils {
     // As per https://developers.google.com/search/reference/robots_txt
     private static final int MAX_ROBOTS_TXT_SIZE = 500 * 1024;
 
-    public static BaseUrlLengthener getUrlLengthener(CrawlToolOptions options, UserAgent userAgent) {
+    public static BaseUrlLengthener getUrlLengthener(CrawlToolOptions options,
+            UserAgent userAgent) {
         if (options.isNoLengthen()) {
             return new NoopUrlLengthener();
         }
