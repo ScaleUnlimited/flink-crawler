@@ -28,7 +28,6 @@ public class CrawlTool {
 
     public static final long DO_NOT_FORCE_CRAWL_DELAY = -1L;
 
-
     private static void printUsageAndExit(CmdLineParser parser) {
         parser.printUsage(System.err);
         System.exit(-1);
@@ -117,5 +116,4 @@ public class CrawlTool {
 
         builder.build().execute();
     }
-
 }
