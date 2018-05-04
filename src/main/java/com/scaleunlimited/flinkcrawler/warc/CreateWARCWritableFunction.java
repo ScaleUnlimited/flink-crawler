@@ -14,6 +14,7 @@ import org.apache.hadoop.io.NullWritable;
 
 import com.scaleunlimited.flinkcrawler.functions.BaseFlatMapFunction;
 import com.scaleunlimited.flinkcrawler.pojos.FetchResultUrl;
+import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 
 @SuppressWarnings("serial")
 public class CreateWARCWritableFunction
@@ -38,6 +39,10 @@ public class CreateWARCWritableFunction
     @Override
     public void flatMap(FetchResultUrl fetchResultUrl,
             Collector<Tuple2<NullWritable, WARCWritable>> collector) throws Exception {
+
+        if (fetchResultUrl.getStatus() != FetchStatus.FETCHED) {
+            return;
+        }
 
         if (!_warcInfoEmitted) {
             outputWARCInfoRecord(collector);
