@@ -4,11 +4,11 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
 
+import org.apache.flink.api.common.functions.RuntimeContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.config.ParserPolicy;
-import com.scaleunlimited.flinkcrawler.metrics.CrawlerAccumulator;
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchResultUrl;
 
@@ -33,25 +33,14 @@ public class SimpleSiteMapParser extends BasePageParser {
     }
 
     @Override
-    public void open(CrawlerAccumulator crawlerAccumulator) throws Exception {
-        setAccumulator(crawlerAccumulator);
-    }
-
-    @Override
-    public void close() throws Exception {
-    }
-
-    private void init() {
-        if (_siteMapParser == null) {
-            _siteMapParser = new SiteMapParser();
-        }
+    public void open(RuntimeContext context) throws Exception {
+        super.open(context);
+        
+        _siteMapParser = new SiteMapParser();
     }
 
     @Override
     public ParserResult parse(FetchResultUrl fetchedUrl) throws Exception {
-
-        init();
-
         if (LOGGER.isTraceEnabled()) {
             LOGGER.trace("Parsing sitemap '{}'", fetchedUrl.getFetchedUrl());
         }

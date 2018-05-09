@@ -52,7 +52,7 @@ public class CrawlTopologyTest {
 
         // Set up for checkpointing with in-memory state.
         env.setStateBackend(new MemoryStateBackend());
-        env.enableCheckpointing(100L, CheckpointingMode.AT_LEAST_ONCE, true);
+        env.enableCheckpointing(1000L, CheckpointingMode.AT_LEAST_ONCE, true);
 
         SimpleUrlNormalizer normalizer = new SimpleUrlNormalizer();
         SimpleWebGraph graph = new SimpleWebGraph(normalizer)
