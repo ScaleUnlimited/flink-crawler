@@ -8,7 +8,7 @@ public enum CrawlerMetrics {
     GAUGE_URLS_IN_FLIGHT("URLsInFlight"),
     GAUGE_UNIQUE_PLDS("UniquePLDs"),
     COUNTER_PAGES_PARSED("PagesParsed"),
-    COUNTER_PAGES_NOTPARSED("PagesFailedParse");
+    COUNTER_PAGES_FAILEDPARSE("PagesFailedParse");
 
     private String _name;
 

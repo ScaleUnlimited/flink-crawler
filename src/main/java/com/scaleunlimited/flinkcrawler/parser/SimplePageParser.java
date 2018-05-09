@@ -180,7 +180,7 @@ public class SimplePageParser extends BasePageParser {
                 throw e;
             }
         } catch (Exception e) {
-            getAccumulator().increment(CrawlerMetrics.COUNTER_PAGES_NOTPARSED);
+            getAccumulator().increment(CrawlerMetrics.COUNTER_PAGES_FAILEDPARSE);
             throw e;
         } finally {
             IoUtils.safeClose(is);
