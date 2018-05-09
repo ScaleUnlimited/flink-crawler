@@ -256,6 +256,10 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
                             _partition, _parallelism, rejectedUrl);
 
                     context.output(STATUS_OUTPUT_TAG, rejectedUrl);
+                    
+                // Otherwise we just added one URL to the queue (vs. replacing one already there)
+                } else {
+                    CounterUtils.increment(getRuntimeContext(), FetchStatus.QUEUED);
                 }
 
                 // We've successfully added a URL from our domain
@@ -340,8 +344,6 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
             LOGGER.trace("UrlDBFunction ({}/{}) emitted URL '{}' ({} active)",
                     _partition, _parallelism, fetchUrl, nowActive);
             
-            CounterUtils.increment(getRuntimeContext(), FetchStatus.FETCHING);
-
             _inFlightUrls.put(fetchUrl.getUrl(), System.currentTimeMillis());
         
         // Otherwise, if it's the result of the fetch attempt then it's no longer active.

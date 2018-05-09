@@ -50,9 +50,13 @@ public class CrawlTopologyTest {
 
         LocalStreamEnvironmentWithAsyncExecution env = new LocalStreamEnvironmentWithAsyncExecution();
 
-        // Set up for checkpointing with in-memory state.
+        // Set up for checkpointing with in-memory state. Our test runs for several seconds, so using
+        // a 1 second interval for checkpointing is sufficient, and using a lower value (like 100ms)
+        // sometimes causes the test to fail, because checkpointing happens before all operators have
+        // finished deploying, and that in turn causes iterations to not start running properly (or
+        // so the logs seem to indicate).
         env.setStateBackend(new MemoryStateBackend());
-        env.enableCheckpointing(100L, CheckpointingMode.AT_LEAST_ONCE, true);
+        env.enableCheckpointing(1000L, CheckpointingMode.AT_LEAST_ONCE, true);
 
         SimpleUrlNormalizer normalizer = new SimpleUrlNormalizer();
         SimpleWebGraph graph = new SimpleWebGraph(normalizer)
