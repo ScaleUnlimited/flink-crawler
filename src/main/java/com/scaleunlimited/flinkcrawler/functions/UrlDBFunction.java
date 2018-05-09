@@ -16,6 +16,7 @@ import org.apache.flink.metrics.Gauge;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
+import org.apache.flink.streaming.api.functions.co.CoProcessFunction;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.OutputTag;
 import org.slf4j.Logger;
@@ -24,6 +25,7 @@ import org.slf4j.LoggerFactory;
 import com.scaleunlimited.flinkcrawler.metrics.CounterUtils;
 import com.scaleunlimited.flinkcrawler.metrics.CrawlerMetrics;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
+import com.scaleunlimited.flinkcrawler.pojos.DomainScore;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.pojos.UrlType;
@@ -41,7 +43,7 @@ import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
  * to scan every URL.
  */
 @SuppressWarnings("serial")
-public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> implements CheckpointedFunction {
+public class UrlDBFunction extends BaseCoProcessFunction<CrawlStateUrl, DomainScore, FetchUrl> implements CheckpointedFunction {
     static final Logger LOGGER = LoggerFactory.getLogger(UrlDBFunction.class);
 
     public static final OutputTag<CrawlStateUrl> STATUS_OUTPUT_TAG 
@@ -53,7 +55,9 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
     // Number of URLs we'll check (for adding to queue) when we receive a domain
     // tickler
     private static final int MAX_URLS_PER_DOMAIN_TO_CHECK = 1000;
-
+    private static final int AVERAGE_URLS_PER_DOMAIN_TO_CHECK = 100;
+    private static final int URLS_PER_UNKNOWN_DOMAIN_TO_CHECK = 10;
+    
     private BaseUrlStateMerger _merger;
 
     // List of URLs that are available to be fetched.
@@ -69,6 +73,9 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
 
     private transient CrawlStateUrl _mergedUrlState;
 
+    private transient Map<String, Float> _domainScores;
+    private transient float _averageDomainScore;
+    
     // TODO(kkrugler) remove this debugging code.
     private transient Map<String, Long> _inFlightUrls;
 
@@ -142,11 +149,13 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
 
         _fetchQueue.open();
 
+        _domainScores = new HashMap<>();
+        
         _inFlightUrls = new HashMap<>();
     }
 
     @Override
-    public void processElement(CrawlStateUrl url, Context context, Collector<FetchUrl> collector) throws Exception {
+    public void processElement1(CrawlStateUrl url, Context context, Collector<FetchUrl> collector) throws Exception {
         if (url.getUrlType() == UrlType.REGULAR) {
             processRegularUrl(url, collector);
         } else if (url.getUrlType() == UrlType.TICKLER) {
@@ -208,7 +217,7 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
 
         // Start at our current index and loop around, until we've added one, or checked enough
         // of them, or checked all of them.
-        int urlsToCheck = Math.min(numUrls, MAX_URLS_PER_DOMAIN_TO_CHECK);
+        int urlsToCheck = Math.min(numUrls, maxUrlsToCheckForDomain(pld));
         Integer startingIndex = _activeIndex.value();
         if (startingIndex == null) {
             startingIndex = 0;
@@ -266,6 +275,34 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
         // Update index of the URL we should check the next time we get called.
         index = (index + 1) % numUrls;
         _activeIndex.update(index);
+    }
+
+    /**
+     * Given the domain <pld>, return how many URLs we'd want to check for adding to
+     * the fetch queue.
+     * 
+     * @param pld
+     * @return
+     */
+    private int maxUrlsToCheckForDomain(String pld) {
+
+
+        Float averagePageScore = _domainScores.get(pld);
+        if (averagePageScore == null) {
+            LOGGER.debug("UrlDBFunction ({}/{}) no average page scores yet for '{}'", _partition, _parallelism, pld);
+
+            return URLS_PER_UNKNOWN_DOMAIN_TO_CHECK;
+        }
+        
+        // see where this domain's average page score falls, relative to the
+        // overall average page score. Then constrain to range [1...MAX_URLS_PER_DOMAIN_TO_CHECK]
+        float ratio = averagePageScore/_averageDomainScore;
+        int rawUrlsToCheck = Math.round(AVERAGE_URLS_PER_DOMAIN_TO_CHECK * ratio);
+        rawUrlsToCheck = Math.min(rawUrlsToCheck, MAX_URLS_PER_DOMAIN_TO_CHECK);
+        rawUrlsToCheck = Math.max(rawUrlsToCheck, 1);
+        
+        LOGGER.debug("UrlDBFunction ({}/{}) returning {} pages to check for '{}'", _partition, _parallelism, rawUrlsToCheck, pld);
+        return rawUrlsToCheck;
     }
 
     /**
@@ -452,6 +489,27 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
             default:
                 throw new RuntimeException("Unknown merge result: " + result);
         }
+    }
+
+    /* (non-Javadoc)
+     * @see org.apache.flink.streaming.api.functions.co.CoProcessFunction#processElement2(IN2, org.apache.flink.streaming.api.functions.co.CoProcessFunction.Context, org.apache.flink.util.Collector)
+     * 
+     * When we get a domain score, just update our internal state, and never emit anything.
+     */
+    @Override
+    public void processElement2(DomainScore domainScore, Context context, Collector<FetchUrl> out)
+            throws Exception {
+        LOGGER.debug("UrlDBFunction ({}/{}) setting '{}' average score to {}",
+                _partition, _parallelism, domainScore.getPld(), domainScore.getScore());
+
+        float summedScores = _averageDomainScore * _domainScores.size();
+        if (_domainScores.containsKey(domainScore.getPld())) {
+            summedScores -= _domainScores.get(domainScore.getPld());
+        }
+        
+        _domainScores.put(domainScore.getPld(), domainScore.getScore());
+        summedScores += domainScore.getScore();
+        _averageDomainScore = summedScores / _domainScores.size();
     }
 
 

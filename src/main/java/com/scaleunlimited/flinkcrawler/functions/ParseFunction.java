@@ -14,6 +14,7 @@ import com.scaleunlimited.flinkcrawler.metrics.CrawlerAccumulator;
 import com.scaleunlimited.flinkcrawler.parser.BasePageParser;
 import com.scaleunlimited.flinkcrawler.parser.ParserResult;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
+import com.scaleunlimited.flinkcrawler.pojos.DomainScore;
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchResultUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
@@ -27,6 +28,8 @@ public class ParseFunction extends BaseProcessFunction<FetchResultUrl, ParsedUrl
         = new OutputTag<CrawlStateUrl>("status"){};
     public static final OutputTag<ExtractedUrl> OUTLINK_OUTPUT_TAG 
         = new OutputTag<ExtractedUrl>("outlink"){};
+    public static final OutputTag<DomainScore> SCORE_OUTPUT_TAG
+        = new OutputTag<DomainScore>("score"){};
     
     private BasePageParser _parser;
     private int _maxOutlinksPerPage;
@@ -87,6 +90,9 @@ public class ParseFunction extends BaseProcessFunction<FetchResultUrl, ParsedUrl
             LOGGER.debug("Skipping content output of zero-score '{}'", fetchResultUrl);
         }
 
+        // Output score for the page.
+        context.output(SCORE_OUTPUT_TAG, new DomainScore(result.getParsedUrl().getPld(), result.getParsedUrl().getScore()));
+        
         // Since we are limiting the number of outlinks, first sort by score and then limit.
         ExtractedUrl[] extractedUrls = result.getExtractedUrls();
         Arrays.sort(extractedUrls, new Comparator<ExtractedUrl>() {
