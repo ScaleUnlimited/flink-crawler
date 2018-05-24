@@ -81,6 +81,7 @@ public class CreateWARCWritableFunction
         WARCRecord record = new WARCRecord(stream);
         WARCWritable writable = new WARCWritable(record);
         collector.collect(new Tuple2<NullWritable, WARCWritable>(NullWritable.get(), writable));
+        stream.close();
     }
 
     private void outputWARCResourceRecord(Collector<Tuple2<NullWritable, WARCWritable>> collector,
@@ -106,6 +107,6 @@ public class CreateWARCWritableFunction
         WARCRecord record = new WARCRecord(stream);
         WARCWritable writable = new WARCWritable(record);
         collector.collect(new Tuple2<NullWritable, WARCWritable>(NullWritable.get(), writable));
-
+        stream.close();
     }
 }
