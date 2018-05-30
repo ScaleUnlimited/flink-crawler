@@ -24,7 +24,7 @@ public class CreateWARCWritableFunction
 
     private SimpleDateFormat _dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
     private String _userAgentString;
-    private boolean _warcInfoEmitted;
+    private boolean _isWarcInfoEmitted;
 
     public CreateWARCWritableFunction(String userAgentString) {
         _userAgentString = userAgentString;
@@ -33,7 +33,7 @@ public class CreateWARCWritableFunction
     @Override
     public void open(Configuration parameters) throws Exception {
         super.open(parameters);
-        _warcInfoEmitted = false;
+        _isWarcInfoEmitted = false;
     }
 
     @Override
@@ -44,9 +44,9 @@ public class CreateWARCWritableFunction
             return;
         }
 
-        if (!_warcInfoEmitted) {
+        if (!_isWarcInfoEmitted) {
             outputWARCInfoRecord(collector);
-            _warcInfoEmitted = true;
+            _isWarcInfoEmitted = true;
         }
 
         outputWARCResourceRecord(collector, fetchResultUrl);

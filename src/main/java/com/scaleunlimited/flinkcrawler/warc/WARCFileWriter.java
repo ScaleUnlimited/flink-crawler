@@ -16,6 +16,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
+ * Based on code from https://github.com/ept/warc-hadoop 
+ * (c) 2014 Martin Kleppmann. MIT License.
+ * 
  * Writes {@link WARCRecord}s to a WARC file, using Hadoop's filesystem APIs. (This means you can
  * write to HDFS, S3 or any other filesystem supported by Hadoop). This implementation is not tied
  * to the MapReduce APIs -- that link is provided by the mapred
@@ -32,17 +35,17 @@ import org.slf4j.LoggerFactory;
  */
 public class WARCFileWriter {
     private static final Logger logger = LoggerFactory.getLogger(WARCFileWriter.class);
-    public static final long DEFAULT_MAX_SEGMENT_SIZE = 1000000000L; // 1 GB
+    public static final long DEFAULT_MAX_SEGMENT_SIZE = 1_000_000_000L; // 1 GB
 
-    private final Configuration conf;
-    private final CompressionCodec codec;
-    private final Path workOutputPath;
-    private final Progressable progress;
-    private final String extensionFormat;
-    private final long maxSegmentSize;
-    private long segmentsCreated = 0, segmentsAttempted = 0, bytesWritten = 0;
-    private CountingOutputStream byteStream;
-    private DataOutputStream dataStream;
+    private final Configuration _conf;
+    private final CompressionCodec _codec;
+    private final Path _workOutputPath;
+    private final Progressable _progress;
+    private final String _extensionFormat;
+    private final long _maxSegmentSize;
+    private long _segmentsCreated = 0, _segmentsAttempted = 0, _bytesWritten = 0;
+    private CountingOutputStream _byteStream;
+    private DataOutputStream _dataStream;
 
     /**
      * Creates a WARC file, and opens it for writing. If a file with the same name already exists,
@@ -83,13 +86,13 @@ public class WARCFileWriter {
      */
     public WARCFileWriter(Configuration conf, CompressionCodec codec, Path workOutputPath,
             Progressable progress) throws IOException {
-        this.conf = conf;
-        this.codec = codec;
-        this.workOutputPath = workOutputPath;
-        this.progress = progress;
-        this.extensionFormat = ".seg-%05d.attempt-%05d.warc"
+        this._conf = conf;
+        this._codec = codec;
+        this._workOutputPath = workOutputPath;
+        this._progress = progress;
+        this._extensionFormat = ".seg-%05d.attempt-%05d.warc"
                 + (codec == null ? "" : codec.getDefaultExtension());
-        this.maxSegmentSize = conf.getLong("warc.output.segment.size", DEFAULT_MAX_SEGMENT_SIZE);
+        this._maxSegmentSize = conf.getLong("warc.output.segment.size", DEFAULT_MAX_SEGMENT_SIZE);
         createSegment();
     }
 
@@ -121,32 +124,32 @@ public class WARCFileWriter {
      * TODO: Investigate this and find a better solution.
      */
     private void createSegment() throws IOException {
-        segmentsAttempted = 0;
-        bytesWritten = 0;
+        _segmentsAttempted = 0;
+        _bytesWritten = 0;
         boolean success = false;
 
         while (!success) {
-            Path path = workOutputPath
-                    .suffix(String.format(extensionFormat, segmentsCreated, segmentsAttempted));
-            FileSystem fs = path.getFileSystem(conf);
+            Path path = _workOutputPath
+                    .suffix(String.format(_extensionFormat, _segmentsCreated, _segmentsAttempted));
+            FileSystem fs = path.getFileSystem(_conf);
 
             try {
                 // The o.a.h.mapred OutputFormats overwrite existing files, whereas
                 // the o.a.h.mapreduce OutputFormats don't overwrite. Bizarre...
                 // Here, overwrite if progress != null, i.e. if using mapred API.
-                FSDataOutputStream fsStream = (progress == null) ? fs.create(path, false)
-                        : fs.create(path, progress);
-                byteStream = new CountingOutputStream(new BufferedOutputStream(fsStream));
-                dataStream = new DataOutputStream(
-                        codec == null ? byteStream : codec.createOutputStream(byteStream));
-                segmentsCreated++;
+                FSDataOutputStream fsStream = (_progress == null) ? fs.create(path, false)
+                        : fs.create(path, _progress);
+                _byteStream = new CountingOutputStream(new BufferedOutputStream(fsStream));
+                _dataStream = new DataOutputStream(
+                        _codec == null ? _byteStream : _codec.createOutputStream(_byteStream));
+                _segmentsCreated++;
                 logger.info("Writing to output file: {}", path);
                 success = true;
 
             } catch (IOException e) {
                 if (e.getMessage().startsWith("File already exists")) {
                     logger.warn("Tried to create file {} but it already exists; retrying.", path);
-                    segmentsAttempted++; // retry
+                    _segmentsAttempted++; // retry
                 } else {
                     throw e;
                 }
@@ -162,11 +165,11 @@ public class WARCFileWriter {
      * @throws IOException
      */
     public void write(WARCRecord record) throws IOException {
-        if (bytesWritten > maxSegmentSize) {
-            dataStream.close();
+        if (_bytesWritten > _maxSegmentSize) {
+            _dataStream.close();
             createSegment();
         }
-        record.write(dataStream);
+        record.write(_dataStream);
     }
 
     /**
@@ -187,7 +190,7 @@ public class WARCFileWriter {
      * @throws IOException
      */
     public void close() throws IOException {
-        dataStream.close();
+        _dataStream.close();
     }
 
     private class CountingOutputStream extends FilterOutputStream {
@@ -198,13 +201,13 @@ public class WARCFileWriter {
         @Override
         public void write(byte[] b, int off, int len) throws IOException {
             out.write(b, off, len);
-            bytesWritten += len;
+            _bytesWritten += len;
         }
 
         @Override
         public void write(int b) throws IOException {
             out.write(b);
-            bytesWritten++;
+            _bytesWritten++;
         }
 
         // Overriding close() because FilterOutputStream's close() method pre-JDK8 has bad behavior:

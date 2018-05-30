@@ -13,6 +13,9 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
+ * Based on code from https://github.com/ept/warc-hadoop 
+ * (c) 2014 Martin Kleppmann. MIT License.
+ * 
  * Immutable implementation of a record in a WARC file. You create a {@link WARCRecord} by parsing
  * it out of a {@link DataInput} stream.
  *
@@ -40,8 +43,8 @@ public class WARCRecord {
             13, 10
     };
 
-    private final Header header;
-    private final byte[] content;
+    private final Header _header;
+    private final byte[] _content;
 
     /**
      * Creates a new WARCRecord by parsing it out of a {@link DataInput} stream.
@@ -51,9 +54,9 @@ public class WARCRecord {
      * @throws IOException
      */
     public WARCRecord(DataInput in) throws IOException {
-        header = readHeader(in);
-        content = new byte[header.getContentLength()];
-        in.readFully(content);
+        _header = readHeader(in);
+        _content = new byte[_header.getContentLength()];
+        in.readFully(_content);
         readSeparator(in);
     }
 
@@ -116,7 +119,7 @@ public class WARCRecord {
      * Returns the parsed header structure of the WARC record.
      */
     public Header getHeader() {
-        return header;
+        return _header;
     }
 
     /**
@@ -126,7 +129,7 @@ public class WARCRecord {
      * server (HTTP headers followed by the body).
      */
     public byte[] getContent() {
-        return content;
+        return _content;
     }
 
     /**
@@ -139,9 +142,9 @@ public class WARCRecord {
      * @throws IOException
      */
     public void write(DataOutput out) throws IOException {
-        header.write(out);
+        _header.write(out);
         out.write(CRLF_BYTES);
-        out.write(content);
+        out.write(_content);
         out.write(CRLF_BYTES);
         out.write(CRLF_BYTES);
     }
@@ -151,7 +154,7 @@ public class WARCRecord {
      */
     @Override
     public String toString() {
-        return header.toString();
+        return _header.toString();
     }
 
     /**
@@ -164,10 +167,10 @@ public class WARCRecord {
      * the specification for more detail.
      */
     public static class Header {
-        private final Map<String, String> fields;
+        private final Map<String, String> _fields;
 
         private Header(Map<String, String> fields) {
-            this.fields = fields;
+            _fields = fields;
         }
 
         /**
@@ -249,7 +252,7 @@ public class WARCRecord {
          * @return The record's `WARC-Type` header field, as a string.
          */
         public String getRecordType() {
-            return fields.get("WARC-Type");
+            return _fields.get("WARC-Type");
         }
 
         /**
@@ -262,7 +265,7 @@ public class WARCRecord {
          * @return The record's `WARC-Date` header field, as a string.
          */
         public String getDateString() {
-            return fields.get("WARC-Date");
+            return _fields.get("WARC-Date");
         }
 
         /**
@@ -274,7 +277,7 @@ public class WARCRecord {
          * @return The record's `WARC-Record-ID` header field, as a string.
          */
         public String getRecordID() {
-            return fields.get("WARC-Record-ID");
+            return _fields.get("WARC-Record-ID");
         }
 
         /**
@@ -290,7 +293,7 @@ public class WARCRecord {
          * @return The record's `Content-Type` header field, as a string.
          */
         public String getContentType() {
-            return fields.get("Content-Type");
+            return _fields.get("Content-Type");
         }
 
         /**
@@ -305,7 +308,7 @@ public class WARCRecord {
          * @return The record's `WARC-Target-URI` header field, as a string.
          */
         public String getTargetURI() {
-            return fields.get("WARC-Target-URI");
+            return _fields.get("WARC-Target-URI");
         }
 
         /**
@@ -314,7 +317,7 @@ public class WARCRecord {
          * @return The record's `Content-Length` header field, parsed into an int.
          */
         public int getContentLength() {
-            String lengthStr = fields.get("Content-Length");
+            String lengthStr = _fields.get("Content-Length");
             if (lengthStr == null)
                 throw new IllegalStateException("Missing Content-Length header");
             try {
@@ -333,7 +336,7 @@ public class WARCRecord {
          * @return The value associated with that field name, or null if not present.
          */
         public String getField(String field) {
-            return fields.get(field);
+            return _fields.get(field);
         }
 
         /**
@@ -356,7 +359,7 @@ public class WARCRecord {
             StringBuffer buf = new StringBuffer();
             buf.append(WARC_VERSION);
             buf.append(CRLF);
-            for (Map.Entry<String, String> field : fields.entrySet()) {
+            for (Map.Entry<String, String> field : _fields.entrySet()) {
                 buf.append(field.getKey());
                 buf.append(": ");
                 buf.append(field.getValue());
