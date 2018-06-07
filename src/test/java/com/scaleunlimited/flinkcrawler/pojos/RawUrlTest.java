@@ -7,14 +7,12 @@ import org.junit.Test;
 public class RawUrlTest {
 
     @Test
-    public void testTicklerGeneration() {
-        final int maxParallelism = 128;
-        final int parallelism = 3;
+    public void testContructors() {
+        final String urlAsString = "http://domain.com/page";
+        RawUrl url = new RawUrl(urlAsString, 2.0f);
+        assertEquals(2.0f, url.getScore(), 0.001);
         
-        for (int operatorIndex = 0; operatorIndex < parallelism; operatorIndex++) {
-            RawUrl url = RawUrl.makeRawTickerUrl(maxParallelism, parallelism, operatorIndex);
-            System.out.format("%d: %s\n", operatorIndex, url.getUrl());
-            assertFalse(url.isRegular());
-        }
+        RawUrl url2 = new RawUrl(url, 3.0f);
+        assertEquals(urlAsString, url2.getUrl());
     }
 }

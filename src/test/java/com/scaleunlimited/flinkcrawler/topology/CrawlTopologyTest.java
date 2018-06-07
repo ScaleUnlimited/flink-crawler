@@ -7,6 +7,7 @@ import java.util.Map;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.runtime.state.memory.MemoryStateBackend;
 import org.apache.flink.streaming.api.CheckpointingMode;
+import org.apache.flink.streaming.api.TimeCharacteristic;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironmentWithAsyncExecution;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.util.FileUtils;
@@ -57,6 +58,7 @@ public class CrawlTopologyTest {
         // so the logs seem to indicate).
         env.setStateBackend(new MemoryStateBackend());
         env.enableCheckpointing(1000L, CheckpointingMode.AT_LEAST_ONCE, true);
+        env.getCheckpointConfig().setMinPauseBetweenCheckpoints(20_000L);
 
         SimpleUrlNormalizer normalizer = new SimpleUrlNormalizer();
         SimpleWebGraph graph = new SimpleWebGraph(normalizer)
@@ -96,7 +98,8 @@ public class CrawlTopologyTest {
             FileUtils.deleteFileOrDirectory(contentTextFile);
         }
 
-        final long maxQuietTime = 2_000L;
+        final long maxQuietTime = 4_000L;
+        final long iterationTimeout = 4_000L;
         SeedUrlSource seedUrlSource = new SeedUrlSource(1.0f, "http://domain1.com");
         seedUrlSource.setTerminator(new NoActivityCrawlTerminator(maxQuietTime));
         
@@ -106,7 +109,7 @@ public class CrawlTopologyTest {
                 
                 // Set a timeout that is safe during our test, given max latency with checkpointing
                 // during a run.
-                .setIterationTimeout(2000L)
+                .setIterationTimeout(iterationTimeout)
                 
                 .setUrlSource(seedUrlSource)
                 .setUrlLengthener(new SimpleUrlLengthener(

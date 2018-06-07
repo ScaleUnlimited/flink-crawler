@@ -16,6 +16,8 @@ import org.apache.flink.metrics.Gauge;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
+import org.apache.flink.streaming.api.functions.ProcessFunction;
+import org.apache.flink.streaming.api.functions.KeyedProcessFunction.OnTimerContext;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.OutputTag;
 import org.slf4j.Logger;
@@ -26,16 +28,14 @@ import com.scaleunlimited.flinkcrawler.metrics.CrawlerMetrics;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
-import com.scaleunlimited.flinkcrawler.pojos.UrlType;
 import com.scaleunlimited.flinkcrawler.urldb.BaseUrlStateMerger;
 import com.scaleunlimited.flinkcrawler.urldb.BaseUrlStateMerger.MergeResult;
 import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
 
 /**
  * The Flink operator that managed the URL portion of the "crawl DB". Incoming URLs are merged in memory, 
- * using MapState with key == URL hash, value = CrawlStateUrl. Whenever we get a "tickler" URL, we emit 
- * URLs from the fetch queue (if available). Whenever we get a "domain" URL, we add URLs for that domain 
- * to the fetch queue.
+ * using a map with key == URL hash, value = CrawlStateUrl. Whenever our timer fires, we emit 
+ * URLs from the fetch queue (if available).
  * 
  * The use of the fetch queue lets us apply some heuristics to fetching the "best" (approximately) URLs, without having
  * to scan every URL.
@@ -44,15 +44,12 @@ import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
 public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> implements CheckpointedFunction {
     static final Logger LOGGER = LoggerFactory.getLogger(UrlDBFunction.class);
 
+    // When we have to update the status of a URL in the fetch queue (because we're either fetching it, or it's
+    // getting booted by a better URL) we output it via this side channel.
     public static final OutputTag<CrawlStateUrl> STATUS_OUTPUT_TAG 
         = new OutputTag<CrawlStateUrl>("status"){};
 
-    private static final int URLS_PER_TICKLE = 10;
-    private static final int MAX_IN_FLIGHT_URLS = URLS_PER_TICKLE * 10;
-
-    // Number of URLs we'll check (for adding to queue) when we receive a domain
-    // tickler
-    private static final int MAX_URLS_PER_DOMAIN_TO_CHECK = 1000;
+    private static final int MAX_IN_FLIGHT_URLS = 100;
 
     private BaseUrlStateMerger _merger;
 
@@ -79,7 +76,7 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
 
     @Override
     public void initializeState(FunctionInitializationContext context) throws Exception {
-        // Create three keyed/managed states
+        // Create our keyed/managed states
 
         // 1. Active URLs: MapState (key = url hash, value = CrawlStateUrl)
         MapStateDescriptor<Long, CrawlStateUrl> urlStateDescriptor = new MapStateDescriptor<>(
@@ -146,21 +143,42 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
     }
 
     @Override
-    public void processElement(CrawlStateUrl url, Context context, Collector<FetchUrl> collector) throws Exception {
+    public void processElement(CrawlStateUrl url, Context ctx, Collector<FetchUrl> collector) throws Exception {
+        record(this.getClass(), url, FetchStatus.class.getSimpleName(), url.getStatus().toString());
+
+        // See if we have this domain already. If not, create a timer.
+        long processingTime = ctx.timerService().currentProcessingTime();
+        String pld = url.getPld();
+        
+        Integer numUrls = _numActiveUrls.value();
+        if (numUrls == null) {
+            // TODO create entries for this domain
+            
+            // And we want to create a timer, so we have one per domain
+            ctx.timerService().registerProcessingTimeTimer(processingTime + 50);
+        } else {
+            // We need to update state for this URL
+        }
+
         if (url.getUrlType() == UrlType.REGULAR) {
             processRegularUrl(url, collector);
         } else if (url.getUrlType() == UrlType.TICKLER) {
             processTicklerUrl(context, collector);
         } else if (url.getUrlType() == UrlType.DOMAIN) {
             processDomainUrl(url.getPld(), context, collector);
-        } else if (url.getUrlType() == UrlType.TERMINATION) {
-            processTerminationUrl();
-        } else {
-            throw new RuntimeException(String.format("Unknown URL type '%s' for '%s'",
-                    url.getUrlType(), url.getUrl()));
         }
     }
 
+    @Override
+    public void onTimer(long timestamp, OnTimerContext ctx, Collector<FetchUrl> out) throws Exception {
+        super.onTimer(timestamp, ctx, out);
+        
+        // See if we've got a URL that we want to add to the fetch queue.
+        if (!_terminator.isStopTime()) {
+            ctx.timerService().registerProcessingTimeTimer(timestamp + 50);
+        }
+    }
+    
     @Override
     public void snapshotState(FunctionSnapshotContext context) throws Exception {
         // Nothing special we need to do here, since we have keyed state that gets
@@ -169,22 +187,12 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
 
     @Override
     public void close() throws Exception {
-
         long curTime = System.currentTimeMillis();
         for (String url : _inFlightUrls.keySet()) {
             LOGGER.debug("{}\t{}", curTime - _inFlightUrls.get(url), url);
         }
 
         super.close();
-    }
-
-    /**
-     * We got a "termination" URL, which tells us to drain our fetch queue, and not add any more URLs to this queue
-     * (ignore domain URLs).
-     */
-    private void processTerminationUrl() {
-        LOGGER.info("UrlDBFunction ({}/{}) terminating", _partition, _parallelism);
-        // TODO flush queue, set flag
     }
 
     /**
@@ -197,7 +205,7 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
     private void processDomainUrl(String pld, Context context, Collector<FetchUrl> collector) throws Exception {
         final boolean doTracing = LOGGER.isTraceEnabled();
         if (doTracing) {
-            LOGGER.trace("Got domain URL for '{}'", pld);
+            LOGGER.trace("UrlDBFunction ({}/{}) got domain tickler URL for '{}'", _partition, _parallelism, pld);
         }
 
         Integer numUrls = _numActiveUrls.value();
@@ -279,6 +287,9 @@ public class UrlDBFunction extends BaseProcessFunction<CrawlStateUrl, FetchUrl> 
      */
     private void processTicklerUrl(Context context, Collector<FetchUrl> collector) {
         final boolean doTracing = LOGGER.isTraceEnabled();
+        if (doTracing) {
+            LOGGER.trace("UrlDBFunction ({}/{}) got tickler URL", _partition, _parallelism);
+        }
 
         for (int i = 0; i < URLS_PER_TICKLE; i++) {
             int activeUrls = _numInFlightUrls.get();

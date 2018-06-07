@@ -74,7 +74,7 @@ public class FocusedCrawlTest {
             FileUtils.deleteFileOrDirectory(contentTextFile);
         }
 
-        final long maxQuietTime = 2_000L;
+        final long maxQuietTime = 4_000L;
         SeedUrlSource seedUrlSource = new SeedUrlSource(1.0f, "http://domain1.com");
         seedUrlSource.setTerminator(new NoActivityCrawlTerminator(maxQuietTime));
         
@@ -82,8 +82,7 @@ public class FocusedCrawlTest {
                 // Explicitly set parallelism so that it doesn't vary based on # of cores
                 .setParallelism(2)
                 
-                // Set a timeout that is safe during our test, given max latency with checkpointing
-                // during a run.
+                // Set a timeout that is safe during our test.
                 .setIterationTimeout(2000L)
                 
                 .setUrlSource(seedUrlSource)
