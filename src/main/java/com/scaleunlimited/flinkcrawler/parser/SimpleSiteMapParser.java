@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.config.ParserPolicy;
+import com.scaleunlimited.flinkcrawler.focused.AllEqualPageScorer;
 import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchResultUrl;
 
@@ -29,13 +30,13 @@ public class SimpleSiteMapParser extends BasePageParser {
     }
 
     public SimpleSiteMapParser(ParserPolicy policy) {
-        super(policy);
+        super(policy, new AllEqualPageScorer());
     }
 
     @Override
     public void open(RuntimeContext context) throws Exception {
         super.open(context);
-        
+
         _siteMapParser = new SiteMapParser();
     }
 
