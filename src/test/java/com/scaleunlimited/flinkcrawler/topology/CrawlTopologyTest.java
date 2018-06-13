@@ -155,11 +155,9 @@ public class CrawlTopologyTest {
 
         LocalStreamEnvironmentWithAsyncExecution env = new LocalStreamEnvironmentWithAsyncExecution();
 
-        // Set up for checkpointing with in-memory state. Our test runs for several seconds, so
-        // using
+        // Set up for checkpointing with in-memory state. Our test runs for several seconds, so using
         // a 1 second interval for checkpointing is sufficient, and using a lower value (like 100ms)
-        // sometimes causes the test to fail, because checkpointing happens before all operators
-        // have
+        // sometimes causes the test to fail, because checkpointing happens before all operators have
         // finished deploying, and that in turn causes iterations to not start running properly (or
         // so the logs seem to indicate).
         env.setStateBackend(new MemoryStateBackend());
@@ -178,18 +176,18 @@ public class CrawlTopologyTest {
 
         Map<String, String> robotPages = new HashMap<String, String>();
         // Block one page, and set no crawl delay.
-        robotPages.put(normalizer.normalize("http://domain1.com/robots.txt"), "User-agent: *"
-                + CRLF + "Disallow: /blocked" + CRLF + "Crawl-delay: 0" + CRLF);
+        robotPages.put(normalizer.normalize("http://domain1.com/robots.txt"),
+                "User-agent: *" + CRLF + "Disallow: /blocked" + CRLF + "Crawl-delay: 0" + CRLF);
 
         // Set a long crawl delay.
-        robotPages.put("http://domain3.com:80/robots.txt", "User-agent: *" + CRLF
-                + "Crawl-delay: 30" + CRLF);
-        robotPages.put(normalizer.normalize("http://domain3.com/robots.txt"), "User-agent: *"
-                + CRLF + "Crawl-delay: 30" + CRLF);
+        robotPages.put("http://domain3.com:80/robots.txt",
+                "User-agent: *" + CRLF + "Crawl-delay: 30" + CRLF);
+        robotPages.put(normalizer.normalize("http://domain3.com/robots.txt"),
+                "User-agent: *" + CRLF + "Crawl-delay: 30" + CRLF);
 
         // And one with a sitemap
-        robotPages.put(normalizer.normalize("http://domain4.com:80/robots.txt"), "User-agent: *"
-                + CRLF + "sitemap : http://domain4.com/sitemap.txt");
+        robotPages.put(normalizer.normalize("http://domain4.com:80/robots.txt"),
+                "User-agent: *" + CRLF + "sitemap : http://domain4.com/sitemap.txt");
 
         // We've got a single URL that needs to get lengthened by our mock lengthener
         Map<String, String> redirections = new HashMap<String, String>();
