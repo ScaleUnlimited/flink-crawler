@@ -54,8 +54,7 @@ public abstract class BasePageParser implements Serializable {
     /**
      * Extract encoding from content-type
      * 
-     * If a charset is returned, then it's a valid/normalized charset name that's supported on this
-     * platform.
+     * If a charset is returned, then it's a valid/normalized charset name that's supported on this platform.
      * 
      * @param datum
      * @return charset in response headers, or null
