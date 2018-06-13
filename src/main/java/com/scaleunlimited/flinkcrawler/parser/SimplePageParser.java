@@ -8,6 +8,7 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.flink.api.common.functions.RuntimeContext;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.parser.AutoDetectParser;
 import org.apache.tika.parser.ParseContext;
@@ -18,7 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.config.ParserPolicy;
-import com.scaleunlimited.flinkcrawler.metrics.CrawlerAccumulator;
+import com.scaleunlimited.flinkcrawler.metrics.CrawlerMetrics;
 import com.scaleunlimited.flinkcrawler.pojos.FetchResultUrl;
 import com.scaleunlimited.flinkcrawler.utils.IoUtils;
 
@@ -124,23 +125,12 @@ public class SimplePageParser extends BasePageParser {
     }
 
     @Override
-    public void open(CrawlerAccumulator crawlerAccumulator) throws Exception {
-        setAccumulator(crawlerAccumulator);
-    }
-
-    @Override
-    public void close() throws Exception {
-    }
-
-    protected synchronized void init() {
-        if (_parser == null) {
-            _parser = new AutoDetectParser();
-        }
-
-        _contentExtractor.reset();
+    public void open(RuntimeContext context) throws Exception {
+        super.open(context);
+        
+        _parser = new AutoDetectParser();
         _linkExtractor.setLinkTags(getParserPolicy().getLinkTags());
         _linkExtractor.setLinkAttributeTypes(getParserPolicy().getLinkAttributeTypes());
-        _linkExtractor.reset();
     }
 
     public void setExtractLanguage(boolean extractLanguage) {
@@ -153,8 +143,6 @@ public class SimplePageParser extends BasePageParser {
 
     @Override
     public ParserResult parse(FetchResultUrl fetchedUrl) throws Exception {
-        init();
-
         if (LOGGER.isTraceEnabled()) {
             LOGGER.trace("Parsing '{}'", fetchedUrl.getFetchedUrl());
         }
@@ -173,26 +161,27 @@ public class SimplePageParser extends BasePageParser {
             URL baseUrl = getContentLocation(fetchedUrl);
             metadata.add(Metadata.CONTENT_LOCATION, baseUrl.toExternalForm());
 
+            _contentExtractor.reset();
+            _linkExtractor.reset();
+
             Callable<ParserResult> c = new TikaCallable(_parser, _contentExtractor, _linkExtractor,
                     is, metadata, isExtractLanguage(), _parseContext);
             FutureTask<ParserResult> task = new FutureTask<ParserResult>(c);
             Thread t = new Thread(task);
             t.start();
 
-            ParserResult result;
             try {
-                result = task.get(getParserPolicy().getMaxParseDuration(), TimeUnit.MILLISECONDS);
+                ParserResult result = task.get(getParserPolicy().getMaxParseDuration(), TimeUnit.MILLISECONDS);
+                getAccumulator().increment(CrawlerMetrics.COUNTER_PAGES_PARSED);
+                return result;
             } catch (TimeoutException e) {
                 task.cancel(true);
                 t.interrupt();
                 throw e;
-            } finally {
-                t = null;
             }
-
-            // result.setHostAddress(fetchedUrl.getHostAddress());
-            // result.setPayload(fetchedUrl.getPayload());
-            return result;
+        } catch (Exception e) {
+            getAccumulator().increment(CrawlerMetrics.COUNTER_PAGES_FAILEDPARSE);
+            throw e;
         } finally {
             IoUtils.safeClose(is);
         }
