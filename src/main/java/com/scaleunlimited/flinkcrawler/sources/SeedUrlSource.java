@@ -112,6 +112,8 @@ public class SeedUrlSource extends BaseUrlSource {
     public void open(Configuration parameters) throws Exception {
         super.open(parameters);
 
+        LOGGER.info("Opening seed URL source");
+
         if (_terminator == null) {
             throw new IllegalStateException("Crawl terminator must be set for the seed URL source");
         }
@@ -131,17 +133,23 @@ public class SeedUrlSource extends BaseUrlSource {
 
     @Override
     public void close() throws Exception {
+        LOGGER.info("Closing seed URL source");
+        
         IOUtils.closeQuietly(_s3FileStream);
         super.close();
     }
 
     @Override
     public void cancel() {
+        LOGGER.info("Cancelling seed URL source");
+        
         _keepRunning = false;
     }
 
     @Override
     public void run(SourceContext<RawUrl> context) throws Exception {
+        LOGGER.info("Running seed URL source");
+
         _keepRunning = true;
 
         BufferedReader s3FileReader = null;
@@ -150,7 +158,6 @@ public class SeedUrlSource extends BaseUrlSource {
         }
 
         while (_keepRunning && !_terminator.isTerminated()) {
-            
             RawUrl url = null;
             if (useS3File()) {
                 String sourceLine = s3FileReader.readLine();

@@ -20,6 +20,7 @@ public class NoActivityCrawlTerminator extends CrawlTerminator {
     public void open() {
         super.open();
         
+        LOGGER.debug("Resetting UrlLogger activity time");
         UrlLogger.resetActivityTime();
     }
     
@@ -29,7 +30,7 @@ public class NoActivityCrawlTerminator extends CrawlTerminator {
         if (lastActivityTime != UrlLogger.NO_ACTIVITY_TIME) {
             long curTime = System.currentTimeMillis();
             if ((curTime - lastActivityTime) > _maxQuietTimeMS) {
-                LOGGER.info("Terminating seed URL source due to lack of activity");
+                LOGGER.info("Terminating due to lack of activity");
                 return true;
             }
         }
