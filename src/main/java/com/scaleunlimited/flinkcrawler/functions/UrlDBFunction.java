@@ -203,7 +203,8 @@ public class UrlDBFunction extends BaseKeyedProcessFunction<String, CrawlStateUr
     }
 
     /**
-     * We got a "domain" URL, which triggers adding a URL for that domain to the fetch queue.
+     * See if have a URL (for the current key/PLD) in our state that should be 
+     * added to the fetch queue.
      * 
      * @param pld
      * @param collector
@@ -214,6 +215,10 @@ public class UrlDBFunction extends BaseKeyedProcessFunction<String, CrawlStateUr
 
         Integer numUrls = _numActiveUrls.value();
         if (numUrls == null) {
+            // Since we never archive URLs currently, the number of active URLs for
+            // the current (keyed) PLD will always be at least 1. And by "active"
+            // I mean not archived; this doesn't have anything to do with in-flight
+            // or fetching or queued or any other state.
             LOGGER.error("Houston, we have a problem - null active URL count for domain");
             return;
         }
