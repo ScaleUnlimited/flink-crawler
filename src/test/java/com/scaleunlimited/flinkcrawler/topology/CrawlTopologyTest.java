@@ -86,9 +86,8 @@ public class CrawlTopologyTest {
             FileUtils.deleteFileOrDirectory(contentTextFile);
         }
 
+        final long iterationTimeout = 10_000L;
         final long maxQuietTime = 2_000L;
-        SeedUrlSource seedUrlSource = new SeedUrlSource(1.0f, "http://domain1.com");
-        seedUrlSource.setTerminator(new NoActivityCrawlTerminator(maxQuietTime));
 
         CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
                 // Explicitly set parallelism so that it doesn't vary based on # of cores
@@ -96,9 +95,10 @@ public class CrawlTopologyTest {
 
                 // Set a timeout that is safe during our test, given max latency with checkpointing
                 // during a run.
-                .setIterationTimeout(2000L)
-
-                .setUrlSource(seedUrlSource)
+                .setIterationTimeout(iterationTimeout)
+                .setCrawlTerminator(new NoActivityCrawlTerminator(maxQuietTime))
+                
+                .setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
                 .setUrlLengthener(
                         new SimpleUrlLengthener(
                                 new MockUrlLengthenerFetcher.MockUrlLengthenerFetcherBuilder(
@@ -162,6 +162,7 @@ public class CrawlTopologyTest {
         // so the logs seem to indicate).
         env.setStateBackend(new MemoryStateBackend());
         env.enableCheckpointing(1000L, CheckpointingMode.AT_LEAST_ONCE, true);
+        env.getCheckpointConfig().setMinPauseBetweenCheckpoints(20_000L);
 
         SimpleUrlNormalizer normalizer = new SimpleUrlNormalizer();
         SimpleWebGraph graph = new SimpleWebGraph(normalizer)
@@ -201,9 +202,8 @@ public class CrawlTopologyTest {
             FileUtils.deleteFileOrDirectory(contentTextFile);
         }
 
+        final long iterationTimeout = 4_000L;
         final long maxQuietTime = 2_000L;
-        SeedUrlSource seedUrlSource = new SeedUrlSource(1.0f, "http://domain1.com");
-        seedUrlSource.setTerminator(new NoActivityCrawlTerminator(maxQuietTime));
 
         CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
                 // Explicitly set parallelism so that it doesn't vary based on # of cores
@@ -211,9 +211,9 @@ public class CrawlTopologyTest {
 
                 // Set a timeout that is safe during our test, given max latency with checkpointing
                 // during a run.
-                .setIterationTimeout(2000L)
-
-                .setUrlSource(seedUrlSource)
+                .setIterationTimeout(iterationTimeout)
+                .setCrawlTerminator(new NoActivityCrawlTerminator(maxQuietTime))
+                .setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
                 .setUrlLengthener(
                         new SimpleUrlLengthener(
                                 new MockUrlLengthenerFetcher.MockUrlLengthenerFetcherBuilder(
