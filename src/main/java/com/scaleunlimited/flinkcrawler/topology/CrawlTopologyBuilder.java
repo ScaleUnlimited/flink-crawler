@@ -22,6 +22,7 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 
+import com.scaleunlimited.flinkcrawler.config.CrawlTerminator;
 import com.scaleunlimited.flinkcrawler.fetcher.BaseHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.fetcher.SimpleHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.functions.CheckUrlWithRobotsFunction;
@@ -79,7 +80,8 @@ public class CrawlTopologyBuilder {
     private long _defaultCrawlDelay = 10_000L;
     private long _iterationTimeout = MAX_ITERATION_TIMEOUT;
     
-    private SeedUrlSource _urlSource = new SeedUrlSource(makeDefaultSeedUrl());;
+    private SeedUrlSource _urlSource = new SeedUrlSource(makeDefaultSeedUrl());
+    private CrawlTerminator _terminator = new NullTerminator();
     private FetchQueue _fetchQueue = new FetchQueue(10_000);
 
     private BaseHttpFetcherBuilder _robotsFetcherBuilder = new SimpleHttpFetcherBuilder(1,
@@ -124,6 +126,11 @@ public class CrawlTopologyBuilder {
         return this;
     }
 
+    public CrawlTopologyBuilder setCrawlTerminator(CrawlTerminator terminator) {
+        _terminator = terminator;
+        return this;
+    }
+    
     public CrawlTopologyBuilder setUrlLengthener(BaseUrlLengthener lengthener) {
         _urlLengthener = lengthener;
         return this;
@@ -251,6 +258,7 @@ public class CrawlTopologyBuilder {
                 Collections.unmodifiableList(new ArrayList<>()).getClass(),
                 UnmodifiableCollectionsSerializer.class);
 
+        _urlSource.setTerminator(_terminator);
         DataStream<RawUrl> seedUrls = _env.addSource(_urlSource)
                 .name("Seed urls source");
 
@@ -259,7 +267,7 @@ public class CrawlTopologyBuilder {
         
         SingleOutputStreamOperator<FetchUrl> postUrlDbUrls = urlDbIteration
                 .keyBy(new PldKeySelector<CrawlStateUrl>())
-                .process(new UrlDBFunction(new DefaultUrlStateMerger(), _fetchQueue))
+                .process(new UrlDBFunction(_terminator, new DefaultUrlStateMerger(), _fetchQueue))
                 .name("UrlDBFunction");
 
         DataStream<FetchUrl> preRobotsUrls = postUrlDbUrls
@@ -445,6 +453,16 @@ public class CrawlTopologyBuilder {
         } catch (MalformedURLException e) {
             throw new RuntimeException("URL should parse just fine?");
         }
+    }
+
+    @SuppressWarnings("serial")
+    private static class NullTerminator extends CrawlTerminator {
+
+        @Override
+        public boolean isTerminated() {
+            return false;
+        }
+        
     }
 
 }

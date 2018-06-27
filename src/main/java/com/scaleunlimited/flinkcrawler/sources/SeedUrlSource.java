@@ -30,7 +30,7 @@ import com.scaleunlimited.flinkcrawler.utils.S3Utils;
 public class SeedUrlSource extends BaseUrlSource {
     static final Logger LOGGER = LoggerFactory.getLogger(SeedUrlSource.class);
 
-    private CrawlTerminator _terminator = new NullTerminator();
+    private CrawlTerminator _terminator;
     private float _estimatedScore;
 
     // For when we're reading from S3
@@ -112,6 +112,10 @@ public class SeedUrlSource extends BaseUrlSource {
     public void open(Configuration parameters) throws Exception {
         super.open(parameters);
 
+        if (_terminator == null) {
+            throw new IllegalStateException("Crawl terminator must be set for the seed URL source");
+        }
+        
         // Open the terminator, so that it knows when we really started running.
         _terminator.open();
         
@@ -172,6 +176,8 @@ public class SeedUrlSource extends BaseUrlSource {
             }
         }
 
+        LOGGER.info("Terminating seed URL source");
+
         if (s3FileReader != null) {
             s3FileReader.close();
         }
@@ -190,13 +196,5 @@ public class SeedUrlSource extends BaseUrlSource {
         return new RawUrl(seedUrl, _estimatedScore);
     }
     
-    private static class NullTerminator extends CrawlTerminator {
-
-        @Override
-        public boolean isTerminated() {
-            return false;
-        }
-        
-    }
 
 }

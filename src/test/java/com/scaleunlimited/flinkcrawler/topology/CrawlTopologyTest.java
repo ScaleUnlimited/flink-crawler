@@ -7,7 +7,6 @@ import java.util.Map;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.runtime.state.memory.MemoryStateBackend;
 import org.apache.flink.streaming.api.CheckpointingMode;
-import org.apache.flink.streaming.api.TimeCharacteristic;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironmentWithAsyncExecution;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.util.FileUtils;
@@ -100,8 +99,6 @@ public class CrawlTopologyTest {
 
         final long maxQuietTime = 4_000L;
         final long iterationTimeout = 4_000L;
-        SeedUrlSource seedUrlSource = new SeedUrlSource(1.0f, "http://domain1.com");
-        seedUrlSource.setTerminator(new NoActivityCrawlTerminator(maxQuietTime));
         
         CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
                 // Explicitly set parallelism so that it doesn't vary based on # of cores
@@ -111,7 +108,10 @@ public class CrawlTopologyTest {
                 // during a run.
                 .setIterationTimeout(iterationTimeout)
                 
-                .setUrlSource(seedUrlSource)
+                // Set a terminator that will bail when there's been no activity
+                .setCrawlTerminator(new NoActivityCrawlTerminator(maxQuietTime))
+                
+                .setUrlSource(new SeedUrlSource(1.0f, "http://domain1.com"))
                 .setUrlLengthener(new SimpleUrlLengthener(
                         new MockUrlLengthenerFetcher.MockUrlLengthenerFetcherBuilder(
                                 new MockUrlLengthenerFetcher(redirections))))

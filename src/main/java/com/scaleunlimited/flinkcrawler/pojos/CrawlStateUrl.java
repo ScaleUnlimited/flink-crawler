@@ -51,6 +51,14 @@ public class CrawlStateUrl extends ValidUrl {
         }
     }
     
+    public FetchStatus getPreviousStatus() {
+        return _previousStatus;
+    }
+    
+    public void setPreviousStatus(FetchStatus previousStatus) {
+        _previousStatus = previousStatus;
+    }
+    
     public void restorePreviousStatus() {
         if (_previousStatus == null) {
             throw new IllegalStateException("No previous status for " + toString());
