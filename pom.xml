@@ -48,12 +48,6 @@
         </repository>
 
         <repository>
-            <id>crawler-commons</id>
-            <name>Sonatype release candidate for crawler-commons 0.10</name>
-            <url>https://oss.sonatype.org/content/repositories/comgithubcrawler-commons-1006/</url>
-        </repository>
-
-        <repository>
             <id>otto-bintray</id>
             <url>https://dl.bintray.com/ottogroup/maven</url>
         </repository>
