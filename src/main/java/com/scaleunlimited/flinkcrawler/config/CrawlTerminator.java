@@ -6,7 +6,6 @@ import java.io.Serializable;
 public abstract class CrawlTerminator implements Serializable {
 
     public void open() {
-        
     }
     
     public abstract boolean isTerminated();

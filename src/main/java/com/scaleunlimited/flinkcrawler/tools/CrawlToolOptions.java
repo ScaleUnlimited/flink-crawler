@@ -23,7 +23,9 @@ public class CrawlToolOptions {
     private boolean _noLengthen = false;
     private String _checkpointDir = null;
     private int _maxOutlinksPerPage = SimpleLinkExtractor.DEFAULT_MAX_EXTRACTED_LINKS_SIZE;
-
+    private int _maxCrawlDurationSec = Integer.MAX_VALUE;
+    private int _iterationTimeoutSec = 60 * 10;
+    
     private String _cacheDir;
     private String _commonCrawlId = null;
 
@@ -124,6 +126,16 @@ public class CrawlToolOptions {
         _maxOutlinksPerPage = maxOutlinksPerPage;
     }
 
+    @Option(name = "-maxduration", usage = "maximum crawl duration in seconds", required = false)
+    public void setMaxCrawlDuration(int maxCrawlDurationSec) {
+        _maxCrawlDurationSec = maxCrawlDurationSec;
+    }
+
+    @Option(name = "-timeout", usage = "max idle time before termination in seconds", required = false)
+    public void setTimeout(int iterationTimeoutSec) {
+        _iterationTimeoutSec = iterationTimeoutSec;
+    }
+
     public void validate() {
         if (_commonCrawlId == null) {
             if (_userAgent == null) {
@@ -218,5 +230,13 @@ public class CrawlToolOptions {
 
     public int getMaxOutlinksPerPage() {
         return _maxOutlinksPerPage;
+    }
+    
+    public int getMaxCrawlDurationSec() {
+        return _maxCrawlDurationSec;
+    }
+    
+    public int getIterationTimeoutSec() {
+        return _iterationTimeoutSec;
     }
 }

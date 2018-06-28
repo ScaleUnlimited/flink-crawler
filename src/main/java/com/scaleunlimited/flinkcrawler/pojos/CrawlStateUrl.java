@@ -1,7 +1,5 @@
 package com.scaleunlimited.flinkcrawler.pojos;
 
-import java.net.MalformedURLException;
-
 import com.scaleunlimited.flinkcrawler.utils.HashUtils;
 
 /**
@@ -53,12 +51,10 @@ public class CrawlStateUrl extends ValidUrl {
         }
     }
     
-    // Only so it's a valid POJO.
     public FetchStatus getPreviousStatus() {
         return _previousStatus;
     }
     
-    // Only so it's a valid POJO.
     public void setPreviousStatus(FetchStatus previousStatus) {
         _previousStatus = previousStatus;
     }
@@ -114,15 +110,7 @@ public class CrawlStateUrl extends ValidUrl {
     @Override
     public String toString() {
         // TODO add more fields to the response.
-        if (getUrlType() == UrlType.REGULAR) {
-            return String.format("%s (%s at %d)", getUrl(), _status, _statusTime);
-        } else if (getUrlType() == UrlType.DOMAIN) {
-            return String.format("%s (%s)", getUrl(), getUrlType());
-        } else if (getUrlType() == UrlType.TICKLER) {
-            return String.format("%s (%s)", getPld(), getUrlType());
-        } else {
-            return String.format("%s", getUrlType());
-        }
+        return String.format("%s (%s at %d)", getUrl(), _status, _statusTime);
     }
 
     @Override
@@ -157,24 +145,6 @@ public class CrawlStateUrl extends ValidUrl {
         if (_statusTime != other._statusTime)
             return false;
         return true;
-    }
-
-    public static CrawlStateUrl makeTicklerUrl(int maxParallelism, int parallelism,
-            int operatorIndex) {
-        return new CrawlStateUrl(ValidUrl.makeTickerUrl(maxParallelism, parallelism, operatorIndex),
-                FetchStatus.UNFETCHED, System.currentTimeMillis());
-    }
-
-    public static CrawlStateUrl makeDomainUrl(String domain) throws MalformedURLException {
-        return new CrawlStateUrl(ValidUrl.makeDomainUrl(domain), FetchStatus.UNFETCHED,
-                System.currentTimeMillis());
-    }
-
-    public static CrawlStateUrl makeTerminateUrl(int maxParallelism, int parallelism,
-            int operatorIndex) {
-        return new CrawlStateUrl(
-                ValidUrl.makeTerminateUrl(maxParallelism, parallelism, operatorIndex),
-                FetchStatus.UNFETCHED, System.currentTimeMillis());
     }
 
 }
