@@ -23,10 +23,6 @@ import com.scaleunlimited.flinkcrawler.utils.S3Utils;
 /**
  * Source for seed URLs.
  * 
- * Generate special CrawlStateUrl values (ticklers) that keep the iteration running, until we're stopped. When that
- * happens, generate termination CrawStateUrls that tell the workflow to flush the fetch queue and not fill it any
- * longer.
- * 
  * TODO add checkpointing - see FromElementsFunction.java
  *
  */
@@ -34,12 +30,8 @@ import com.scaleunlimited.flinkcrawler.utils.S3Utils;
 public class SeedUrlSource extends BaseUrlSource {
     static final Logger LOGGER = LoggerFactory.getLogger(SeedUrlSource.class);
 
-    // Time between tickler URLs.
-    public static final long TICKLER_INTERVAL = 100L;
-    
-    private CrawlTerminator _terminator = new NullTerminator();
+    private CrawlTerminator _terminator;
     private float _estimatedScore;
-    private int _parallelism = -1;
 
     // For when we're reading from S3
     private String _seedUrlsS3Bucket;
@@ -52,7 +44,6 @@ public class SeedUrlSource extends BaseUrlSource {
 
     private transient InputStream _s3FileStream;
     private transient int _seedUrlIndex;
-    private transient RawUrl[] _ticklers;
 
     /**
      * Note that we re-order parameters so this doesn't get confused with the constructor that takes a variable length
@@ -111,10 +102,6 @@ public class SeedUrlSource extends BaseUrlSource {
         _urls = rawUrls;
     }
 
-    public void setParallelism(int parallelism) {
-        _parallelism = parallelism;
-    }
-    
     public CrawlTerminator setTerminator(CrawlTerminator terminator) {
         CrawlTerminator oldTerminator = _terminator;
         _terminator = terminator;
@@ -123,21 +110,18 @@ public class SeedUrlSource extends BaseUrlSource {
     
     @Override
     public void open(Configuration parameters) throws Exception {
-        if (_parallelism == -1) {
-            throw new IllegalStateException("Parallelism must be explicitly set");
-        }
-        
         super.open(parameters);
 
+        LOGGER.info("Opening seed URL source");
+
+        if (_terminator == null) {
+            throw new IllegalStateException("Crawl terminator must be set for the seed URL source");
+        }
+        
         // Open the terminator, so that it knows when we really started running.
         _terminator.open();
         
         _seedUrlIndex = 0;
-
-        _ticklers = new RawUrl[_parallelism];
-        for (int i = 0; i < _parallelism; i++) {
-            _ticklers[i] = RawUrl.makeRawTickerUrl(getMaxParallelism(), _parallelism, i);
-        }
 
         if (useS3File()) {
             AmazonS3 s3Client = S3Utils.makeS3Client();
@@ -149,17 +133,23 @@ public class SeedUrlSource extends BaseUrlSource {
 
     @Override
     public void close() throws Exception {
+        LOGGER.info("Closing seed URL source");
+        
         IOUtils.closeQuietly(_s3FileStream);
         super.close();
     }
 
     @Override
     public void cancel() {
+        LOGGER.info("Cancelling seed URL source");
+        
         _keepRunning = false;
     }
 
     @Override
     public void run(SourceContext<RawUrl> context) throws Exception {
+        LOGGER.info("Running seed URL source");
+
         _keepRunning = true;
 
         BufferedReader s3FileReader = null;
@@ -167,34 +157,24 @@ public class SeedUrlSource extends BaseUrlSource {
             s3FileReader = new BufferedReader(new InputStreamReader(_s3FileStream));
         }
 
-        long nextTickleTime = 0;
         while (_keepRunning && !_terminator.isTerminated()) {
-            
+            RawUrl url = null;
             if (useS3File()) {
                 String sourceLine = s3FileReader.readLine();
                 if (sourceLine == null) {
                     break;
                 }
                 
-                RawUrl url = parseSourceLine(sourceLine);
-                
-                if (url != null) {
-                    collectUrl(url, context);
-                }
+                url = parseSourceLine(sourceLine);
             } else if (_seedUrlIndex < _urls.length) {
-                collectUrl(_urls[_seedUrlIndex++], context);
+                url = _urls[_seedUrlIndex++];
             }
 
-            // Now see if it's time to emit tickler URLs.
-            long curTime = System.currentTimeMillis();
-            if (curTime >= nextTickleTime) {
-                for (RawUrl tickler : _ticklers) {
-                    collectUrl(tickler, context);
-                }
-
-                nextTickleTime = curTime + TICKLER_INTERVAL;
+            if (url != null) {
+                LOGGER.debug("Emitting '{}'", url);
+                context.collect(url);
             }
-
+            
             try {
                 // Sleep so we can be interrupted
                 Thread.sleep(10L);
@@ -203,26 +183,11 @@ public class SeedUrlSource extends BaseUrlSource {
             }
         }
 
+        LOGGER.info("Terminating seed URL source");
+
         if (s3FileReader != null) {
             s3FileReader.close();
         }
-
-        // TODO(kkrugler) - generate termination URLs, then wait for the configured
-        // amount of time before we actually return, and thus really end.
-    }
-
-    private void collectUrl(RawUrl url, SourceContext<RawUrl> context) {
-        if (url.isRegular()) {
-            if (LOGGER.isDebugEnabled()) {
-                LOGGER.debug("Emitting '{}'", url);
-            }
-        } else {
-            if (LOGGER.isTraceEnabled()) {
-                LOGGER.trace("Emitting '{}'", url);
-            }
-        }
-
-        context.collect(url);
     }
 
     private boolean useS3File() {
@@ -238,13 +203,5 @@ public class SeedUrlSource extends BaseUrlSource {
         return new RawUrl(seedUrl, _estimatedScore);
     }
     
-    private static class NullTerminator extends CrawlTerminator {
-
-        @Override
-        public boolean isTerminated() {
-            return false;
-        }
-        
-    }
 
 }

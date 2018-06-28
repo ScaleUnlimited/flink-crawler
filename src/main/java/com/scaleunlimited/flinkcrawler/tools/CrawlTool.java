@@ -13,6 +13,7 @@ import org.apache.tika.parser.html.HtmlParser;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
 
+import com.scaleunlimited.flinkcrawler.config.DurationCrawlTerminator;
 import com.scaleunlimited.flinkcrawler.fetcher.BaseHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.pojos.RawUrl;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
@@ -99,15 +100,18 @@ public class CrawlTool {
             pageFetcherBuilder.setValidMimeTypes(validMimeTypes);
         }
 
-        CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env).setUserAgent(userAgent)
+        CrawlTopologyBuilder builder = new CrawlTopologyBuilder(env)
+                .setUserAgent(userAgent)
                 .setUrlLengthener(urlLengthener)
                 .setUrlSource(new SeedUrlSource(options.getSeedUrlsFilename(), RawUrl.DEFAULT_SCORE))
+                .setCrawlTerminator(new DurationCrawlTerminator(options.getMaxCrawlDurationSec()))
                 .setRobotsFetcherBuilder(robotsFetcherBuilder).setUrlFilter(urlValidator)
                 .setSiteMapFetcherBuilder(siteMapFetcherBuilder)
                 .setPageFetcherBuilder(pageFetcherBuilder)
                 .setForceCrawlDelay(options.getForceCrawlDelay())
                 .setDefaultCrawlDelay(options.getDefaultCrawlDelay())
                 .setParallelism(options.getParallelism())
+                .setIterationTimeout(options.getIterationTimeoutSec() * 1000L)
                 .setMaxOutlinksPerPage(options.getMaxOutlinksPerPage());
 
         if (options.getOutputFile() != null) {
