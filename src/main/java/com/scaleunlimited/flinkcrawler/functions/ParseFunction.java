@@ -3,14 +3,12 @@ package com.scaleunlimited.flinkcrawler.functions;
 import java.util.Arrays;
 import java.util.Comparator;
 
-import org.apache.flink.api.common.functions.RuntimeContext;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.Collector;
 import org.apache.flink.util.OutputTag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.scaleunlimited.flinkcrawler.metrics.CrawlerAccumulator;
 import com.scaleunlimited.flinkcrawler.parser.BasePageParser;
 import com.scaleunlimited.flinkcrawler.parser.ParserResult;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
@@ -42,10 +40,17 @@ public class ParseFunction extends BaseProcessFunction<FetchResultUrl, ParsedUrl
     @Override
     public void open(Configuration parameters) throws Exception {
         super.open(parameters);
-        RuntimeContext context = getRuntimeContext();
-        _parser.open(new CrawlerAccumulator(context));
+        
+        _parser.open(getRuntimeContext());
     }
 
+    @Override
+    public void close() throws Exception {
+        _parser.close();
+        
+        super.close();
+    }
+    
     @Override
     public void processElement( FetchResultUrl fetchResultUrl,
                                 Context context,

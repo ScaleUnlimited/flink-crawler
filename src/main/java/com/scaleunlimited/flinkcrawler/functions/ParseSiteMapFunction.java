@@ -1,5 +1,6 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,8 +12,7 @@ import com.scaleunlimited.flinkcrawler.pojos.FetchResultUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 
 @SuppressWarnings("serial")
-public class ParseSiteMapFunction
-        extends BaseFlatMapFunction<FetchResultUrl, ExtractedUrl> {
+public class ParseSiteMapFunction extends BaseFlatMapFunction<FetchResultUrl, ExtractedUrl> {
 
     static final Logger LOGGER = LoggerFactory.getLogger(ParseSiteMapFunction.class);
 
@@ -22,6 +22,13 @@ public class ParseSiteMapFunction
         _siteMapParser = siteMapParser;
     }
 
+    @Override
+    public void open(Configuration parameters) throws Exception {
+        super.open(parameters);
+        
+        _siteMapParser.open(getRuntimeContext());
+    }
+    
     @Override
     public void flatMap(FetchResultUrl fetchedUrl,
             Collector<ExtractedUrl> collector) throws Exception {

@@ -25,10 +25,10 @@ import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.flink.streaming.api.windowing.assigners.GlobalWindows;
 import org.apache.flink.streaming.api.windowing.triggers.CountTrigger;
 
+import com.scaleunlimited.flinkcrawler.config.CrawlTerminator;
 import com.scaleunlimited.flinkcrawler.fetcher.BaseHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.fetcher.SimpleHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.functions.CheckUrlWithRobotsFunction;
-import com.scaleunlimited.flinkcrawler.functions.DomainDBFunction;
 import com.scaleunlimited.flinkcrawler.functions.DomainScoreKeySelector;
 import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.LengthenUrlsFunction;
@@ -86,7 +86,8 @@ public class CrawlTopologyBuilder {
     private long _defaultCrawlDelay = 10_000L;
     private long _iterationTimeout = MAX_ITERATION_TIMEOUT;
     
-    private SeedUrlSource _urlSource = new SeedUrlSource(makeDefaultSeedUrl());;
+    private SeedUrlSource _urlSource = new SeedUrlSource(makeDefaultSeedUrl());
+    private CrawlTerminator _terminator = new NullTerminator();
     private FetchQueue _fetchQueue = new FetchQueue(10_000);
 
     private BaseHttpFetcherBuilder _robotsFetcherBuilder = new SimpleHttpFetcherBuilder(1,
@@ -131,6 +132,11 @@ public class CrawlTopologyBuilder {
         return this;
     }
 
+    public CrawlTopologyBuilder setCrawlTerminator(CrawlTerminator terminator) {
+        _terminator = terminator;
+        return this;
+    }
+    
     public CrawlTopologyBuilder setUrlLengthener(BaseUrlLengthener lengthener) {
         _urlLengthener = lengthener;
         return this;
@@ -258,51 +264,23 @@ public class CrawlTopologyBuilder {
                 Collections.unmodifiableList(new ArrayList<>()).getClass(),
                 UnmodifiableCollectionsSerializer.class);
 
-        // Make sure the tickler parallelism is set for the urlSource
-        _urlSource.setParallelism(getRealParallelism());
-        SplitStream<RawUrl> seedUrls = _env.addSource(_urlSource)
-                .name("Seed urls source")
-                .split(new OutputSelector<RawUrl>() {
+        _urlSource.setTerminator(_terminator);
+        DataStream<RawUrl> seedUrls = _env.addSource(_urlSource)
+                .name("Seed urls source");
 
-                    private final List<String> REGULAR_URLS = Arrays.asList("regular");
-                    private final List<String> SPECIAL_URLS = Arrays.asList("special");
-
-                    @Override
-                    public Iterable<String> select(RawUrl url) {
-                        return url.isRegular() ? REGULAR_URLS : SPECIAL_URLS;
-                    }
-                });
-
-        // Clean up the regular URLs, and then re-combine (union) with the special
-        // URLs that don't need cleaning.
-        DataStream<CrawlStateUrl> cleanedUrls = cleanUrls(seedUrls.select("regular"))
-                .union(seedUrls.select("special")
-                        .map(new MapFunction<RawUrl, CrawlStateUrl>() {
-
-                    @Override
-                    public CrawlStateUrl map(RawUrl url) throws Exception {
-                        return new CrawlStateUrl(url);
-                    }
-                }));
-
-        // Update the URL DB, then run URLs it emits through robots filtering.
-        IterativeStream<CrawlStateUrl> urlDbIteration = cleanedUrls
+        IterativeStream<CrawlStateUrl> urlDbIteration = cleanUrls(seedUrls)
                 .iterate(_iterationTimeout);
-        SingleOutputStreamOperator<CrawlStateUrl> postDomainDbUrls = urlDbIteration
-                .keyBy(new PldKeySelector<CrawlStateUrl>())
-                .process(new DomainDBFunction())
-                .name("DomainDBFunction");
-                
+
         // Create an empty domain score stream that we'll close with a stream of 
         // average domain scores calculated lower down.
         IterativeStream<DomainScore> domainScoresIter = _env.fromCollection(new ArrayList<DomainScore>(), ListTypeInfo.of(DomainScore.class))
                 .name("Domain scores")
                 .iterate(_iterationTimeout);
         
-        SingleOutputStreamOperator<FetchUrl> postUrlDbUrls = postDomainDbUrls
+        SingleOutputStreamOperator<FetchUrl> postUrlDbUrls = urlDbIteration
                 .connect(domainScoresIter)
                 .keyBy(new PldKeySelector<CrawlStateUrl>(), new DomainScoreKeySelector())
-                .process(new UrlDBFunction(new DefaultUrlStateMerger(), _fetchQueue))
+                .process(new UrlDBFunction(_terminator, new DefaultUrlStateMerger(), _fetchQueue))
                 .name("UrlDBFunction");
 
         DataStream<FetchUrl> preRobotsUrls = postUrlDbUrls
@@ -359,18 +337,13 @@ public class CrawlTopologyBuilder {
                 // robots fetch/check task.
                 .rebalance();
 
-        DataStream<FetchResultUrl> sitemapUrls =
+        DataStream<RawUrl> newSiteMapExtractedUrls =
                 // TODO get capacity from fetcher builder.
                 AsyncDataStream.unorderedWait(sitemapUrlsToFetch,
                         new FetchUrlsFunction(_siteMapFetcherBuilder),
                         _siteMapFetcherBuilder.getFetchDurationTimeoutInSeconds() * 2,
                         TimeUnit.SECONDS, 10000)
-                .name("FetchUrlsFunction for sitemap");
-
-        // Run the failed urls into a custom function to log it and then to a DiscardingSink.
-        // FUTURE - flag as sitemap and emit as any other url from the robots code; but this would require us to payload
-        // the flag through
-        DataStream<RawUrl> newSiteMapExtractedUrls = sitemapUrls
+                .name("FetchUrlsFunction for sitemap")
                 .flatMap(new ParseSiteMapFunction(_siteMapParser))
                 .name("ParseSiteMapFunction")
                 .map(new OutlinkToStateUrlFunction())
@@ -437,10 +410,9 @@ public class CrawlTopologyBuilder {
 
         // We need to merge robotBlockedUrls with the "queued status" stream from putting URLs onto the
         // fetch queue and the "status" stream from the fetch attempts and all of the new URLs from outlinks and sitemaps.
-        DataStream<CrawlStateUrl> domainTicklerUrls = postDomainDbUrls.getSideOutput(DomainDBFunction.DOMAIN_TICKLER_TAG);
         DataStream<CrawlStateUrl> queuedStatusUrls = postUrlDbUrls.getSideOutput(UrlDBFunction.STATUS_OUTPUT_TAG);
         DataStream<CrawlStateUrl> fetchStatusUrls = parsedUrls.getSideOutput(ParseFunction.STATUS_OUTPUT_TAG);
-        urlDbIteration.closeWith(robotBlockedUrls.union(domainTicklerUrls, queuedStatusUrls, fetchStatusUrls, newUrls));
+        urlDbIteration.closeWith(robotBlockedUrls.union(queuedStatusUrls, fetchStatusUrls, newUrls));
 
         // Save off parsed page content by passing it on to the provided content sink function.
        parsedUrls
@@ -503,6 +475,16 @@ public class CrawlTopologyBuilder {
         } catch (MalformedURLException e) {
             throw new RuntimeException("URL should parse just fine?");
         }
+    }
+
+    @SuppressWarnings("serial")
+    private static class NullTerminator extends CrawlTerminator {
+
+        @Override
+        public boolean isTerminated() {
+            return false;
+        }
+        
     }
 
 }

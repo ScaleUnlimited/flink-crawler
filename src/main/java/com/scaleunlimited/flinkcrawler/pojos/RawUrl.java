@@ -36,17 +36,4 @@ public class RawUrl extends BaseUrl {
     public void setScore(float score) {
         _score = score;
     }
-
-    @Override
-    public String toString() {
-        if (isRegular()) {
-            return getUrl();
-        } else {
-            return String.format("%s (%s)", getUrl(), getUrlType());
-        }
-    }
-
-    public static RawUrl makeRawTickerUrl(int maxParallelism, int parallelism, int operatorIndex) {
-        return new RawUrl(BaseUrl.makeTicklerUrl(maxParallelism, parallelism, operatorIndex), 0.0f);
-    }
 }

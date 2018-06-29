@@ -36,10 +36,4 @@ public class ValidUrlTest {
         assertEquals("fi.com", url.getPld());
     }
 
-    @Test
-    public void testSettingUrlType() throws Exception {
-        ValidUrl url = new ValidUrl("http://domain.com");
-        assertEquals(UrlType.REGULAR, url.getUrlType());
-    }
-
 }

@@ -168,19 +168,4 @@ public class ValidUrl extends BaseUrl {
             return result;
         }
     }
-
-    public static ValidUrl makeTickerUrl(int maxParallelism, int parallelism, int operatorIndex) {
-        return new ValidUrl(BaseUrl.makeTicklerUrl(maxParallelism, parallelism, operatorIndex));
-    }
-
-    public static ValidUrl makeDomainUrl(String domain) throws MalformedURLException {
-        ValidUrl result = new ValidUrl("http://" + domain);
-        result.setUrlType(UrlType.DOMAIN);
-        return result;
-    }
-
-    public static ValidUrl makeTerminateUrl(int maxParallelism, int parallelism,
-            int operatorIndex) {
-        return new ValidUrl(BaseUrl.makeTerminateUrl(maxParallelism, parallelism, operatorIndex));
-    }
 }

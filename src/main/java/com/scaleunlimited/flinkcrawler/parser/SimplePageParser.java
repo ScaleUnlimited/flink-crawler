@@ -8,6 +8,7 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.apache.flink.api.common.functions.RuntimeContext;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.parser.AutoDetectParser;
 import org.apache.tika.parser.ParseContext;
@@ -18,7 +19,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.config.ParserPolicy;
-import com.scaleunlimited.flinkcrawler.metrics.CrawlerAccumulator;
+import com.scaleunlimited.flinkcrawler.focused.AllEqualPageScorer;
+import com.scaleunlimited.flinkcrawler.focused.BasePageScorer;
+import com.scaleunlimited.flinkcrawler.metrics.CrawlerMetrics;
+import com.scaleunlimited.flinkcrawler.pojos.ExtractedUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchResultUrl;
 import com.scaleunlimited.flinkcrawler.utils.IoUtils;
 
@@ -34,11 +38,12 @@ public class SimplePageParser extends BasePageParser {
     private transient Parser _parser;
 
     public SimplePageParser() {
-        this(new ParserPolicy());
+        this(new ParserPolicy(), new AllEqualPageScorer());
     }
 
-    public SimplePageParser(ParserPolicy parserPolicy) {
-        this(new SimpleContentExtractor(), new SimpleLinkExtractor(), parserPolicy, null);
+    public SimplePageParser(ParserPolicy parserPolicy, BasePageScorer pageScorer) {
+        this(new SimpleContentExtractor(), new SimpleLinkExtractor(), parserPolicy, null,
+                pageScorer);
     }
 
     /**
@@ -48,47 +53,54 @@ public class SimplePageParser extends BasePageParser {
      *            to use instead of new {@link SimpleLinkExtractor}()
      * @param parserPolicy
      *            to customize operation of the parser <BR>
-     *            <BR>
-     *            <B>Note:</B> There is no need to construct your own {@link SimpleLinkExtractor} simply to control the
-     *            set of link tags and attributes it processes. Instead, use {@link ParserPolicy#setLinkTags} and
-     *            {@link ParserPolicy#setLinkAttributeTypes}, and then pass this policy to
-     *            {@link SimplePageParser#SimpleParser(ParserPolicy)}.
+     * <BR>
+     *            <B>Note:</B> There is no need to construct your own {@link SimpleLinkExtractor}
+     *            simply to control the set of link tags and attributes it processes. Instead, use
+     *            {@link ParserPolicy#setLinkTags} and {@link ParserPolicy#setLinkAttributeTypes},
+     *            and then pass this policy to {@link SimplePageParser#SimpleParser(ParserPolicy)}.
+     * @param pageScorer
+     *            to score importance of page (priority of its outlinks)
      */
     public SimplePageParser(BaseContentExtractor contentExtractor, BaseLinkExtractor linkExtractor,
-            ParserPolicy parserPolicy) {
-        this(contentExtractor, linkExtractor, parserPolicy, null);
+            ParserPolicy parserPolicy, BasePageScorer pageScorer) {
+        this(contentExtractor, linkExtractor, parserPolicy, null, pageScorer);
     }
 
     /**
      * @param parserPolicy
      *            to customize operation of the parser
+     * @param pageScorer
+     *            to score importance of page (priority of its outlinks)
      * @param includeMarkup
      *            true if output should be raw HTML, versus extracted text <BR>
-     *            <BR>
-     *            <B>Note:</B> There is no need to construct your own {@link SimpleLinkExtractor} simply to control the
-     *            set of link tags and attributes it processes. Instead, use {@link ParserPolicy#setLinkTags} and
-     *            {@link ParserPolicy#setLinkAttributeTypes}, and then pass this policy to
-     *            {@link SimplePageParser#SimpleParser(ParserPolicy)}.
+     * <BR>
+     *            <B>Note:</B> There is no need to construct your own {@link SimpleLinkExtractor}
+     *            simply to control the set of link tags and attributes it processes. Instead, use
+     *            {@link ParserPolicy#setLinkTags} and {@link ParserPolicy#setLinkAttributeTypes},
+     *            and then pass this policy to {@link SimplePageParser#SimpleParser(ParserPolicy)}.
      */
-    public SimplePageParser(ParserPolicy parserPolicy, boolean includeMarkup) {
+    public SimplePageParser(ParserPolicy parserPolicy, BasePageScorer pageScorer,
+            boolean includeMarkup) {
         this(includeMarkup ? new HtmlContentExtractor() : new SimpleContentExtractor(),
-                new SimpleLinkExtractor(), parserPolicy, includeMarkup);
+                new SimpleLinkExtractor(), parserPolicy, pageScorer, includeMarkup);
     }
 
     /**
      * @param parserPolicy
      *            to customize operation of the parser
+     * @param pageScorer
+     *            to score importance of page (priority of its outlinks)
      * @param includeMarkup
      *            true if output should be raw HTML, versus extracted text <BR>
-     *            <BR>
-     *            <B>Note:</B> There is no need to construct your own {@link SimpleLinkExtractor} simply to control the
-     *            set of link tags and attributes it processes. Instead, use {@link ParserPolicy#setLinkTags} and
-     *            {@link ParserPolicy#setLinkAttributeTypes}, and then pass this policy to
-     *            {@link SimplePageParser#SimpleParser(ParserPolicy)}.
+     * <BR>
+     *            <B>Note:</B> There is no need to construct your own {@link SimpleLinkExtractor}
+     *            simply to control the set of link tags and attributes it processes. Instead, use
+     *            {@link ParserPolicy#setLinkTags} and {@link ParserPolicy#setLinkAttributeTypes},
+     *            and then pass this policy to {@link SimplePageParser#SimpleParser(ParserPolicy)}.
      */
     public SimplePageParser(BaseContentExtractor contentExtractor, BaseLinkExtractor linkExtractor,
-            ParserPolicy parserPolicy, boolean includeMarkup) {
-        super(parserPolicy);
+            ParserPolicy parserPolicy, BasePageScorer pageScorer, boolean includeMarkup) {
+        super(parserPolicy, pageScorer);
 
         _contentExtractor = contentExtractor;
         _linkExtractor = linkExtractor;
@@ -108,15 +120,17 @@ public class SimplePageParser extends BasePageParser {
      *            to customize operation of the parser
      * @param parseContext
      *            used to pass context info to the parser <BR>
-     *            <BR>
-     *            <B>Note:</B> There is no need to construct your own {@link SimpleLinkExtractor} simply to control the
-     *            set of link tags and attributes it processes. Instead, use {@link ParserPolicy#setLinkTags} and
-     *            {@link ParserPolicy#setLinkAttributeTypes}, and then pass this policy to
-     *            {@link SimplePageParser#SimpleParser(ParserPolicy)}.
+     * <BR>
+     *            <B>Note:</B> There is no need to construct your own {@link SimpleLinkExtractor}
+     *            simply to control the set of link tags and attributes it processes. Instead, use
+     *            {@link ParserPolicy#setLinkTags} and {@link ParserPolicy#setLinkAttributeTypes},
+     *            and then pass this policy to {@link SimplePageParser#SimpleParser(ParserPolicy)}.
+     * @param pageScorer
+     *            to score importance of page (priority of its outlinks)
      */
     public SimplePageParser(BaseContentExtractor contentExtractor, BaseLinkExtractor linkExtractor,
-            ParserPolicy parserPolicy, ParseContext parseContext) {
-        super(parserPolicy);
+            ParserPolicy parserPolicy, ParseContext parseContext, BasePageScorer pageScorer) {
+        super(parserPolicy, pageScorer);
 
         _contentExtractor = contentExtractor;
         _linkExtractor = linkExtractor;
@@ -124,23 +138,12 @@ public class SimplePageParser extends BasePageParser {
     }
 
     @Override
-    public void open(CrawlerAccumulator crawlerAccumulator) throws Exception {
-        setAccumulator(crawlerAccumulator);
-    }
+    public void open(RuntimeContext context) throws Exception {
+        super.open(context);
 
-    @Override
-    public void close() throws Exception {
-    }
-
-    protected synchronized void init() {
-        if (_parser == null) {
-            _parser = new AutoDetectParser();
-        }
-
-        _contentExtractor.reset();
+        _parser = new AutoDetectParser();
         _linkExtractor.setLinkTags(getParserPolicy().getLinkTags());
         _linkExtractor.setLinkAttributeTypes(getParserPolicy().getLinkAttributeTypes());
-        _linkExtractor.reset();
     }
 
     public void setExtractLanguage(boolean extractLanguage) {
@@ -153,8 +156,6 @@ public class SimplePageParser extends BasePageParser {
 
     @Override
     public ParserResult parse(FetchResultUrl fetchedUrl) throws Exception {
-        init();
-
         if (LOGGER.isTraceEnabled()) {
             LOGGER.trace("Parsing '{}'", fetchedUrl.getFetchedUrl());
         }
@@ -173,26 +174,38 @@ public class SimplePageParser extends BasePageParser {
             URL baseUrl = getContentLocation(fetchedUrl);
             metadata.add(Metadata.CONTENT_LOCATION, baseUrl.toExternalForm());
 
+            _contentExtractor.reset();
+            _linkExtractor.reset();
+
             Callable<ParserResult> c = new TikaCallable(_parser, _contentExtractor, _linkExtractor,
                     is, metadata, isExtractLanguage(), _parseContext);
             FutureTask<ParserResult> task = new FutureTask<ParserResult>(c);
             Thread t = new Thread(task);
             t.start();
 
-            ParserResult result;
             try {
-                result = task.get(getParserPolicy().getMaxParseDuration(), TimeUnit.MILLISECONDS);
+                ParserResult result = task.get(getParserPolicy().getMaxParseDuration(),
+                        TimeUnit.MILLISECONDS);
+                getAccumulator().increment(CrawlerMetrics.COUNTER_PAGES_PARSED);
+
+                // Score the page itself
+                float score = getPageScorer().score(result);
+                result.getParsedUrl().setScore(score);
+
+                // Set the score of each outlink to its fraction of the page score.
+                ExtractedUrl[] outlinks = result.getExtractedUrls();
+                for (ExtractedUrl outlink : outlinks) {
+                    outlink.setScore(score / outlinks.length);
+                }
+                return result;
             } catch (TimeoutException e) {
                 task.cancel(true);
                 t.interrupt();
                 throw e;
-            } finally {
-                t = null;
             }
-
-            // result.setHostAddress(fetchedUrl.getHostAddress());
-            // result.setPayload(fetchedUrl.getPayload());
-            return result;
+        } catch (Exception e) {
+            getAccumulator().increment(CrawlerMetrics.COUNTER_PAGES_FAILEDPARSE);
+            throw e;
         } finally {
             IoUtils.safeClose(is);
         }
