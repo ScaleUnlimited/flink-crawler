@@ -94,6 +94,9 @@ public class ParseFunction extends BaseProcessFunction<FetchResultUrl, ParsedUrl
         } else {
             LOGGER.debug("Skipping content output of zero-score '{}'", fetchResultUrl);
         }
+        
+        // TODO VMa - why are we extracting outlinks and outputting text content if the score is less than
+        // or equal to zero ?
 
         // Output score for the page.
         context.output(SCORE_OUTPUT_TAG, new DomainScore(result.getParsedUrl().getPld(), result.getParsedUrl().getScore()));

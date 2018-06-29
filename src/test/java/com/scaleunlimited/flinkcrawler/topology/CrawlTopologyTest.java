@@ -4,6 +4,7 @@ import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
 import org.apache.flink.runtime.state.memory.MemoryStateBackend;
 import org.apache.flink.streaming.api.CheckpointingMode;
@@ -11,6 +12,7 @@ import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironmentWithAsyncExecution;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.util.FileUtils;
+import org.apache.hadoop.io.NullWritable;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,13 +32,13 @@ import com.scaleunlimited.flinkcrawler.parser.ParserResult;
 import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
 import com.scaleunlimited.flinkcrawler.parser.SimpleSiteMapParser;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
-import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
 import com.scaleunlimited.flinkcrawler.sources.SeedUrlSource;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlLengthener;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlNormalizer;
 import com.scaleunlimited.flinkcrawler.urls.SimpleUrlValidator;
 import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
 import com.scaleunlimited.flinkcrawler.utils.TestUrlLogger.UrlLoggerResults;
+import com.scaleunlimited.flinkcrawler.warc.WARCWritable;
 import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 import com.scaleunlimited.flinkcrawler.webgraph.BaseWebGraph;
 import com.scaleunlimited.flinkcrawler.webgraph.ScoredWebGraph;
@@ -107,7 +109,7 @@ public class CrawlTopologyTest {
                         new MockRobotsFetcher.MockRobotsFetcherBuilder(new MockRobotsFetcher()))
                 .setRobotsParser(new SimpleRobotRulesParser())
                 .setPageParser(new SimplePageParser(new ParserPolicy(), new PageNumberScorer()))
-                .setContentSink(new DiscardingSink<ParsedUrl>())
+                .setContentSink(new DiscardingSink<Tuple2<NullWritable, WARCWritable>>())
                 .setContentTextFile(contentTextFile.getAbsolutePath())
                 .setUrlNormalizer(normalizer)
                 .setUrlFilter(new SimpleUrlValidator())
@@ -224,7 +226,7 @@ public class CrawlTopologyTest {
                                 robotPages)))
                 .setRobotsParser(new SimpleRobotRulesParser())
                 .setPageParser(new SimplePageParser())
-                .setContentSink(new DiscardingSink<ParsedUrl>())
+                .setContentSink(new DiscardingSink<Tuple2<NullWritable, WARCWritable>>())
                 .setContentTextFile(contentTextFile.getAbsolutePath())
                 .setUrlNormalizer(normalizer)
                 .setUrlFilter(new SimpleUrlValidator())
