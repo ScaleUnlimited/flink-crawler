@@ -391,7 +391,9 @@ public class CrawlTopologyBuilder {
                 // Parsing is CPU intensive, so we want to use more slots for it.
                 .setParallelism(parseParallelism);
 
-        // Calc moving average for domain scores, and feed back into the UrlDBFunction
+        // Calc moving average for domain scores, and feed back into the UrlDBFunction. Sadly, our
+        // "fake" source for DomainScores has a fixed parallelism of 1, which we have to match here,
+        // so that's why setParallelism(1).
         DataStream<DomainScore> domainScores = parsedUrls.getSideOutput(ParseFunction.SCORE_OUTPUT_TAG)
             .keyBy(new DomainScoreKeySelector())
             .window(GlobalWindows.create())
