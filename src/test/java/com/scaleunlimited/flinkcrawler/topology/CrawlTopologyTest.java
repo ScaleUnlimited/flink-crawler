@@ -60,26 +60,26 @@ public class CrawlTopologyTest {
         final float minFetchScore = 0.75f;
         SimpleUrlNormalizer normalizer = new SimpleUrlNormalizer();
         ScoredWebGraph graph = new ScoredWebGraph(normalizer)
-                .add("domain1.com", 2.0f, "domain1.com/page1", "domain1.com/page2")
+                .add("domain1.com", 2.0f, "domain1.com/page11", "domain1.com/page12")
 
                 // This page will get fetched right away, because the two links from domain1.com
-                // have score of 1.0f
-                .add("domain1.com/page1", 1.0f, "domain1.com/page3", "domain1.com/page4")
+                // each have score of 1.0f
+                .add("domain1.com/page11", 1.0f, "domain1.com/page13", "domain2.com/page21")
 
                 // This page will get fetched right away, because the two links have score of 1.0f
-                .add("domain1.com/page2", 1.0f, "domain1.com/page5")
+                .add("domain1.com/page12", 1.0f, "domain1.com/page14")
 
                 // This page will never be fetched.
-                .add("domain1.com/page3", 1.0f)
+                .add("domain1.com/page13", 1.0f)
 
-                // This page will eventually be fetched. The first inbound link (from page1) has a
-                // score of 0.5,
-                // and then the next link from page5 adds 1.0 to push us over the threshhold
-                .add("domain1.com/page4", 1.0f)
+                // This page will fetched right away, because page12 gives all of its score (1.0) to
+                // page14
+                .add("domain1.com/page14", 1.0f, "domain2.com/page21")
 
-                // This page will fetched right away, because page2 gives all of its score (1.0) to
-                // page5
-                .add("domain1.com/page5", 1.0f, "domain1.com/page4");
+                // This page will eventually be fetched. The first in-bound link (from page11) has a
+                // score of 0.5, and then the next link from page14 adds 1.0 to push us over the threshold
+                .add("domain2.com/page21", 1.0f);
+
 
         File testDir = new File("target/FocusedCrawlTest/");
         testDir.mkdirs();
@@ -134,11 +134,11 @@ public class CrawlTopologyTest {
             LOGGER.debug("{}: {}", entry.f0, entry.f1);
         }
 
-        String domain1page1 = normalizer.normalize("domain1.com/page1");
-        String domain1page2 = normalizer.normalize("domain1.com/page2");
-        String domain1page3 = normalizer.normalize("domain1.com/page3");
-        String domain1page4 = normalizer.normalize("domain1.com/page4");
-        String domain1page5 = normalizer.normalize("domain1.com/page5");
+        String domain1page1 = normalizer.normalize("domain1.com/page11");
+        String domain1page2 = normalizer.normalize("domain1.com/page12");
+        String domain1page3 = normalizer.normalize("domain1.com/page13");
+        String domain1page4 = normalizer.normalize("domain1.com/page14");
+        String domain2page1 = normalizer.normalize("domain2.com/page21");
 
         UrlLoggerResults results = new UrlLoggerResults(UrlLogger.getLog());
 
@@ -147,7 +147,7 @@ public class CrawlTopologyTest {
                 // This page never got a high enough estimated score.
                 .assertUrlLoggedBy(FetchUrlsFunction.class, domain1page3, 0)
                 .assertUrlLoggedBy(FetchUrlsFunction.class, domain1page4, 1)
-                .assertUrlLoggedBy(FetchUrlsFunction.class, domain1page5, 1);
+                .assertUrlLoggedBy(FetchUrlsFunction.class, domain2page1, 1);
     }
 
     @SuppressWarnings("deprecation")

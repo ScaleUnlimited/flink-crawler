@@ -12,6 +12,7 @@ import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.java.hadoop.mapreduce.HadoopOutputFormat;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.tuple.Tuple3;
+import org.apache.flink.api.java.typeutils.ListTypeInfo;
 import org.apache.flink.core.fs.FileSystem.WriteMode;
 import org.apache.flink.streaming.api.collector.selector.OutputSelector;
 import org.apache.flink.streaming.api.datastream.AsyncDataStream;
@@ -24,6 +25,8 @@ import org.apache.flink.streaming.api.datastream.SplitStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
+import org.apache.flink.streaming.api.windowing.assigners.GlobalWindows;
+import org.apache.flink.streaming.api.windowing.triggers.CountTrigger;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
@@ -32,8 +35,10 @@ import com.scaleunlimited.flinkcrawler.config.CrawlTerminator;
 import com.scaleunlimited.flinkcrawler.fetcher.BaseHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.fetcher.SimpleHttpFetcherBuilder;
 import com.scaleunlimited.flinkcrawler.functions.CheckUrlWithRobotsFunction;
+import com.scaleunlimited.flinkcrawler.functions.DomainScoreKeySelector;
 import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.LengthenUrlsFunction;
+import com.scaleunlimited.flinkcrawler.functions.MovingAverageAggregator;
 import com.scaleunlimited.flinkcrawler.functions.NormalizeUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.OutlinkToStateUrlFunction;
 import com.scaleunlimited.flinkcrawler.functions.ParseFunction;
@@ -46,6 +51,7 @@ import com.scaleunlimited.flinkcrawler.parser.SimpleLinkExtractor;
 import com.scaleunlimited.flinkcrawler.parser.SimplePageParser;
 import com.scaleunlimited.flinkcrawler.parser.SimpleSiteMapParser;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
+import com.scaleunlimited.flinkcrawler.pojos.DomainScore;
 import com.scaleunlimited.flinkcrawler.pojos.FetchResultUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.pojos.ParsedUrl;
@@ -288,9 +294,16 @@ public class CrawlTopologyBuilder {
 
         IterativeStream<CrawlStateUrl> urlDbIteration = cleanUrls(seedUrls)
                 .iterate(_iterationTimeout);
+
+        // Create an empty domain score stream that we'll close with a stream of 
+        // average domain scores calculated lower down.
+        IterativeStream<DomainScore> domainScoresIter = _env.fromCollection(new ArrayList<DomainScore>(), ListTypeInfo.of(DomainScore.class))
+                .name("Domain scores")
+                .iterate(_iterationTimeout);
         
         SingleOutputStreamOperator<FetchUrl> postUrlDbUrls = urlDbIteration
-                .keyBy(new PldKeySelector<CrawlStateUrl>())
+                .connect(domainScoresIter)
+                .keyBy(new PldKeySelector<CrawlStateUrl>(), new DomainScoreKeySelector())
                 .process(new UrlDBFunction(_terminator, new DefaultUrlStateMerger(), _fetchQueue))
                 .name("UrlDBFunction");
 
@@ -410,7 +423,7 @@ public class CrawlTopologyBuilder {
             WARCOutputFormat.setOutputPath(job, new Path(_contentFilePathString));
             HadoopOutputFormat<NullWritable, WARCWritable> hadoopOutputFormat = new HadoopOutputFormat<NullWritable, WARCWritable>(new WARCOutputFormat(), job);
             contentSinkUsingOutputFormat = warcStream.writeUsingOutputFormat(hadoopOutputFormat);
-        } 
+        }
 
         contentSinkUsingOutputFormat
                 .name("Content Sink");
@@ -422,6 +435,17 @@ public class CrawlTopologyBuilder {
                 // Parsing is CPU intensive, so we want to use more slots for it.
                 .setParallelism(parseParallelism);
 
+        // Calc moving average for domain scores, and feed back into the UrlDBFunction. Sadly, our
+        // "fake" source for DomainScores has a fixed parallelism of 1, which we have to match here,
+        // so that's why setParallelism(1).
+        DataStream<DomainScore> domainScores = parsedUrls.getSideOutput(ParseFunction.SCORE_OUTPUT_TAG)
+            .keyBy(new DomainScoreKeySelector())
+            .window(GlobalWindows.create())
+            .trigger(CountTrigger.of(1))
+            .aggregate(new MovingAverageAggregator(10))
+            .setParallelism(1);
+        domainScoresIter.closeWith(domainScores);
+        
         DataStream<RawUrl> newRawUrls = parsedUrls.getSideOutput(ParseFunction.OUTLINK_OUTPUT_TAG)
                 .map(new OutlinkToStateUrlFunction())
                 .name("OutlinkToStateUrlFunction")

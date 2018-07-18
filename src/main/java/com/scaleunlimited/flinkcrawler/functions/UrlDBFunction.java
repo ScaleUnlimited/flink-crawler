@@ -25,6 +25,7 @@ import com.scaleunlimited.flinkcrawler.config.CrawlTerminator;
 import com.scaleunlimited.flinkcrawler.metrics.CounterUtils;
 import com.scaleunlimited.flinkcrawler.metrics.CrawlerMetrics;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
+import com.scaleunlimited.flinkcrawler.pojos.DomainScore;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
 import com.scaleunlimited.flinkcrawler.urldb.BaseUrlStateMerger;
@@ -40,16 +41,19 @@ import com.scaleunlimited.flinkcrawler.utils.FetchQueue;
  * to scan every URL.
  */
 @SuppressWarnings("serial")
-public class UrlDBFunction extends BaseKeyedProcessFunction<String, CrawlStateUrl, FetchUrl> implements CheckpointedFunction {
+public class UrlDBFunction extends BaseCoProcessFunction<CrawlStateUrl, DomainScore, FetchUrl> implements CheckpointedFunction {
     static final Logger LOGGER = LoggerFactory.getLogger(UrlDBFunction.class);
 
     // When we have to update the status of a URL in the fetch queue (because we're either fetching it, or it's
     // getting booted by a better URL) we output it via this side channel.
-    public static final OutputTag<CrawlStateUrl> STATUS_OUTPUT_TAG 
-        = new OutputTag<CrawlStateUrl>("status"){};
+    public static final OutputTag<CrawlStateUrl> STATUS_OUTPUT_TAG = new OutputTag<CrawlStateUrl>("status"){};
 
     private static final int MAX_IN_FLIGHT_URLS = 100;
 
+    // Max and average time between checks for URLs to emit for a domain
+    private static final long MAX_DOMAIN_CHECK_INTERVAL = 1000;
+    private static final long AVERAGE_DOMAIN_CHECK_INTERVAL = 200;
+    
     private BaseUrlStateMerger _merger;
     private CrawlTerminator _terminator;
 
@@ -62,10 +66,14 @@ public class UrlDBFunction extends BaseKeyedProcessFunction<String, CrawlStateUr
     private transient MapState<Integer, Long> _activeUrlsIndex;
     private transient ValueState<Integer> _numActiveUrls;
     private transient ValueState<Integer> _activeIndex;
+    private transient ValueState<String> _pld;
     private transient MapState<Long, CrawlStateUrl> _archivedUrls;
 
     private transient CrawlStateUrl _mergedUrlState;
 
+    private transient Map<String, Float> _domainScores;
+    private transient float _averageDomainScore;
+    
     // TODO(kkrugler) remove this debugging code.
     private transient Map<String, Long> _inFlightUrls;
 
@@ -109,6 +117,12 @@ public class UrlDBFunction extends BaseKeyedProcessFunction<String, CrawlStateUr
         MapStateDescriptor<Integer, Long> activeUrlsIndexStateDescriptor = new MapStateDescriptor<>(
                 "active-urls-index", Integer.class, Long.class);
         _activeUrlsIndex = getRuntimeContext().getMapState(activeUrlsIndexStateDescriptor);
+        
+        // 6. PLD (key) for current state, so we can access it in the timer handler.
+        ValueStateDescriptor<String> pldDescriptor = new ValueStateDescriptor<>(
+                "pld", TypeInformation.of(new TypeHint<String>() {
+                }));
+        _pld = getRuntimeContext().getState(pldDescriptor);
     }
 
     @Override
@@ -141,11 +155,13 @@ public class UrlDBFunction extends BaseKeyedProcessFunction<String, CrawlStateUr
         _fetchQueue.open();
         _terminator.open();
 
+        _domainScores = new HashMap<>();
+        
         _inFlightUrls = new HashMap<>();
     }
 
     @Override
-    public void processElement(CrawlStateUrl url, Context ctx, Collector<FetchUrl> collector) throws Exception {
+    public void processElement1(CrawlStateUrl url, Context ctx, Collector<FetchUrl> collector) throws Exception {
         record(this.getClass(), url, FetchStatus.class.getSimpleName(), url.getStatus().toString());
 
         // See if we have this domain already. If not, create a timer.
@@ -156,6 +172,7 @@ public class UrlDBFunction extends BaseKeyedProcessFunction<String, CrawlStateUr
             // Create entries for this domain in the various states.
             _numActiveUrls.update(0);
             _activeIndex.update(0);
+            _pld.update(url.getPld());
             
             // And we want to create a timer, so we have one per domain
             ctx.timerService().registerProcessingTimeTimer(processingTime + 100);
@@ -180,9 +197,10 @@ public class UrlDBFunction extends BaseKeyedProcessFunction<String, CrawlStateUr
             emitUrlFromFetchQueue(ctx);
             
             // And re-register the timer
-            ctx.timerService().registerProcessingTimeTimer(timestamp + 100);
+            long fireAt = timestamp + checkIntervalForDomain(_pld.value(), _numActiveUrls.value());
+            ctx.timerService().registerProcessingTimeTimer(fireAt);
         } else {
-            LOGGER.info("Terminating timer for domain {}", ctx.getCurrentKey());
+            LOGGER.info("Terminating timer for domain {}", _pld.value());
         }
     }
     
@@ -272,6 +290,32 @@ public class UrlDBFunction extends BaseKeyedProcessFunction<String, CrawlStateUr
         // Update index of the URL we should check the next time we get called.
         index = (index + 1) % numUrls;
         _activeIndex.update(index);
+    }
+
+    /**
+     * Given the domain <pld>, return how long between each check. For better domains
+     * we want to check more often.
+     * 
+     * @param pld
+     * @return
+     */
+    private long checkIntervalForDomain(String pld, Integer numActive) {
+        Float averagePageScore = _domainScores.get(pld);
+        if (averagePageScore == null) {
+            LOGGER.debug("UrlDBFunction ({}/{}) no average page scores yet for '{}'", _partition, _parallelism, pld);
+
+            return MAX_DOMAIN_CHECK_INTERVAL;
+        }
+        
+        // see where this domain's average page score falls, relative to the
+        // overall average page score. Then constrain to range [1...MAX_DOMAIN_CHECK_INTERVAL]
+        float ratio = _averageDomainScore / averagePageScore;
+        long domainCheckInterval = Math.round(AVERAGE_DOMAIN_CHECK_INTERVAL * ratio);
+        domainCheckInterval = Math.min(domainCheckInterval, MAX_DOMAIN_CHECK_INTERVAL);
+        domainCheckInterval = Math.max(domainCheckInterval, 1);
+        
+        LOGGER.debug("UrlDBFunction ({}/{}) returning {}ms between URL checks for '{}'", _partition, _parallelism, domainCheckInterval, pld);
+        return domainCheckInterval;
     }
 
     /**
@@ -447,6 +491,29 @@ public class UrlDBFunction extends BaseKeyedProcessFunction<String, CrawlStateUr
             default:
                 throw new RuntimeException("Unknown merge result: " + result);
         }
+    }
+
+    /* (non-Javadoc)
+     * @see org.apache.flink.streaming.api.functions.co.CoProcessFunction#processElement2(IN2, org.apache.flink.streaming.api.functions.co.CoProcessFunction.Context, org.apache.flink.util.Collector)
+     * 
+     * When we get a domain score, just update our internal state, and never emit anything.
+     */
+    @Override
+    public void processElement2(DomainScore domainScore, Context context, Collector<FetchUrl> out)
+            throws Exception {
+        // Ensure we don't wind up with DBZ problems.
+        float score = Math.max(0.01f, domainScore.getScore());
+        LOGGER.debug("UrlDBFunction ({}/{}) setting '{}' average score to {}",
+                _partition, _parallelism, domainScore.getPld(), score);
+
+        float summedScores = _averageDomainScore * _domainScores.size();
+        if (_domainScores.containsKey(domainScore.getPld())) {
+            summedScores -= _domainScores.get(domainScore.getPld());
+        }
+        
+        _domainScores.put(domainScore.getPld(), score);
+        summedScores += score;
+        _averageDomainScore = summedScores / _domainScores.size();
     }
 
 
