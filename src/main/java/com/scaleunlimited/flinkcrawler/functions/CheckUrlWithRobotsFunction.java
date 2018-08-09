@@ -28,13 +28,15 @@ import crawlercommons.robots.BaseRobotRules;
 import crawlercommons.robots.SimpleRobotRulesParser;
 
 /**
- * We get passed a URL to fetch, that we check against the domain's robots.txt rules. The resulting Tuple3 will have
- * only one of the three fields set to a none-null value, based on the result (and optional extraction of sitemap URLs):
+ * We get passed a URL to fetch, that we check against the domain's robots.txt rules. The resulting
+ * Tuple3 will have only one of the three fields set to a none-null value, based on the result (and
+ * optional extraction of sitemap URLs):
  * 
- * Blocked: first field (CrawlStateUrl) is set to a blocked by robots status Allowed: second field (FetchUrl) is set to
- * be the same as the incoming FetchUrl Sitemap: third field (FetchUrl) is set to the sitemap URL. There can be multiple
- * sitemaps, in which case the Collection we pass to the collector will have multiple Tuple3<> values. Sitemap URLs that
- * are invalid are logged and dropped.
+ * Blocked: first field (CrawlStateUrl) is set to a blocked by robots status Allowed: second field
+ * (FetchUrl) is set to be the same as the incoming FetchUrl Sitemap: third field (FetchUrl) is set
+ * to the sitemap URL. There can be multiple sitemaps, in which case the Collection we pass to the
+ * collector will have multiple Tuple3<> values. Sitemap URLs that are invalid are logged and
+ * dropped.
  *
  */
 @SuppressWarnings("serial")
@@ -54,12 +56,10 @@ public class CheckUrlWithRobotsFunction
     private long _forceCrawlDelay;
     private long _defaultCrawlDelay;
 
-    private long _numMissingRobots = 0;
-    private long _numFetchedRobots = 0;
-    private long _numFailedRobots = 0;
-
-    private transient Map<String, Long> _domainUrlsAccepted;
-    private transient Map<String, Long> _domainUrlsRejected;
+    private static long _numMissingRobots;
+    private static long _numFetchedRobots;
+    private static long _numFailedRobots;
+    private String _currentDomain;
 
     private transient BaseHttpFetcher _fetcher;
 
@@ -86,16 +86,6 @@ public class CheckUrlWithRobotsFunction
         _fetcher = _fetcherBuilder.build();
         _rules = new ConcurrentHashMap<>();
         _ruleExpirations = new ConcurrentHashMap<>();
-        _domainUrlsAccepted = new ConcurrentHashMap<>();
-        _domainUrlsRejected = new ConcurrentHashMap<>();
-    }
-
-    @Override
-    public void close() throws Exception {
-        super.close();
-        LOGGER.debug(String.format("Number of missing robots.txt files = %d", _numMissingRobots));
-        LOGGER.debug(String.format("Number of fetched robots.txt files = %d", _numFetchedRobots));
-        LOGGER.debug(String.format("Number of failed robots.txt files = %d", _numFailedRobots));
     }
 
     @Override
@@ -104,7 +94,6 @@ public class CheckUrlWithRobotsFunction
         record(this.getClass(), url);
 
         LOGGER.trace("Queueing '{}' for robots check", url);
-
         _executor.execute(new Runnable() {
 
             @Override
@@ -126,12 +115,13 @@ public class CheckUrlWithRobotsFunction
                     }
                 }
 
+                int httpStatusCode;
                 long robotsFetchRetryDelay;
                 try {
                     FetchedResult result = _fetcher.get(robotsUrl);
-                    int httpStatusCode = result.getStatusCode();
-                    LOGGER.trace("CheckUrlWithRobotsFunction fetched URL '{}' with status {}", robotsUrl,
-                            httpStatusCode);
+                    httpStatusCode = result.getStatusCode();
+                    LOGGER.trace("CheckUrlWithRobotsFunction fetched URL '{}' with status {}",
+                            robotsUrl, httpStatusCode);
                     robotsFetchRetryDelay = calcRobotsFetchRetryDelay(httpStatusCode);
                     if (httpStatusCode != HttpStatus.SC_OK) {
                         rules = _parser.failedFetch(httpStatusCode);
@@ -146,24 +136,16 @@ public class CheckUrlWithRobotsFunction
                         _numFetchedRobots++;
                     }
                 } catch (Exception e) {
-                    robotsFetchRetryDelay = calcRobotsFetchRetryDelay(
-                            HttpStatus.SC_INTERNAL_SERVER_ERROR);
-                    rules = _parser.failedFetch(HttpStatus.SC_INTERNAL_SERVER_ERROR);
+                    httpStatusCode = HttpStatus.SC_INTERNAL_SERVER_ERROR;
+                    robotsFetchRetryDelay = calcRobotsFetchRetryDelay(httpStatusCode);
+                    rules = _parser.failedFetch(httpStatusCode);
                     _numFailedRobots++;
                 }
 
-                if (LOGGER.isDebugEnabled()) {
-                    if ((_numMissingRobots % 10) == 0) {
-                        LOGGER.debug(String.format("Number of missing robots.txt files = %d", _numMissingRobots));
-                    }
-                    if ((_numFetchedRobots % 10) == 0) {
-                        LOGGER.debug(String.format("Number of fetched robots.txt files = %d", _numFetchedRobots));
-                    }
-                    if ((_numFailedRobots % 10) == 0) {
-                        LOGGER.debug(String.format("Number of failed robots.txt files = %d", _numFailedRobots));
-                    }
+                String hostname = url.getHostname();
+                if (!hostname.equals(_currentDomain)) {
+                    printCounters(hostname, httpStatusCode);
                 }
-
                 // Set re-fetch time for robots. Note that we put the expiration first, so that
                 // by the time someone checks _rules, the expiration entry exists.
                 _ruleExpirations.put(robotsUrl, System.currentTimeMillis() + robotsFetchRetryDelay);
@@ -195,7 +177,8 @@ public class CheckUrlWithRobotsFunction
     }
 
     /**
-     * Given the result of trying to fetch the robots.txt file, decide how long until we retry (or refetch) it again.
+     * Given the result of trying to fetch the robots.txt file, decide how long until we retry (or
+     * refetch) it again.
      * 
      * @param statusCode
      * @return interval to wait, in milliseconds.
@@ -217,9 +200,9 @@ public class CheckUrlWithRobotsFunction
 
     private Collection<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> processUrl(BaseRobotRules rules,
             FetchUrl url) {
-        String hostname = url.getHostname();
         if (rules.isAllowed(url.getUrl())) {
-            // Add the crawl delay to the url, so that it can be used to do delay limiting in the fetcher
+            // Add the crawl delay to the url, so that it can be used to do delay limiting in the
+            // fetcher
             long crawlDelay = _forceCrawlDelay;
             if (_forceCrawlDelay == CrawlTool.DO_NOT_FORCE_CRAWL_DELAY) {
                 crawlDelay = rules.getCrawlDelay();
@@ -227,7 +210,6 @@ public class CheckUrlWithRobotsFunction
                     crawlDelay = _defaultCrawlDelay;
                 }
             }
-            incrementDomainUrlCount(hostname, _domainUrlsAccepted, "accepted");
             url.setCrawlDelay(crawlDelay);
             return Collections
                     .singleton(new Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>(null, url, null));
@@ -237,7 +219,6 @@ public class CheckUrlWithRobotsFunction
             // refetch time should be much shorter. Note that we want to make this refetch time
             // a bit longer than the robots.txt reload/retry time, so that it can be reloaded.
             // See https://github.com/ScaleUnlimited/flink-crawler/issues/53
-            incrementDomainUrlCount(hostname, _domainUrlsRejected, "rejected");
             long now = System.currentTimeMillis();
             CrawlStateUrl crawlStateUrl = new CrawlStateUrl(url,
                     rules.isDeferVisits() ? FetchStatus.SKIPPED_DEFERRED
@@ -250,22 +231,18 @@ public class CheckUrlWithRobotsFunction
         }
     }
 
-    private void incrementDomainUrlCount(String hostname, Map<String, Long> domainUrls, String messageStr) {
-        Long val = domainUrls.get(hostname);
-        if (val == null) {
-            val = new Long(0);
-        }
-        val++;
-        domainUrls.put(hostname, val);
-        if (LOGGER.isDebugEnabled()) {
-            if ((val % 100) == 0) {
-                LOGGER.debug(String.format("Number of urls %s for domain '%s' = %d", messageStr, hostname, val));
-            }
-        }
-    }
 
     private String makeRobotsKey(FetchUrl url) {
         return String.format("%s/robots.txt", url.getUrlWithoutPath());
     }
 
+    private static void printCounters(String hostname, int status) {
+        if (LOGGER.isDebugEnabled()) {
+            String counters = String.format(
+                    "Currently processing = '%s', httpStatus = '%d'\n"
+                    + "\tmissing robots.txt files = %d\tfetched robots.txt files = %d\tfailedrobots.txt files = %d",
+                    hostname, status, _numMissingRobots, _numFetchedRobots, _numFailedRobots);
+            LOGGER.debug(counters);
+        }
+    }
 }
