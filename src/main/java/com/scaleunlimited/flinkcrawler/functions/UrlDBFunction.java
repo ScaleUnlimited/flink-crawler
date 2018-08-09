@@ -1,5 +1,6 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -147,6 +148,20 @@ public class UrlDBFunction extends BaseCoProcessFunction<CrawlStateUrl, DomainSc
                         return _numInFlightUrls.get();
                     }
                 });
+
+        // Track the number of active URLs.
+        context.getMetricGroup().gauge(CrawlerMetrics.GAUGE_URLS_ACTIVE.toString(),
+                new Gauge<Integer>() {
+                    @Override
+                    public Integer getValue() {
+                        try {
+                            return _numActiveUrls.value();
+                        } catch (IOException e) {
+                            return -1;
+                        }
+                    }
+                });
+
 
         _mergedUrlState = new CrawlStateUrl();
 
