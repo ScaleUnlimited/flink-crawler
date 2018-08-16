@@ -56,10 +56,9 @@ public class CheckUrlWithRobotsFunction
     private long _forceCrawlDelay;
     private long _defaultCrawlDelay;
 
-    private static long _numMissingRobots;
-    private static long _numFetchedRobots;
-    private static long _numFailedRobots;
-    private String _currentDomain;
+    private long _numMissingRobots;
+    private long _numFetchedRobots;
+    private long _numFailedRobots;
 
     private transient BaseHttpFetcher _fetcher;
 
@@ -136,20 +135,21 @@ public class CheckUrlWithRobotsFunction
                         _numFetchedRobots++;
                     }
                 } catch (Exception e) {
+                    LOGGER.error(String.format("Unexpected error while fetching robots file for '%s'", url.getHostname()), e);
                     httpStatusCode = HttpStatus.SC_INTERNAL_SERVER_ERROR;
                     robotsFetchRetryDelay = calcRobotsFetchRetryDelay(httpStatusCode);
                     rules = _parser.failedFetch(httpStatusCode);
                     _numFailedRobots++;
                 }
 
-                String hostname = url.getHostname();
-                if (!hostname.equals(_currentDomain)) {
-                    printCounters(hostname, httpStatusCode);
-                }
                 // Set re-fetch time for robots. Note that we put the expiration first, so that
                 // by the time someone checks _rules, the expiration entry exists.
                 _ruleExpirations.put(robotsUrl, System.currentTimeMillis() + robotsFetchRetryDelay);
-                _rules.put(robotsUrl, rules);
+                BaseRobotRules oldRules = _rules.put(robotsUrl, rules);
+                if (oldRules == null) {
+                    // Output counters whenever we encounter a new domain
+                    printCounters(url.getHostname(), httpStatusCode);
+                }
 
                 List<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> result = new ArrayList<>();
                 result.addAll(processUrl(rules, url));
@@ -236,12 +236,11 @@ public class CheckUrlWithRobotsFunction
         return String.format("%s/robots.txt", url.getUrlWithoutPath());
     }
 
-    private static void printCounters(String hostname, int status) {
+    private void printCounters(String hostname, int status) {
         if (LOGGER.isDebugEnabled()) {
             String counters = String.format(
-                    "Currently processing = '%s', httpStatus = '%d'\n"
-                    + "\tmissing robots.txt files = %d\tfetched robots.txt files = %d\tfailedrobots.txt files = %d",
-                    hostname, status, _numMissingRobots, _numFetchedRobots, _numFailedRobots);
+                    "Domain: %s, status: %d, missing: %d, good: %d, bad: %d", hostname,
+                    status, _numMissingRobots, _numFetchedRobots, _numFailedRobots);
             LOGGER.debug(counters);
         }
     }
