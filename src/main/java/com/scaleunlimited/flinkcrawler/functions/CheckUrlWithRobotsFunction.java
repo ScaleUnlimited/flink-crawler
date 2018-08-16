@@ -28,13 +28,15 @@ import crawlercommons.robots.BaseRobotRules;
 import crawlercommons.robots.SimpleRobotRulesParser;
 
 /**
- * We get passed a URL to fetch, that we check against the domain's robots.txt rules. The resulting Tuple3 will have
- * only one of the three fields set to a none-null value, based on the result (and optional extraction of sitemap URLs):
+ * We get passed a URL to fetch, that we check against the domain's robots.txt rules. The resulting
+ * Tuple3 will have only one of the three fields set to a none-null value, based on the result (and
+ * optional extraction of sitemap URLs):
  * 
- * Blocked: first field (CrawlStateUrl) is set to a blocked by robots status Allowed: second field (FetchUrl) is set to
- * be the same as the incoming FetchUrl Sitemap: third field (FetchUrl) is set to the sitemap URL. There can be multiple
- * sitemaps, in which case the Collection we pass to the collector will have multiple Tuple3<> values. Sitemap URLs that
- * are invalid are logged and dropped.
+ * Blocked: first field (CrawlStateUrl) is set to a blocked by robots status Allowed: second field
+ * (FetchUrl) is set to be the same as the incoming FetchUrl Sitemap: third field (FetchUrl) is set
+ * to the sitemap URL. There can be multiple sitemaps, in which case the Collection we pass to the
+ * collector will have multiple Tuple3<> values. Sitemap URLs that are invalid are logged and
+ * dropped.
  *
  */
 @SuppressWarnings("serial")
@@ -53,6 +55,10 @@ public class CheckUrlWithRobotsFunction
     private SimpleRobotRulesParser _parser;
     private long _forceCrawlDelay;
     private long _defaultCrawlDelay;
+
+    private long _numMissingRobots;
+    private long _numFetchedRobots;
+    private long _numFailedRobots;
 
     private transient BaseHttpFetcher _fetcher;
 
@@ -87,7 +93,6 @@ public class CheckUrlWithRobotsFunction
         record(this.getClass(), url);
 
         LOGGER.trace("Queueing '{}' for robots check", url);
-
         _executor.execute(new Runnable() {
 
             @Override
@@ -109,28 +114,42 @@ public class CheckUrlWithRobotsFunction
                     }
                 }
 
+                int httpStatusCode;
                 long robotsFetchRetryDelay;
                 try {
                     FetchedResult result = _fetcher.get(robotsUrl);
-                    LOGGER.trace("CheckUrlWithRobotsFunction fetched URL '{}' with status {}", robotsUrl,
-                            result.getStatusCode());
-                    robotsFetchRetryDelay = calcRobotsFetchRetryDelay(result.getStatusCode());
-                    if (result.getStatusCode() != HttpStatus.SC_OK) {
-                        rules = _parser.failedFetch(result.getStatusCode());
+                    httpStatusCode = result.getStatusCode();
+                    LOGGER.trace("CheckUrlWithRobotsFunction fetched URL '{}' with status {}",
+                            robotsUrl, httpStatusCode);
+                    robotsFetchRetryDelay = calcRobotsFetchRetryDelay(httpStatusCode);
+                    if (httpStatusCode != HttpStatus.SC_OK) {
+                        rules = _parser.failedFetch(httpStatusCode);
+                        if ((httpStatusCode >= 400) && (httpStatusCode < 500)) {
+                            _numMissingRobots++;
+                        } else {
+                            _numFailedRobots++;
+                        }
                     } else {
                         rules = _parser.parseContent(robotsUrl, result.getContent(),
                                 result.getContentType(), _fetcher.getUserAgent().getAgentName());
+                        _numFetchedRobots++;
                     }
                 } catch (Exception e) {
-                    robotsFetchRetryDelay = calcRobotsFetchRetryDelay(
-                            HttpStatus.SC_INTERNAL_SERVER_ERROR);
-                    rules = _parser.failedFetch(HttpStatus.SC_INTERNAL_SERVER_ERROR);
+                    LOGGER.error(String.format("Unexpected error while fetching robots file for '%s'", url.getHostname()), e);
+                    httpStatusCode = HttpStatus.SC_INTERNAL_SERVER_ERROR;
+                    robotsFetchRetryDelay = calcRobotsFetchRetryDelay(httpStatusCode);
+                    rules = _parser.failedFetch(httpStatusCode);
+                    _numFailedRobots++;
                 }
 
                 // Set re-fetch time for robots. Note that we put the expiration first, so that
                 // by the time someone checks _rules, the expiration entry exists.
                 _ruleExpirations.put(robotsUrl, System.currentTimeMillis() + robotsFetchRetryDelay);
-                _rules.put(robotsUrl, rules);
+                BaseRobotRules oldRules = _rules.put(robotsUrl, rules);
+                if (oldRules == null) {
+                    // Output counters whenever we encounter a new domain
+                    printCounters(url.getHostname(), httpStatusCode);
+                }
 
                 List<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> result = new ArrayList<>();
                 result.addAll(processUrl(rules, url));
@@ -158,7 +177,8 @@ public class CheckUrlWithRobotsFunction
     }
 
     /**
-     * Given the result of trying to fetch the robots.txt file, decide how long until we retry (or refetch) it again.
+     * Given the result of trying to fetch the robots.txt file, decide how long until we retry (or
+     * refetch) it again.
      * 
      * @param statusCode
      * @return interval to wait, in milliseconds.
@@ -181,7 +201,8 @@ public class CheckUrlWithRobotsFunction
     private Collection<Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>> processUrl(BaseRobotRules rules,
             FetchUrl url) {
         if (rules.isAllowed(url.getUrl())) {
-            // Add the crawl delay to the url, so that it can be used to do delay limiting in the fetcher
+            // Add the crawl delay to the url, so that it can be used to do delay limiting in the
+            // fetcher
             long crawlDelay = _forceCrawlDelay;
             if (_forceCrawlDelay == CrawlTool.DO_NOT_FORCE_CRAWL_DELAY) {
                 crawlDelay = rules.getCrawlDelay();
@@ -189,7 +210,6 @@ public class CheckUrlWithRobotsFunction
                     crawlDelay = _defaultCrawlDelay;
                 }
             }
-
             url.setCrawlDelay(crawlDelay);
             return Collections
                     .singleton(new Tuple3<CrawlStateUrl, FetchUrl, FetchUrl>(null, url, null));
@@ -211,8 +231,17 @@ public class CheckUrlWithRobotsFunction
         }
     }
 
+
     private String makeRobotsKey(FetchUrl url) {
         return String.format("%s/robots.txt", url.getUrlWithoutPath());
     }
 
+    private void printCounters(String hostname, int status) {
+        if (LOGGER.isDebugEnabled()) {
+            String counters = String.format(
+                    "Domain: %s, status: %d, missing: %d, good: %d, bad: %d", hostname,
+                    status, _numMissingRobots, _numFetchedRobots, _numFailedRobots);
+            LOGGER.debug(counters);
+        }
+    }
 }

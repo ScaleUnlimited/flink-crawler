@@ -60,6 +60,9 @@ public class UrlDBFunction extends BaseCoProcessFunction<CrawlStateUrl, DomainSc
     // List of URLs that are available to be fetched.
     private final FetchQueue _fetchQueue;
 
+    // TODO - Sync up the total active urls value with state whenever we restore from state.
+    private int _totalActiveUrls;
+    
     private transient AtomicInteger _numInFlightUrls;
 
     private transient MapState<Long, CrawlStateUrl> _activeUrls;
@@ -147,6 +150,16 @@ public class UrlDBFunction extends BaseCoProcessFunction<CrawlStateUrl, DomainSc
                         return _numInFlightUrls.get();
                     }
                 });
+
+        // Track the number of active URLs.
+        context.getMetricGroup().gauge(CrawlerMetrics.GAUGE_URLS_ACTIVE.toString(),
+                new Gauge<Integer>() {
+                    @Override
+                    public Integer getValue() {
+                        return _totalActiveUrls;
+                    }
+                });
+
 
         _mergedUrlState = new CrawlStateUrl();
 
@@ -450,6 +463,7 @@ public class UrlDBFunction extends BaseCoProcessFunction<CrawlStateUrl, DomainSc
                 int numActiveUrls = _numActiveUrls.value();
                 _activeUrlsIndex.put(numActiveUrls, urlHash);
                 _numActiveUrls.update(numActiveUrls + 1);
+                _totalActiveUrls++;
             } else {
                 if (LOGGER.isTraceEnabled()) {
                     LOGGER.trace("UrlDBFunction ({}/{}) needs to merge incoming URL '{}' with '{}' (hash {})",
