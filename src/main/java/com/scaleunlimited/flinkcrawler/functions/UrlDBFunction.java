@@ -158,8 +158,9 @@ public class UrlDBFunction extends BaseKeyedProcessFunction<String, CrawlStateUr
             _activeIndex.update(0);
             
             // And we want to create a timer, so we have one per domain
-            ctx.timerService().registerProcessingTimeTimer(processingTime + 100);
-            LOGGER.debug("Adding timer for domain {}", url.getPld());
+            long nextTime = processingTime + 100;
+            LOGGER.debug("Adding timer for domain {} at {}", url.getPld(), nextTime);
+            ctx.timerService().registerProcessingTimeTimer(nextTime);
         }
 
         // Now update state for this URL, and potentially emit it if status is 'fetching'.
@@ -180,7 +181,9 @@ public class UrlDBFunction extends BaseKeyedProcessFunction<String, CrawlStateUr
             emitUrlFromFetchQueue(ctx);
             
             // And re-register the timer
-            ctx.timerService().registerProcessingTimeTimer(timestamp + 100);
+            long nextTime = timestamp + 100;
+            LOGGER.debug("Resetting timer for domain {} at {}", ctx.getCurrentKey(), nextTime);
+            ctx.timerService().registerProcessingTimeTimer(nextTime);
         } else {
             LOGGER.info("Terminating timer for domain {}", ctx.getCurrentKey());
         }

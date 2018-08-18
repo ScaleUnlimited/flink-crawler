@@ -67,7 +67,7 @@ public class FetchQueue implements Serializable {
         }
     }
 
-    private void addToQueue(CrawlStateUrl url) {
+    protected void addToQueue(CrawlStateUrl url) {
         // We need to make a copy of this, so that if/when we change it,
         // we're not also accidentally changing our state value.
         CrawlStateUrl urlToQueue = new CrawlStateUrl();
