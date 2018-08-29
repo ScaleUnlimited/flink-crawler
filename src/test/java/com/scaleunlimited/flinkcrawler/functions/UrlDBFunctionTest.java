@@ -1,7 +1,6 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.net.MalformedURLException;
@@ -38,8 +37,7 @@ import com.scaleunlimited.flinkcrawler.utils.FlinkUtils;
 public class UrlDBFunctionTest {
     static final Logger LOGGER = LoggerFactory.getLogger(UrlDBFunctionTest.class);
 
-//    private static final int NUM_INPUT_URLS = 50;
-    private static final int NUM_INPUT_URLS = 5;
+    private static final int NUM_INPUT_URLS = 50;
     private static final int MAX_PARALLELISM = 10;
     private static final long MAX_URL_PROCESS_TIME = 100L;
 
@@ -69,25 +67,30 @@ public class UrlDBFunctionTest {
         // via the side channel as (UNFETCHED->FETCHING) CrawlStateUrls.
         addProcessingTime(MAX_URL_PROCESS_TIME);
         
-        // Grab the status update (UNFETCHED->FETCHING) CrawlStateUrls from the side channel
-        // and feed them back into processUrls()
+        // Grab the status update (UNFETCHED->FETCHING) CrawlStateUrls from the side channel,
+        // make sure they refer to the same set of input URLs, and feed them back into processUrls()
+        // to force UrlDBFunction to update their states in the URL DB.
         List<CrawlStateUrl> fetchingUrls = getStatusUpdateUrls(0);
         checkFetchingUrls(inputUrls, fetchingUrls);
         processUrls(fetchingUrls);
         
-        // Grab the FetchUrls from the main output, build FETCHED CrawlStateUrls from them
-        // and feed them back into processUrls()
+        // Ensure that UrlDBFunction outputs the same set of FetchUrls as a result.
+        // Pretend to fetch the URLs by building FETCHED CrawlStateUrls from them 
+        // and feeding those back into processUrls() to update their states in the URL DB.
         List<FetchUrl> outputUrls = getOutputUrls(0);
+        checkOutputUrls(inputUrls, outputUrls);
         List<CrawlStateUrl> fetchedUrls = makeFetchedUrls(outputUrls);
         processUrls(fetchedUrls);
         
-        // Make sure there's no more records in either the side channel or the main output
+        // UrlDBFunction should not output any additional URLs or generate any side channel
+        // status updates as a result, so those Tuple lists should not have increased in size.
         assertEquals(fetchingUrls.size(), getStatusUpdateUrls(0).size());
         assertEquals(outputUrls.size(), getOutputUrls(0).size());
         
-        // TODO These expectations currently fail, since Timers don't
-        // seem to be included in the snapshot, at least the one produced by
-        // the test harness.
+        // Note: Our test harness employs a ReFetchingQueue that re-fetches any URLs in the DB
+        // that haven't been fetched since the queue was constructed (along with the harness).
+        // Therefore, constructing the (2-subtask) harness from the saved state of the (1-subtask)
+        // harness should force all of the URLs in the DB to get fetched again.
         
         LOGGER.info("Stop and then restart with parallelism of 2");
         OperatorSubtaskState savedState = _testHarnesses[0].snapshot(0L, 0L);
@@ -104,21 +107,25 @@ public class UrlDBFunctionTest {
         // via the side channel as (UNFETCHED->FETCHING) CrawlStateUrls.
         addProcessingTime(MAX_URL_PROCESS_TIME);
         
-        // Grab the status update (UNFETCHED->FETCHING) CrawlStateUrls from the side channel
-        // and feed them back into processUrls()
+        // Grab the status update (UNFETCHED->FETCHING) CrawlStateUrls from the side channel,
+        // make sure they refer to the same set of input URLs, and feed them back into processUrls()
+        // to force UrlDBFunction to update their states in the URL DB.
         fetchingUrls = getStatusUpdateUrls(0);
         fetchingUrls.addAll(getStatusUpdateUrls(1));
         checkFetchingUrls(inputUrls, fetchingUrls);
         processUrls(fetchingUrls);
         
-        // Grab the FetchUrls from the main output, build FETCHED CrawlStateUrls from them
-        // and feed them back into processUrls()
+        // Ensure that UrlDBFunction outputs the same set of FetchUrls as a result.
+        // Pretend to fetch the URLs by building FETCHED CrawlStateUrls from them 
+        // and feeding those back into processUrls() to update their states in the URL DB.
         outputUrls = getOutputUrls(0);
         outputUrls.addAll(getOutputUrls(1));
+        checkOutputUrls(inputUrls, outputUrls);
         fetchedUrls = makeFetchedUrls(outputUrls);
         processUrls(fetchedUrls);
         
-        // Make sure there's no more records in either the side channel or the main output
+        // UrlDBFunction should not output any additional URLs or generate any side channel
+        // status updates as a result, so those Tuple lists should not have increased in size.
         assertEquals(fetchingUrls.size(), (getStatusUpdateUrls(0).size() + getStatusUpdateUrls(1).size()));
         assertEquals(outputUrls.size(), (getOutputUrls(0).size() + getOutputUrls(1).size()));
         
@@ -126,6 +133,124 @@ public class UrlDBFunctionTest {
         _terminator.terminate();
         closeTestHarnesses();
     }
+    
+    /**
+     * @return UNFETCHED CrawlStateUrl Tuples to feed into UrlDBFunction
+     * @throws MalformedURLException
+     */
+    private ArrayList<CrawlStateUrl> makeInputUrls() throws MalformedURLException {
+        return makeInputUrls(1);
+    }
+    
+    private ArrayList<CrawlStateUrl> makeInputUrls(int pageIndex) throws MalformedURLException {
+        ArrayList<CrawlStateUrl> result = new ArrayList<CrawlStateUrl>();
+        for (int i = 0; i < NUM_INPUT_URLS; i++) {
+            String urlString = String.format("https://domain-%d.com/page%d", i, pageIndex);
+            CrawlStateUrl url = new CrawlStateUrl(new RawUrl(urlString));
+            result.add(url);
+        }
+        return result;
+    }
+
+    /**
+     * @param urls to partition and send to the appropriate instance of UrlDBFunction
+     * via that partition's test harness
+     * @throws Exception
+     */
+    private void processUrls(List<CrawlStateUrl> urls) throws Exception {
+        int parallelism = _testHarnesses.length;
+        for (CrawlStateUrl url : urls) {
+            String key = _pldKeySelector.getKey(url);
+            int subTaskIndex = FlinkUtils.getOperatorIndexForKey(key, MAX_PARALLELISM, parallelism);
+            _testHarnesses[subTaskIndex].processElement(new StreamRecord<>(url));
+        }
+    }
+
+    /**
+     * @param outputUrls from main output of UrlDBFunction that it wants to be fetched
+     * @return FETCHED CrawlStateUrl Tuples that would result from such fetching
+     */
+    private List<CrawlStateUrl> makeFetchedUrls(List<FetchUrl> outputUrls) {
+        List<CrawlStateUrl> result = new ArrayList<CrawlStateUrl>();
+        for (FetchUrl outputUrl : outputUrls) {
+            FetchResultUrl fetchedUrl = new FetchResultUrl(outputUrl, FetchStatus.FETCHED, System.currentTimeMillis());
+            result.add(new CrawlStateUrl(fetchedUrl));
+        }
+        return result;
+    }
+
+    /**
+     * Ensure that each URL in <code>inputUrls</code> resulted in exactly one UNFETCHED->FETCHING
+     * status update
+     * @param inputUrls that were fed into (all partitions of) UrlDBFunction
+     * @param fetchingUrls that (all partitions of) UrlDBFunction sent to its side channel
+     */
+    private void checkFetchingUrls(List<CrawlStateUrl> inputUrls, List<CrawlStateUrl> fetchingUrls) {
+        assertEquals(inputUrls.size(), fetchingUrls.size());
+        Set<String> expectedUrlStrings = new HashSet<String>();
+        for (CrawlStateUrl inputUrl : inputUrls) {
+            expectedUrlStrings.add(inputUrl.getUrl());
+        }
+        for (CrawlStateUrl fetchingUrl : fetchingUrls) {
+            assertTrue(expectedUrlStrings.remove(fetchingUrl.getUrl()));
+            assertEquals(FetchStatus.FETCHING, fetchingUrl.getStatus());
+        }
+    }
+
+    /**
+     * Ensure that each URL in <code>inputUrls</code> resulted in exactly one FetchUrl output
+     * @param inputUrls that were fed into (all partitions of) UrlDBFunction
+     * @param fetchingUrls that (all partitions of) UrlDBFunction sent to its side channel
+     */
+    private void checkOutputUrls(List<CrawlStateUrl> inputUrls, List<FetchUrl> outputUrls) {
+        assertEquals(inputUrls.size(), outputUrls.size());
+        Set<String> expectedUrlStrings = new HashSet<String>();
+        for (CrawlStateUrl inputUrl : inputUrls) {
+            expectedUrlStrings.add(inputUrl.getUrl());
+        }
+        for (FetchUrl outputUrl : outputUrls) {
+            assertTrue(expectedUrlStrings.remove(outputUrl.getUrl()));
+        }
+    }
+
+    /**
+     * @param subTaskIndex of test harness partition
+     * @return All CrawlStateUrl Tuples that the <code>subTaskIndex</code> instance of
+     * UrlDBFunction sent to its side channel since its test harness was constructed
+     */
+    private List<CrawlStateUrl> getStatusUpdateUrls(int subTaskIndex) {
+        ConcurrentLinkedQueue<StreamRecord<CrawlStateUrl>> recordQueue =
+            _testHarnesses[subTaskIndex].getSideOutput(UrlDBFunction.STATUS_OUTPUT_TAG);
+        Iterator<StreamRecord<CrawlStateUrl>> iterator = recordQueue.iterator();
+        List<CrawlStateUrl> result = new ArrayList<CrawlStateUrl>();
+        while (iterator.hasNext()) {
+            CrawlStateUrl url = iterator.next().getValue();
+            result.add(url);
+        }
+        return result;
+    }
+    
+    /**
+     * @param subTaskIndex of test harness partition
+     * @return All FetchUrl Tuples that the <code>subTaskIndex</code> instance of
+     * UrlDBFunction has output since its test harness was constructed
+     */
+    @SuppressWarnings("unchecked")
+    private List<FetchUrl> getOutputUrls(int subTaskIndex) {
+        ConcurrentLinkedQueue<Object> recordQueue =
+            _testHarnesses[subTaskIndex].getOutput();
+        List<FetchUrl> result = new ArrayList<FetchUrl>();
+        Iterator<Object> iterator = recordQueue.iterator();
+        while (iterator.hasNext()) {
+            StreamRecord<FetchUrl> streamRecord = 
+                (StreamRecord<FetchUrl>)(iterator.next());
+            FetchUrl url = streamRecord.getValue();
+            result.add(url);
+        }
+        return result;
+    }
+    
+    // Methods to manipulate the processing time on which our timers are based
     
     private void setProcessingTime(long newTime) throws Exception {
         for (int subTaskIndex = 0; subTaskIndex < _testHarnesses.length; subTaskIndex++) {
@@ -146,99 +271,8 @@ public class UrlDBFunctionTest {
         }
     }
     
-    private List<CrawlStateUrl> makeFetchedUrls(List<FetchUrl> outputUrls) {
-        List<CrawlStateUrl> result = new ArrayList<CrawlStateUrl>();
-        for (FetchUrl outputUrl : outputUrls) {
-            FetchResultUrl fetchedUrl = new FetchResultUrl(outputUrl, FetchStatus.FETCHED, System.currentTimeMillis());
-            result.add(new CrawlStateUrl(fetchedUrl));
-        }
-        return result;
-    }
-
-    private void checkFetchingUrls(List<CrawlStateUrl> inputUrls, List<CrawlStateUrl> fetchingUrls) {
-        assertEquals(inputUrls.size(), fetchingUrls.size());
-        Set<String> expectedUrlStrings = new HashSet<String>();
-        for (CrawlStateUrl inputUrl : inputUrls) {
-            expectedUrlStrings.add(inputUrl.getUrl());
-        }
-        for (CrawlStateUrl fetchingUrl : fetchingUrls) {
-            assertTrue(expectedUrlStrings.remove(fetchingUrl.getUrl()));
-            assertEquals(FetchStatus.FETCHING, fetchingUrl.getStatus());
-        }
-    }
-
-    @SuppressWarnings("unused")
-    private void checkNoOverlap(List<CrawlStateUrl> outputDomains0,
-                                List<CrawlStateUrl> outputDomains1, 
-                                List<CrawlStateUrl> inputUrls) {
-        for (CrawlStateUrl outputDomain : outputDomains0) {
-            String domainString = outputDomain.getPld();
-            for (CrawlStateUrl otherDomain : outputDomains1) {
-                assertFalse(domainString.equals(otherDomain.getPld()));
-            }
-            for (CrawlStateUrl inputUrl : inputUrls) {
-                String inputDomainString = inputUrl.getPld();
-                if (domainString.equals(inputDomainString)) {
-                    inputUrls.remove(inputUrl);
-                    break;
-                }
-            }
-        }
-    }
-
-    private List<CrawlStateUrl> getStatusUpdateUrls(int subTaskIndex) {
-        ConcurrentLinkedQueue<StreamRecord<CrawlStateUrl>> recordQueue =
-            _testHarnesses[subTaskIndex].getSideOutput(UrlDBFunction.STATUS_OUTPUT_TAG);
-        Iterator<StreamRecord<CrawlStateUrl>> iterator = recordQueue.iterator();
-        List<CrawlStateUrl> result = new ArrayList<CrawlStateUrl>();
-        while (iterator.hasNext()) {
-            CrawlStateUrl url = iterator.next().getValue();
-            result.add(url);
-        }
-        return result;
-    }
+    // Methods to manipulate the test harness in which UrlDBFunction executes
     
-    @SuppressWarnings("unchecked")
-    private List<FetchUrl> getOutputUrls(int subTaskIndex) {
-        
-        // TODO I'm not sure what Objects the iterator of the harness returns,
-        // StreamRecord<FetchUrl>? FetchUrl? something else?
-        ConcurrentLinkedQueue<Object> recordQueue =
-            _testHarnesses[subTaskIndex].getOutput();
-        List<FetchUrl> result = new ArrayList<FetchUrl>();
-        Iterator<Object> iterator = recordQueue.iterator();
-        while (iterator.hasNext()) {
-            StreamRecord<FetchUrl> streamRecord = 
-                (StreamRecord<FetchUrl>)(iterator.next());
-            FetchUrl url = streamRecord.getValue();
-            result.add(url);
-        }
-        return result;
-    }
-    
-    private ArrayList<CrawlStateUrl> makeInputUrls() throws MalformedURLException {
-        return makeInputUrls(1);
-    }
-    
-    private ArrayList<CrawlStateUrl> makeInputUrls(int pageIndex) throws MalformedURLException {
-        ArrayList<CrawlStateUrl> result = new ArrayList<CrawlStateUrl>();
-        for (int i = 0; i < NUM_INPUT_URLS; i++) {
-            String urlString = String.format("https://domain-%d.com/page%d", i, pageIndex);
-            CrawlStateUrl url = new CrawlStateUrl(new RawUrl(urlString));
-            result.add(url);
-        }
-        return result;
-    }
-
-    private void processUrls(List<CrawlStateUrl> urls) throws Exception {
-        int parallelism = _testHarnesses.length;
-        for (CrawlStateUrl url : urls) {
-            String key = _pldKeySelector.getKey(url);
-            int subTaskIndex = FlinkUtils.getOperatorIndexForKey(key, MAX_PARALLELISM, parallelism);
-            _testHarnesses[subTaskIndex].processElement(new StreamRecord<>(url));
-        }
-    }
-
     private OneInputStreamOperatorTestHarness<CrawlStateUrl, FetchUrl>[] makeTestHarnesses(
         int parallelism, 
         OperatorSubtaskState savedState)
@@ -255,12 +289,6 @@ public class UrlDBFunctionTest {
         return result;
     }
     
-    private void closeTestHarnesses() throws Exception {
-        for (OneInputStreamOperatorTestHarness<CrawlStateUrl, FetchUrl> harness : _testHarnesses) {
-            harness.close();
-        }
-    }
-
     private OneInputStreamOperatorTestHarness<CrawlStateUrl, FetchUrl> makeTestHarness(
         int parallelism, 
         int subTaskIndex, 
@@ -288,6 +316,12 @@ public class UrlDBFunctionTest {
         return result;
     }
     
+    private void closeTestHarnesses() throws Exception {
+        for (OneInputStreamOperatorTestHarness<CrawlStateUrl, FetchUrl> harness : _testHarnesses) {
+            harness.close();
+        }
+    }
+
     /**
      * A FetchQueue that will just go ahead and re-fetch any URL
      * that hasn't been fetched since the queue was opened.
