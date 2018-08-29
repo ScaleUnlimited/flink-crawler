@@ -10,6 +10,7 @@ import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.streaming.api.functions.source.RichSourceFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,7 +28,7 @@ import com.scaleunlimited.flinkcrawler.utils.S3Utils;
  *
  */
 @SuppressWarnings("serial")
-public class SeedUrlSource extends BaseUrlSource {
+public class SeedUrlSource extends RichSourceFunction<RawUrl> {
     static final Logger LOGGER = LoggerFactory.getLogger(SeedUrlSource.class);
 
     private CrawlTerminator _terminator;
