@@ -14,10 +14,9 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.runtime.checkpoint.OperatorSubtaskState;
 import org.apache.flink.runtime.state.memory.MemoryStateBackend;
-import org.apache.flink.streaming.api.operators.KeyedProcessOperator;
+import org.apache.flink.streaming.api.operators.co.KeyedCoProcessOperator;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
-import org.apache.flink.streaming.util.KeyedOneInputStreamOperatorTestHarness;
-import org.apache.flink.streaming.util.OneInputStreamOperatorTestHarness;
+import org.apache.flink.streaming.util.KeyedTwoInputStreamOperatorTestHarness;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -25,6 +24,7 @@ import org.slf4j.LoggerFactory;
 
 import com.scaleunlimited.flinkcrawler.config.CrawlTerminator;
 import com.scaleunlimited.flinkcrawler.pojos.CrawlStateUrl;
+import com.scaleunlimited.flinkcrawler.pojos.DomainScore;
 import com.scaleunlimited.flinkcrawler.pojos.FetchResultUrl;
 import com.scaleunlimited.flinkcrawler.pojos.FetchStatus;
 import com.scaleunlimited.flinkcrawler.pojos.FetchUrl;
@@ -39,15 +39,16 @@ public class UrlDBFunctionTest {
 
     private static final int NUM_INPUT_URLS = 50;
     private static final int MAX_PARALLELISM = 10;
-    private static final long MAX_URL_PROCESS_TIME = 100L;
 
     ManualCrawlTerminator _terminator;
     PldKeySelector<CrawlStateUrl> _pldKeySelector;
-    OneInputStreamOperatorTestHarness<CrawlStateUrl, FetchUrl> _testHarnesses[];
+    DomainScoreKeySelector _domainScoreKeySelector;
+    KeyedTwoInputStreamOperatorTestHarness<String, CrawlStateUrl, DomainScore, FetchUrl> _testHarnesses[];
 
     @Before
     public void setUp() throws Exception {
         _pldKeySelector = new PldKeySelector<CrawlStateUrl>();
+        _domainScoreKeySelector = new DomainScoreKeySelector();
     }    
     
     @Test
@@ -65,7 +66,7 @@ public class UrlDBFunctionTest {
         // Ensure that timerService has had enough time to call UrlDBFunction.onTimer()
         // enough times that all URLs get added to the fetch queue and then emitted
         // via the side channel as (UNFETCHED->FETCHING) CrawlStateUrls.
-        addProcessingTime(MAX_URL_PROCESS_TIME);
+        addProcessingTime(UrlDBFunction.MAX_DOMAIN_CHECK_INTERVAL);
         
         // Grab the status update (UNFETCHED->FETCHING) CrawlStateUrls from the side channel,
         // make sure they refer to the same set of input URLs, and feed them back into processUrls()
@@ -105,7 +106,7 @@ public class UrlDBFunctionTest {
         // Ensure that timerService has had enough time to call UrlDBFunction.onTimer()
         // enough times that all URLs get added to the fetch queue and then emitted
         // via the side channel as (UNFETCHED->FETCHING) CrawlStateUrls.
-        addProcessingTime(MAX_URL_PROCESS_TIME);
+        addProcessingTime(UrlDBFunction.MAX_DOMAIN_CHECK_INTERVAL);
         
         // Grab the status update (UNFETCHED->FETCHING) CrawlStateUrls from the side channel,
         // make sure they refer to the same set of input URLs, and feed them back into processUrls()
@@ -162,7 +163,7 @@ public class UrlDBFunctionTest {
         for (CrawlStateUrl url : urls) {
             String key = _pldKeySelector.getKey(url);
             int subTaskIndex = FlinkUtils.getOperatorIndexForKey(key, MAX_PARALLELISM, parallelism);
-            _testHarnesses[subTaskIndex].processElement(new StreamRecord<>(url));
+            _testHarnesses[subTaskIndex].processElement1(new StreamRecord<>(url));
         }
     }
 
@@ -254,7 +255,7 @@ public class UrlDBFunctionTest {
     
     private void setProcessingTime(long newTime) throws Exception {
         for (int subTaskIndex = 0; subTaskIndex < _testHarnesses.length; subTaskIndex++) {
-            OneInputStreamOperatorTestHarness<CrawlStateUrl, FetchUrl> testHarness = 
+            KeyedTwoInputStreamOperatorTestHarness<String, CrawlStateUrl, DomainScore, FetchUrl> testHarness = 
                 _testHarnesses[subTaskIndex];
             LOGGER.debug("Processing time is now {} for subTask {}", newTime, subTaskIndex);
             testHarness.setProcessingTime(newTime);
@@ -263,7 +264,7 @@ public class UrlDBFunctionTest {
         
     private void addProcessingTime(long extraTime) throws Exception {
         for (int subTaskIndex = 0; subTaskIndex < _testHarnesses.length; subTaskIndex++) {
-            OneInputStreamOperatorTestHarness<CrawlStateUrl, FetchUrl> testHarness = 
+            KeyedTwoInputStreamOperatorTestHarness<String, CrawlStateUrl, DomainScore, FetchUrl> testHarness = 
                 _testHarnesses[subTaskIndex];
             long newTime = testHarness.getProcessingTime() + extraTime;
             LOGGER.debug("Processing time is now {} for subTask {}", newTime, subTaskIndex);
@@ -273,14 +274,14 @@ public class UrlDBFunctionTest {
     
     // Methods to manipulate the test harness in which UrlDBFunction executes
     
-    private OneInputStreamOperatorTestHarness<CrawlStateUrl, FetchUrl>[] makeTestHarnesses(
+    private KeyedTwoInputStreamOperatorTestHarness<String, CrawlStateUrl, DomainScore, FetchUrl>[] makeTestHarnesses(
         int parallelism, 
         OperatorSubtaskState savedState)
         throws Exception {
         
         @SuppressWarnings("unchecked")
-        OneInputStreamOperatorTestHarness<CrawlStateUrl, FetchUrl> result[] = 
-            new OneInputStreamOperatorTestHarness[parallelism];
+        KeyedTwoInputStreamOperatorTestHarness<String, CrawlStateUrl, DomainScore, FetchUrl> result[] = 
+            new KeyedTwoInputStreamOperatorTestHarness[parallelism];
         
         _terminator = new ManualCrawlTerminator();
         for (int i = 0; i < parallelism; i++) {
@@ -289,7 +290,7 @@ public class UrlDBFunctionTest {
         return result;
     }
     
-    private OneInputStreamOperatorTestHarness<CrawlStateUrl, FetchUrl> makeTestHarness(
+    private KeyedTwoInputStreamOperatorTestHarness<String, CrawlStateUrl, DomainScore, FetchUrl> makeTestHarness(
         int parallelism, 
         int subTaskIndex, 
         OperatorSubtaskState savedState)
@@ -297,12 +298,13 @@ public class UrlDBFunctionTest {
         
         BaseUrlStateMerger merger = new DefaultUrlStateMerger();
         FetchQueue fetchQueue = new ReFetchingQueue();
-        KeyedProcessOperator<String, CrawlStateUrl, FetchUrl> operator = 
-            new KeyedProcessOperator<>(new UrlDBFunction(_terminator, merger, fetchQueue));
-        OneInputStreamOperatorTestHarness<CrawlStateUrl, FetchUrl> result =
-            new KeyedOneInputStreamOperatorTestHarness<String, CrawlStateUrl, FetchUrl>(
+        KeyedCoProcessOperator<String, CrawlStateUrl, DomainScore, FetchUrl> operator = 
+            new KeyedCoProcessOperator<>(new UrlDBFunction(_terminator, merger, fetchQueue));
+        KeyedTwoInputStreamOperatorTestHarness<String, CrawlStateUrl, DomainScore, FetchUrl> result =
+            new KeyedTwoInputStreamOperatorTestHarness<>(
                     operator,
                     _pldKeySelector,
+                    _domainScoreKeySelector, 
                     BasicTypeInfo.STRING_TYPE_INFO,
                     MAX_PARALLELISM,
                     parallelism,
@@ -317,7 +319,7 @@ public class UrlDBFunctionTest {
     }
     
     private void closeTestHarnesses() throws Exception {
-        for (OneInputStreamOperatorTestHarness<CrawlStateUrl, FetchUrl> harness : _testHarnesses) {
+        for (KeyedTwoInputStreamOperatorTestHarness<String, CrawlStateUrl, DomainScore, FetchUrl> harness : _testHarnesses) {
             harness.close();
         }
     }

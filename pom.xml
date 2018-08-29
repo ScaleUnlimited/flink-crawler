@@ -20,7 +20,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
-        <flink.version>1.5.2</flink.version>
+        <flink.version>1.5.0</flink.version>
         <slf4j.version>1.7.21</slf4j.version>
         <tika.version>1.16</tika.version>
         <log4j.version>1.2.17</log4j.version>
@@ -106,6 +106,12 @@
                 <type>test-jar</type>
             </dependency>
 
+            <dependency>
+                <groupId>org.apache.flink</groupId>
+                <artifactId>flink-hadoop-compatibility_${scala.binary.version}</artifactId>
+                <version>${flink.version}</version>
+            </dependency>
+            
             <dependency>
                 <groupId>org.slf4j</groupId>
                 <artifactId>slf4j-api</artifactId>
@@ -304,6 +310,11 @@
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-clients_${scala.binary.version}</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-hadoop-compatibility_2.11</artifactId>
         </dependency>
 
         <dependency>
