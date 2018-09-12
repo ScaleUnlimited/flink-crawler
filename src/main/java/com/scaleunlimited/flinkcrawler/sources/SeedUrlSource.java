@@ -216,7 +216,8 @@ public class SeedUrlSource extends RichSourceFunction<RawUrl> implements ListChe
                 
                 if (s3FileLineIndex++ < _urlIndex) {
                     // Skip over previously processed lines if we're restarting 
-                    // from checkpointed/saved state.
+                    // from checkpointed/saved state. So no delay is needed in
+                    // this case.
                     continue;
                 }
 
