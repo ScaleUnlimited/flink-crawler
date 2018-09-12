@@ -27,16 +27,18 @@ import com.scaleunlimited.flinkcrawler.utils.S3Utils;
 /**
  * Source for seed URLs.
  * 
- * TODO add checkpointing - see FromElementsFunction.java
- *
  */
 @SuppressWarnings("serial")
 public class SeedUrlSource extends RichSourceFunction<RawUrl> implements ListCheckpointed<Integer> {
     static final Logger LOGGER = LoggerFactory.getLogger(SeedUrlSource.class);
 
+    // Delay between calls to the collector to emit elemnts.
+    private static final long DEFAULT_COLLECTOR_DELAY = 10;
+
     private CrawlTerminator _terminator;
     private float _estimatedScore;
-
+    private long _collectorDelay = DEFAULT_COLLECTOR_DELAY;
+    
     // For when we're reading from S3
     private String _seedUrlsS3Bucket;
     private String _seedUrlsS3Path;
@@ -110,6 +112,12 @@ public class SeedUrlSource extends RichSourceFunction<RawUrl> implements ListChe
         CrawlTerminator oldTerminator = _terminator;
         _terminator = terminator;
         return oldTerminator;
+    }
+    
+    public long setCollectorDelay(long delay) {
+        long oldDelay = _collectorDelay;
+        _collectorDelay = delay;
+        return oldDelay;
     }
     
     @Override
@@ -198,7 +206,7 @@ public class SeedUrlSource extends RichSourceFunction<RawUrl> implements ListChe
             
             try {
                 // Sleep so we can be interrupted
-                Thread.sleep(10L);
+                Thread.sleep(_collectorDelay);
             } catch (InterruptedException e) {
                 _keepRunning = false;
             }
@@ -231,7 +239,7 @@ public class SeedUrlSource extends RichSourceFunction<RawUrl> implements ListChe
 
                 try {
                     // Sleep so we can be interrupted
-                    Thread.sleep(10L);
+                    Thread.sleep(_collectorDelay);
                 } catch (InterruptedException e) {
                     _keepRunning = false;
                 }
