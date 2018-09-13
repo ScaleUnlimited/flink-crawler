@@ -1,7 +1,10 @@
 package com.scaleunlimited.flinkcrawler.functions;
 
+import java.io.IOException;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.flink.api.common.functions.RuntimeContext;
@@ -52,7 +55,7 @@ public class UrlDBFunction extends BaseCoProcessFunction<CrawlStateUrl, DomainSc
 
     // Max and average time between checks for URLs to emit for a domain
     protected static final long MAX_DOMAIN_CHECK_INTERVAL = 1000;
-    private static final long AVERAGE_DOMAIN_CHECK_INTERVAL = 200;
+    protected static final long AVERAGE_DOMAIN_CHECK_INTERVAL = 200;
     
     private BaseUrlStateMerger _merger;
     private CrawlTerminator _terminator;
@@ -71,10 +74,11 @@ public class UrlDBFunction extends BaseCoProcessFunction<CrawlStateUrl, DomainSc
     private transient ValueState<Integer> _activeIndex;
     private transient ValueState<String> _pld;
     private transient MapState<Long, CrawlStateUrl> _archivedUrls;
-
+    private transient ValueState<Float> _domainScore;
+    
     private transient CrawlStateUrl _mergedUrlState;
 
-    private transient Map<String, Float> _domainScores;
+    private transient Set<String> _scoredDomains;
     private transient float _averageDomainScore;
     
     // TODO(kkrugler) remove this debugging code.
@@ -126,6 +130,12 @@ public class UrlDBFunction extends BaseCoProcessFunction<CrawlStateUrl, DomainSc
                 "pld", TypeInformation.of(new TypeHint<String>() {
                 }));
         _pld = getRuntimeContext().getState(pldDescriptor);
+        
+        // 7. Domain score for current PLD, for checkpointing.
+        ValueStateDescriptor<Float> domainScoreDescriptor = new ValueStateDescriptor<>(
+                "domain-score", TypeInformation.of(new TypeHint<Float>() {
+                }));
+        _domainScore = getRuntimeContext().getState(domainScoreDescriptor);
     }
 
     @Override
@@ -168,7 +178,8 @@ public class UrlDBFunction extends BaseCoProcessFunction<CrawlStateUrl, DomainSc
         _fetchQueue.open();
         _terminator.open();
 
-        _domainScores = new HashMap<>();
+        _scoredDomains = new HashSet<>();
+        _averageDomainScore = 0.0f;
         
         _inFlightUrls = new HashMap<>();
     }
@@ -210,9 +221,13 @@ public class UrlDBFunction extends BaseCoProcessFunction<CrawlStateUrl, DomainSc
             // properly updated)
             emitUrlFromFetchQueue(ctx);
             
+            // Update our average domain score info if needed.
+            String pld = _pld.value();
+            updateAverageDomainScore(pld);
+            
             // And re-register the timer
             long fireAt = timestamp + checkIntervalForDomain(_pld.value());
-            LOGGER.debug("Resetting timer for domain {} to fire at {}", _pld.value(), fireAt);
+            LOGGER.debug("Resetting timer for domain {} to fire at {}", pld, fireAt);
             ctx.timerService().registerProcessingTimeTimer(fireAt);
         } else {
             LOGGER.info("Terminating timer for domain {}", _pld.value());
@@ -313,9 +328,10 @@ public class UrlDBFunction extends BaseCoProcessFunction<CrawlStateUrl, DomainSc
      * 
      * @param pld
      * @return
+     * @throws IOException 
      */
-    protected long checkIntervalForDomain(String pld) {
-        Float averagePageScore = _domainScores.get(pld);
+    private long checkIntervalForDomain(String pld) throws IOException {
+        Float averagePageScore = _domainScore.value();
         if (averagePageScore == null) {
             LOGGER.debug("UrlDBFunction ({}/{}) no average page scores yet for '{}'", _partition, _parallelism, pld);
 
@@ -329,10 +345,33 @@ public class UrlDBFunction extends BaseCoProcessFunction<CrawlStateUrl, DomainSc
         domainCheckInterval = Math.min(domainCheckInterval, MAX_DOMAIN_CHECK_INTERVAL);
         domainCheckInterval = Math.max(domainCheckInterval, 1);
         
+        LOGGER.debug("UrlDBFunction ({}/{}) average page score for '{}' is {} (vs. average domain score {})", _partition, _parallelism, pld, averagePageScore, _averageDomainScore);
         LOGGER.debug("UrlDBFunction ({}/{}) returning {}ms between URL checks for '{}'", _partition, _parallelism, domainCheckInterval, pld);
         return domainCheckInterval;
     }
 
+    /**
+     * See if this is a PLD that we don't have in our set of "known"
+     * PLDs for average domain score, and process if so.
+     * 
+     * @param pld
+     * @throws IOException 
+     */
+    private void updateAverageDomainScore(String pld) throws IOException {
+        if (!_scoredDomains.contains(pld)) {
+            Float score = _domainScore.value();
+            
+            // We might not have received a score (via processElement2()) yet for this
+            // PLD. If that's the case, there's nothing to update.
+            if (score != null) {
+                float summedScores = _averageDomainScore * _scoredDomains.size();
+                summedScores += score;
+                _scoredDomains.add(pld);
+                _averageDomainScore = summedScores / _scoredDomains.size();
+            }
+        }
+    }
+    
     /**
      * See if there's a URL in the fetch queue that we should emit (via side output, so that
      * it loops around to the UrlDBFunction to update the status).
@@ -509,27 +548,36 @@ public class UrlDBFunction extends BaseCoProcessFunction<CrawlStateUrl, DomainSc
         }
     }
 
-    /* (non-Javadoc)
-     * @see org.apache.flink.streaming.api.functions.co.CoProcessFunction#processElement2(IN2, org.apache.flink.streaming.api.functions.co.CoProcessFunction.Context, org.apache.flink.util.Collector)
+    /*
+     * (non-Javadoc)
+     * 
+     * @see org.apache.flink.streaming.api.functions.co.CoProcessFunction#processElement2(IN2,
+     * org.apache.flink.streaming.api.functions.co.CoProcessFunction.Context, org.apache.flink.util.Collector)
      * 
      * When we get a domain score, just update our internal state, and never emit anything.
      */
     @Override
     public void processElement2(DomainScore domainScore, Context context, Collector<FetchUrl> out)
             throws Exception {
+        
         // Ensure we don't wind up with DBZ problems.
         float score = Math.max(0.01f, domainScore.getScore());
+        String pld = domainScore.getPld();
         LOGGER.debug("UrlDBFunction ({}/{}) setting '{}' average score to {}",
-                _partition, _parallelism, domainScore.getPld(), score);
-
-        float summedScores = _averageDomainScore * _domainScores.size();
-        if (_domainScores.containsKey(domainScore.getPld())) {
-            summedScores -= _domainScores.get(domainScore.getPld());
+                _partition, _parallelism, pld, score);
+        
+        // At this point we might be seeing this PLD for the first time, or we might have seen
+        // it before in this method, or we might have seen it via the onTimer call. So it may 
+        // or may not have any state set up, and it may or may not be in _domainScores (non-state)
+        float summedScores = _averageDomainScore * _scoredDomains.size();
+        if (_scoredDomains.contains(pld)) {
+            summedScores -= _domainScore.value();
         }
         
-        _domainScores.put(domainScore.getPld(), score);
+        _domainScore.update(score);
+        _scoredDomains.add(pld);
         summedScores += score;
-        _averageDomainScore = summedScores / _domainScores.size();
+        _averageDomainScore = summedScores / _scoredDomains.size();
     }
 
 
