@@ -23,10 +23,7 @@ import org.apache.flink.streaming.api.datastream.KeyedStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.datastream.SplitStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
-import org.apache.flink.streaming.api.windowing.assigners.GlobalWindows;
-import org.apache.flink.streaming.api.windowing.triggers.CountTrigger;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
@@ -38,7 +35,7 @@ import com.scaleunlimited.flinkcrawler.functions.CheckUrlWithRobotsFunction;
 import com.scaleunlimited.flinkcrawler.functions.DomainScoreKeySelector;
 import com.scaleunlimited.flinkcrawler.functions.FetchUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.LengthenUrlsFunction;
-import com.scaleunlimited.flinkcrawler.functions.MovingAverageAggregator;
+import com.scaleunlimited.flinkcrawler.functions.MovingAverageFunction;
 import com.scaleunlimited.flinkcrawler.functions.NormalizeUrlsFunction;
 import com.scaleunlimited.flinkcrawler.functions.OutlinkToStateUrlFunction;
 import com.scaleunlimited.flinkcrawler.functions.ParseFunction;
@@ -440,9 +437,7 @@ public class CrawlTopologyBuilder {
         // so that's why setParallelism(1).
         DataStream<DomainScore> domainScores = parsedUrls.getSideOutput(ParseFunction.SCORE_OUTPUT_TAG)
             .keyBy(new DomainScoreKeySelector())
-            .window(GlobalWindows.create())
-            .trigger(CountTrigger.of(1))
-            .aggregate(new MovingAverageAggregator(10))
+            .map(new MovingAverageFunction(10))
             .setParallelism(1);
         domainScoresIter.closeWith(domainScores);
         
