@@ -54,8 +54,8 @@ public class UrlDBFunction extends BaseCoProcessFunction<CrawlStateUrl, DomainSc
     private static final int MAX_IN_FLIGHT_URLS = 100;
 
     // Max and average time between checks for URLs to emit for a domain
-    private static final long MAX_DOMAIN_CHECK_INTERVAL = 1000;
-    private static final long AVERAGE_DOMAIN_CHECK_INTERVAL = 200;
+    protected static final long MAX_DOMAIN_CHECK_INTERVAL = 1000;
+    protected static final long AVERAGE_DOMAIN_CHECK_INTERVAL = 200;
     
     private BaseUrlStateMerger _merger;
     private CrawlTerminator _terminator;
@@ -199,8 +199,9 @@ public class UrlDBFunction extends BaseCoProcessFunction<CrawlStateUrl, DomainSc
             _pld.update(url.getPld());
             
             // And we want to create a timer, so we have one per domain
-            ctx.timerService().registerProcessingTimeTimer(processingTime + 100);
-            LOGGER.debug("Adding timer for domain {}", url.getPld());
+            long nextTime = processingTime + 100;
+            LOGGER.debug("Adding timer for domain {} at {}", url.getPld(), nextTime);
+            ctx.timerService().registerProcessingTimeTimer(nextTime);
         }
 
         // Now update state for this URL, and potentially emit it if status is 'fetching'.
@@ -225,7 +226,8 @@ public class UrlDBFunction extends BaseCoProcessFunction<CrawlStateUrl, DomainSc
             updateAverageDomainScore(pld);
             
             // And re-register the timer
-            long fireAt = timestamp + checkIntervalForDomain(pld, _numActiveUrls.value());
+            long fireAt = timestamp + checkIntervalForDomain(_pld.value());
+            LOGGER.debug("Resetting timer for domain {} to fire at {}", pld, fireAt);
             ctx.timerService().registerProcessingTimeTimer(fireAt);
         } else {
             LOGGER.info("Terminating timer for domain {}", _pld.value());
@@ -328,7 +330,7 @@ public class UrlDBFunction extends BaseCoProcessFunction<CrawlStateUrl, DomainSc
      * @return
      * @throws IOException 
      */
-    private long checkIntervalForDomain(String pld, Integer numActive) throws IOException {
+    private long checkIntervalForDomain(String pld) throws IOException {
         Float averagePageScore = _domainScore.value();
         if (averagePageScore == null) {
             LOGGER.debug("UrlDBFunction ({}/{}) no average page scores yet for '{}'", _partition, _parallelism, pld);
@@ -343,6 +345,7 @@ public class UrlDBFunction extends BaseCoProcessFunction<CrawlStateUrl, DomainSc
         domainCheckInterval = Math.min(domainCheckInterval, MAX_DOMAIN_CHECK_INTERVAL);
         domainCheckInterval = Math.max(domainCheckInterval, 1);
         
+        LOGGER.debug("UrlDBFunction ({}/{}) average page score for '{}' is {} (vs. average domain score {})", _partition, _parallelism, pld, averagePageScore, _averageDomainScore);
         LOGGER.debug("UrlDBFunction ({}/{}) returning {}ms between URL checks for '{}'", _partition, _parallelism, domainCheckInterval, pld);
         return domainCheckInterval;
     }

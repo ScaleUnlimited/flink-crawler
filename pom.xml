@@ -80,13 +80,36 @@
 
             <dependency>
                 <groupId>org.apache.flink</groupId>
+                <artifactId>flink-streaming-java_${scala.binary.version}</artifactId>
+                <version>${flink.version}</version>
+                <scope>test</scope>
+                <type>test-jar</type>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.flink</groupId>
                 <artifactId>flink-clients_${scala.binary.version}</artifactId>
                 <version>${flink.version}</version>
             </dependency>
 
             <dependency>
                 <groupId>org.apache.flink</groupId>
-                <artifactId>flink-hadoop-compatibility_2.11</artifactId>
+                <artifactId>flink-test-utils-junit</artifactId>
+                <version>${flink.version}</version>
+                <scope>test</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.flink</groupId>
+                <artifactId>flink-runtime_${scala.binary.version}</artifactId>
+                <version>${flink.version}</version>
+                <scope>test</scope>
+                <type>test-jar</type>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.flink</groupId>
+                <artifactId>flink-hadoop-compatibility_${scala.binary.version}</artifactId>
                 <version>${flink.version}</version>
             </dependency>
             
@@ -460,6 +483,26 @@
             <scope>test</scope>
         </dependency>
 
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-test-utils-junit</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-runtime_${scala.binary.version}</artifactId>
+            <scope>test</scope>
+            <type>test-jar</type>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-streaming-java_${scala.binary.version}</artifactId>
+            <scope>test</scope>
+            <type>test-jar</type>
+        </dependency>
+
         <!-- TODO decide if we want to switch to Java 8, so we can use flinkspector. <dependency> <groupId>org.flinkspector</groupId> 
             <artifactId>flinkspector-dataset_${scala.binary.version}</artifactId> <version>0.4</version> <scope>test</scope> 
             </dependency> <dependency> <groupId>org.flinkspector</groupId> <artifactId>flinkspector-datastream_${scala.binary.version}</artifactId> 
@@ -677,7 +720,7 @@
                 <version>2.19.1</version>
 
                 <configuration>
-                    <argLine>-Xms1g -Xmx1g -XX:PermSize=1g -XX:MaxPermSize=1g</argLine>
+                    <argLine>-Xms1g -Xmx1g</argLine>
                     <systemProperties>
                         <property>
                             <name>log4j.configuration</name>
