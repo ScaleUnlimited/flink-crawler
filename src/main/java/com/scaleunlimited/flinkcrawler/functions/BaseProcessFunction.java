@@ -11,25 +11,23 @@ import com.scaleunlimited.flinkcrawler.utils.UrlLogger;
 public abstract class BaseProcessFunction<IN, OUT> extends ProcessFunction<IN, OUT> {
 
     protected transient int _parallelism;
-    protected transient int _operatorIndex;
-    protected transient int _maxParallelism;
-    
+    protected transient int _partition;
+
     @Override
     public void open(Configuration parameters) throws Exception {
         super.open(parameters);
 
         RuntimeContext context = getRuntimeContext();
         _parallelism = context.getNumberOfParallelSubtasks();
-        _operatorIndex = context.getIndexOfThisSubtask() + 1;
-        _maxParallelism = context.getMaxNumberOfParallelSubtasks();
+        _partition = context.getIndexOfThisSubtask() + 1;
     }
 
     protected void record(Class<?> clazz, BaseUrl url, String... metaData) {
-        UrlLogger.record(clazz, _operatorIndex, _parallelism, url, metaData);
+        UrlLogger.record(clazz, _partition, _parallelism, url, metaData);
     }
 
     protected void record(Class<?> clazz, BaseUrl url) {
-        UrlLogger.record(clazz, _operatorIndex, _parallelism, url);
+        UrlLogger.record(clazz, _partition, _parallelism, url);
     }
 
 }
