@@ -57,13 +57,13 @@ public class CounterUtils {
     }
 
     /**
-     * Convert an Enum to the counter portion of its name.
+     * Convert an Enum to the "pretty version" of the counter portion of its name.
      *
      * @param e
      * @return
      */
     public static String enumToCounter(Enum<?> e) {
-        return e.name();
+        return e.toString();
     }
 
     public static String mergeGroupCounter(String group, String counter) {
