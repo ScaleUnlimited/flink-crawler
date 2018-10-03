@@ -14,7 +14,7 @@ public class CrawlToolIT {
         options.setCommonCrawlCacheDir("./target/test/CrawlToolTest/cc-cache/");
         options.setForceCrawlDelay(0L);
         options.setMaxContentSize(100000);
-        options.setOutputFile("./target/test/CrawlToolIT/output/cc-farsi-content.txt");
+        options.setWARCContentPath("./target/test/CrawlToolIT/output/cc-farsi-content.txt");
         options.setMaxCrawlDuration(20);
         options.setTimeout(10);
         

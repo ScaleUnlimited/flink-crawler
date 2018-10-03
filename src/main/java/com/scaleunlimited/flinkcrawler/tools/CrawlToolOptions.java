@@ -18,7 +18,8 @@ public class CrawlToolOptions {
     private int _maxContentSize = SimpleHttpFetcher.DEFAULT_MAX_CONTENT_SIZE;
     private int _fetchersPerTask = 1;
     private int _parallelism = CrawlTopologyBuilder.DEFAULT_PARALLELISM;
-    private String _outputFile = null;
+    private String _warcContentPathString = null;
+    private String _textContentPathString = null;
     private boolean _htmlOnly = false;
     private boolean _noLengthen = false;
     private String _checkpointDir = null;
@@ -101,9 +102,14 @@ public class CrawlToolOptions {
         _parallelism = parallelism;
     }
 
-    @Option(name = "-outputfile", usage = "Local file to store fetched content (testing only)", required = false)
-    public void setOutputFile(String outputFile) {
-        _outputFile = outputFile;
+    @Option(name = "-warccontentpath", usage = "WARC path to store fetched content", required = false)
+    public void setWARCContentPath(String pathString) {
+        _warcContentPathString = pathString;
+    }
+
+    @Option(name = "-textcontentfile", usage = "Local text file to store fetched content (testing only)", required = false)
+    public void setTextContentPath(String pathString) {
+        _textContentPathString = pathString;
     }
 
     @Option(name = "-checkpointdir", usage = "URI to directory to store checkpoint (enables checkpointing)", required = false)
@@ -208,9 +214,14 @@ public class CrawlToolOptions {
         return _parallelism;
     }
 
-    public String getOutputFile() {
+    public String getWARCContentPathString() {
         validate();
-        return _outputFile;
+        return _warcContentPathString;
+    }
+
+    public String getTextContentPathString() {
+        validate();
+        return _textContentPathString;
     }
 
     public String getCheckpointDir() {

@@ -23,6 +23,7 @@ import org.apache.flink.streaming.api.datastream.KeyedStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.datastream.SplitStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.streaming.api.functions.sink.SinkFunction;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.NullWritable;
@@ -101,10 +102,8 @@ public class CrawlTopologyBuilder {
     private SimpleRobotRulesParser _robotsParser = new SimpleRobotRulesParser();
 
     private BaseUrlLengthener _urlLengthener = new SimpleUrlLengthener(INVALID_USER_AGENT, 1);
-    private SinkFunction<Tuple2<NullWritable, WARCWritable>> _contentSink;
-    private String _contentFilePathString;
-    private SinkFunction<String> _contentTextSink;
-    private String _contentTextFilePathString;
+    private String _warcContentPathString;
+    private String _textContentPathString;
     private BaseUrlNormalizer _urlNormalizer = new SimpleUrlNormalizer();
     private BaseUrlValidator _urlFilter = new SimpleUrlValidator();
     private BaseHttpFetcherBuilder _pageFetcherBuilder = new SimpleHttpFetcherBuilder(1,
@@ -207,33 +206,13 @@ public class CrawlTopologyBuilder {
         return this;
     }
 
-    public CrawlTopologyBuilder setContentSink(SinkFunction<Tuple2<NullWritable, WARCWritable>> contentSink) {
-        _contentSink = contentSink;
+    public CrawlTopologyBuilder setWARCContentPath(String pathString) {
+        _warcContentPathString = pathString;
         return this;
     }
 
-    public CrawlTopologyBuilder setContentFile(String filePathString) {
-        if (_contentSink != null) {
-            throw new IllegalArgumentException("already have a content sink");
-        }
-        _contentFilePathString = filePathString;
-        return this;
-    }
-
-
-    public CrawlTopologyBuilder setContentTextSink(SinkFunction<String> contentTextSink) {
-        if (_contentTextFilePathString != null) {
-            throw new IllegalArgumentException("already have a content text file path");
-        }
-        _contentTextSink = contentTextSink;
-        return this;
-    }
-
-    public CrawlTopologyBuilder setContentTextFile(String filePathString) {
-        if (_contentTextSink != null) {
-            throw new IllegalArgumentException("already have a content text sink");
-        }
-        _contentTextFilePathString = filePathString;
+    public CrawlTopologyBuilder setTextContentPath(String pathString) {
+        _textContentPathString = pathString;
         return this;
     }
 
@@ -413,13 +392,15 @@ public class CrawlTopologyBuilder {
                 .name("Create WARC writable");
         
         DataStreamSink<Tuple2<NullWritable, WARCWritable>> contentSinkUsingOutputFormat = null;
-        if (_contentSink != null) {
-            contentSinkUsingOutputFormat = warcStream.addSink(_contentSink);
-        } else {
+        if (_warcContentPathString != null) {
             Job job = Job.getInstance();
-            WARCOutputFormat.setOutputPath(job, new Path(_contentFilePathString));
+            WARCOutputFormat.setOutputPath(job, new Path(_warcContentPathString));
             HadoopOutputFormat<NullWritable, WARCWritable> hadoopOutputFormat = new HadoopOutputFormat<NullWritable, WARCWritable>(new WARCOutputFormat(), job);
             contentSinkUsingOutputFormat = warcStream.writeUsingOutputFormat(hadoopOutputFormat);
+        } else {
+            SinkFunction<Tuple2<NullWritable, WARCWritable>> discardingSink = 
+                    new DiscardingSink<Tuple2<NullWritable, WARCWritable>>();
+            contentSinkUsingOutputFormat = warcStream.addSink(discardingSink);
         }
 
         contentSinkUsingOutputFormat
@@ -472,10 +453,8 @@ public class CrawlTopologyBuilder {
                 .setParallelism(parseParallelism);
 
         DataStreamSink<String> contentTextSink;
-        if (_contentTextSink != null) {
-            contentTextSink = contentText.addSink(_contentTextSink);
-        } else if (_contentTextFilePathString != null) {
-            contentTextSink = contentText.writeAsText(_contentTextFilePathString, WriteMode.OVERWRITE);
+        if (_textContentPathString != null) {
+            contentTextSink = contentText.writeAsText(_textContentPathString, WriteMode.OVERWRITE);
         } else {
             contentTextSink = contentText.print();
         }

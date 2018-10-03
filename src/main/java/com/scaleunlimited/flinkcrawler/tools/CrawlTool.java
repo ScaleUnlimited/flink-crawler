@@ -114,8 +114,8 @@ public class CrawlTool {
                 .setIterationTimeout(options.getIterationTimeoutSec() * 1000L)
                 .setMaxOutlinksPerPage(options.getMaxOutlinksPerPage());
 
-        if (options.getOutputFile() != null) {
-            builder.setContentTextFile(options.getOutputFile());
+        if (options.getTextContentPathString() != null) {
+            builder.setTextContentPath(options.getTextContentPathString());
         }
 
         builder.build().execute();
