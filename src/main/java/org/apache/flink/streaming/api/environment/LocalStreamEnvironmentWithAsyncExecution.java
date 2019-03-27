@@ -56,8 +56,7 @@ public class LocalStreamEnvironmentWithAsyncExecution extends LocalStreamEnviron
         Configuration configuration = new Configuration();
         configuration.addAll(jobGraph.getJobConfiguration());
 
-        configuration.setLong(TaskManagerOptions.MANAGED_MEMORY_SIZE, -1L);
-        configuration.setInteger(ConfigConstants.TASK_MANAGER_NUM_TASK_SLOTS,
+        configuration.setInteger(TaskManagerOptions.NUM_TASK_SLOTS,
                 jobGraph.getMaximumParallelism());
 
         // add (and override) the settings with what the user defined
@@ -91,8 +90,7 @@ public class LocalStreamEnvironmentWithAsyncExecution extends LocalStreamEnviron
         Configuration configuration = new Configuration();
         configuration.addAll(jobGraph.getJobConfiguration());
 
-        configuration.setLong(TaskManagerOptions.MANAGED_MEMORY_SIZE, -1L);
-        configuration.setInteger(ConfigConstants.TASK_MANAGER_NUM_TASK_SLOTS,
+        configuration.setInteger(TaskManagerOptions.NUM_TASK_SLOTS,
                 jobGraph.getMaximumParallelism());
 
         // add (and override) the settings with what the user defined
