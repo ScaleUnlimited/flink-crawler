@@ -20,14 +20,13 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
-        <flink.version>1.5.0</flink.version>
+        <flink.version>1.7.2</flink.version>
         <slf4j.version>1.7.21</slf4j.version>
         <tika.version>1.16</tika.version>
         <log4j.version>1.2.17</log4j.version>
         <crawlercommons.version>0.10</crawlercommons.version>
         <http-fetcher.version>0.1-SNAPSHOT</http-fetcher.version>
         <aws-java-sdk.version>1.11.226</aws-java-sdk.version>
-
         <javac.src.version>1.8</javac.src.version>
         <javac.target.version>1.8</javac.target.version>
         <scala.binary.version>2.11</scala.binary.version>
@@ -113,6 +112,13 @@
                 <version>${flink.version}</version>
             </dependency>
             
+            <dependency>
+                <groupId>org.apache.flink</groupId>
+                <artifactId>flink-shaded-hadoop2</artifactId>
+                <version>${flink.version}</version>
+                <scope>provided</scope>
+            </dependency>
+
             <dependency>
                 <groupId>org.slf4j</groupId>
                 <artifactId>slf4j-api</artifactId>
@@ -316,6 +322,11 @@
         <dependency>
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-hadoop-compatibility_${scala.binary.version}</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-shaded-hadoop2</artifactId>
         </dependency>
 
         <dependency>
